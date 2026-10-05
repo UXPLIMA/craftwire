@@ -3,6 +3,7 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import type { AgentKind, AgentServer } from "../agents.js";
 import type { AuditLog } from "../audit.js";
+import type { ServerManager } from "../dev/server-manager.js";
 import { CraftwireError, toToolError } from "../errors.js";
 import type { OperationTracker } from "../operations.js";
 
@@ -10,6 +11,7 @@ export interface ToolContext {
   agents: AgentServer;
   ops: OperationTracker;
   audit: AuditLog;
+  servers: ServerManager;
 }
 
 export const targetArgs = {
