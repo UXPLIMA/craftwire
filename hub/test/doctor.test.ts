@@ -3,6 +3,7 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { WebSocketServer } from "ws";
 import { AgentServer } from "../src/agents.js";
 import { writeHubConfig } from "../src/config.js";
 import { type Check, formatChecks, runDoctor } from "../src/doctor.js";
@@ -48,6 +49,19 @@ describe("craftwire doctor", () => {
     });
     writeHubConfig({ port, token: TOKEN }, h);
     expect(find(await runDoctor({ home: h, javaMajor: java25 }), "no hub answers")?.status).toBe("warn");
+  });
+
+  it("recognises a hub older than 0.3.0, which closes unknown first messages with 4003", async () => {
+    const wss = new WebSocketServer({ host: "127.0.0.1", port: 0 });
+    await new Promise((r) => wss.once("listening", r));
+    wss.on("connection", (s) => s.once("message", () => s.close(4003, "first message must be hello")));
+    try {
+      const h = home();
+      writeHubConfig({ port: (wss.address() as { port: number }).port, token: TOKEN }, h);
+      expect(find(await runDoctor({ home: h, javaMajor: java25 }), "older than 0.3.0")).toMatchObject({ status: "warn", fix: expect.stringContaining("Restart Claude Code") });
+    } finally {
+      await new Promise((r) => wss.close(r));
+    }
   });
 
   it("fails on an old Node and warns on an old Java", async () => {

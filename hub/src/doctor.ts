@@ -12,12 +12,16 @@ export interface Check {
   fix?: string;
 }
 
+const OLD_HUB = "OLD_HUB";
+
 /** Asks a running hub for its status over the agent WebSocket (token from hub.json). */
 export function hubStatus(port: number, token: string, timeoutMs = 3000): Promise<HubStatus> {
   return new Promise((resolve, reject) => {
     const socket = new WebSocket(`ws://127.0.0.1:${port}/`);
     const timer = setTimeout(() => { socket.terminate(); reject(new Error("no answer")); }, timeoutMs);
     socket.once("error", (e) => { clearTimeout(timer); reject(e); });
+    // Hubs before 0.3.0 only accept hello and close anything else with 4003.
+    socket.once("close", (code) => { clearTimeout(timer); reject(new Error(code === 4003 ? OLD_HUB : "closed")); });
     socket.once("open", () => socket.send(JSON.stringify({ jsonrpc: "2.0", id: 0, method: "status", params: { token } })));
     socket.once("message", (raw) => {
       clearTimeout(timer);
@@ -56,8 +60,12 @@ export async function runDoctor(o: DoctorOptions): Promise<Check[]> {
     checks.push({ status: "ok", label: `hub.json: port ${cfg.port}` });
     try {
       checks.push(...hubChecks(await hubStatus(cfg.port, cfg.token)));
-    } catch {
-      checks.push({ status: "warn", label: `no hub answers on 127.0.0.1:${cfg.port}`, fix: "The hub runs inside Claude Code: open Claude Code with the craftwire plugin enabled (check /mcp)." });
+    } catch (e) {
+      if ((e as Error).message === OLD_HUB) {
+        checks.push({ status: "warn", label: `a hub older than 0.3.0 is running on 127.0.0.1:${cfg.port}`, fix: `Restart Claude Code (or the process running the hub) so it uses craftwire ${HUB_VERSION}.` });
+      } else {
+        checks.push({ status: "warn", label: `no hub answers on 127.0.0.1:${cfg.port}`, fix: "The hub runs inside Claude Code: open Claude Code with the craftwire plugin enabled (check /mcp)." });
+      }
     }
   }
 
