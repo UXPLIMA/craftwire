@@ -3,6 +3,7 @@ package com.uxplima.craftwire.fabric.handlers;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.uxplima.craftwire.core.AgentError;
+import com.uxplima.craftwire.fabric.CaptureFaults;
 import com.uxplima.craftwire.fabric.ClientScheduler;
 import com.uxplima.craftwire.fabric.CraftwireAgent;
 import com.uxplima.craftwire.fabric.Params;
@@ -19,6 +20,9 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Base64;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageWriteParam;
@@ -83,7 +87,7 @@ final class ScreenshotHandler {
                             agent.setCaptureInProgress(false);
                             return Boolean.TRUE;
                         }).thenApply(done -> {
-                            if (err != null) throw new java.util.concurrent.CompletionException(err);
+                            if (err != null) throw new CompletionException(err instanceof CompletionException && err.getCause() != null ? err.getCause() : err);
                             return file;
                         }))
                         .thenCompose(f -> f))
@@ -92,6 +96,11 @@ final class ScreenshotHandler {
 
     private static CompletableFuture<Path> grab(ClientScheduler s) {
         CompletableFuture<Path> out = new CompletableFuture<>();
+        long timeout = CaptureFaults.grabTimeoutMillis;
+        if (CaptureFaults.stallNextGrab) {
+            CaptureFaults.stallNextGrab = false;
+            return withTimeout(out, timeout);
+        }
         s.call(() -> {
             Minecraft mc = Minecraft.getInstance();
             Screenshot.takeScreenshot(mc.gameRenderer.mainRenderTarget(), image -> {
@@ -110,7 +119,19 @@ final class ScreenshotHandler {
             out.completeExceptionally(e);
             return Boolean.FALSE;
         });
-        return out;
+        return withTimeout(out, timeout);
+    }
+
+    // The GPU readback may never call back (e.g. a minimised window); without a deadline the HUD would stay hidden.
+    private static CompletableFuture<Path> withTimeout(CompletableFuture<Path> grab, long timeoutMillis) {
+        return grab.orTimeout(timeoutMillis, TimeUnit.MILLISECONDS).exceptionally(e -> {
+            Throwable cause = e instanceof CompletionException && e.getCause() != null ? e.getCause() : e;
+            if (cause instanceof TimeoutException) {
+                throw new AgentError("SCREENSHOT_FAILED", "The frame was not captured within " + timeoutMillis + " ms.",
+                        "Make sure the Minecraft window is not minimised, then retry.");
+            }
+            throw cause instanceof RuntimeException r ? r : new CompletionException(cause);
+        });
     }
 
     private static JsonElement encode(Path file, int maxSize, String savePath, String format) {

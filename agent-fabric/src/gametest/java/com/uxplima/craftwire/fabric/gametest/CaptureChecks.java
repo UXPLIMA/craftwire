@@ -38,6 +38,14 @@ final class CaptureChecks {
         Calls.error(ctx, "screenshot", "{\"hud\":false,\"savePath\":\"" + bad + "\"}");
         check(!Calls.call(ctx, "hud.read", "{}").getAsJsonObject().get("hidden").getAsBoolean(), "HUD restored after failure");
         check(!CraftwireClient.agent().isCaptureInProgress(), "capture flag cleared after failure");
+        // A frame grab that never completes (e.g. minimised window) times out and still restores state.
+        com.uxplima.craftwire.fabric.CaptureFaults.grabTimeoutMillis = 300;
+        com.uxplima.craftwire.fabric.CaptureFaults.stallNextGrab = true;
+        var stalled = Calls.error(ctx, "screenshot", "{\"hud\":false}");
+        com.uxplima.craftwire.fabric.CaptureFaults.grabTimeoutMillis = 10_000;
+        check("SCREENSHOT_FAILED".equals(stalled.code()), "stalled grab code: " + stalled.code());
+        check(!Calls.call(ctx, "hud.read", "{}").getAsJsonObject().get("hidden").getAsBoolean(), "HUD restored after stalled grab");
+        check(!CraftwireClient.agent().isCaptureInProgress(), "capture flag cleared after stalled grab");
         Calls.call(ctx, "gui.action", "{\"action\":\"close\"}");
 
         // Camera override moves only the render camera.
