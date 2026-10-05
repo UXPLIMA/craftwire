@@ -15,3 +15,10 @@ describe("errors", () => {
     expect(body(toToolError("weird"))).toMatchObject({ code: "INTERNAL", message: "weird" });
   });
 });
+
+describe("error details", () => {
+  it("carries structured details into the tool error", () => {
+    const err = new CraftwireError("BUILD_FAILED", "Build failed", "Fix it", { errors: [{ file: "A.java", line: 3 }] });
+    expect(body(toToolError(err))).toEqual({ code: "BUILD_FAILED", message: "Build failed", hint: "Fix it", details: { errors: [{ file: "A.java", line: 3 }] } });
+  });
+});

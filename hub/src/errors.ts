@@ -5,15 +5,17 @@ export class CraftwireError extends Error {
     readonly code: string,
     message: string,
     readonly hint?: string,
+    readonly details?: Record<string, unknown>,
   ) {
     super(message);
     this.name = "CraftwireError";
   }
 
-  toJSON(): { code: string; message: string; hint?: string } {
-    return this.hint === undefined
-      ? { code: this.code, message: this.message }
-      : { code: this.code, message: this.message, hint: this.hint };
+  toJSON(): { code: string; message: string; hint?: string; details?: Record<string, unknown> } {
+    const out: { code: string; message: string; hint?: string; details?: Record<string, unknown> } = { code: this.code, message: this.message };
+    if (this.hint !== undefined) out.hint = this.hint;
+    if (this.details !== undefined) out.details = this.details;
+    return out;
   }
 }
 
