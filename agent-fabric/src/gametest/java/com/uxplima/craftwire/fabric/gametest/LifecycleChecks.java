@@ -31,5 +31,17 @@ final class LifecycleChecks {
         ctx.getInput().pressKey(GLFW.GLFW_KEY_F8);
         ctx.waitTicks(2);
         check(!agent.dispatcher().isPaused(), "second F8 should resume");
+
+        // F8 must also work while a menu is open; that is where the AI spends most of its time.
+        ctx.setScreen(() -> new net.minecraft.client.gui.screens.inventory.InventoryScreen(net.minecraft.client.Minecraft.getInstance().player));
+        ctx.waitTicks(2);
+        ctx.getInput().pressKey(GLFW.GLFW_KEY_F8);
+        ctx.waitTicks(2);
+        check(agent.dispatcher().isPaused(), "F8 should pause while a screen is open");
+        ctx.getInput().pressKey(GLFW.GLFW_KEY_F8);
+        ctx.waitTicks(2);
+        check(!agent.dispatcher().isPaused(), "F8 should resume while a screen is open");
+        ctx.setScreen(() -> null);
+        ctx.waitTicks(2);
     }
 }
