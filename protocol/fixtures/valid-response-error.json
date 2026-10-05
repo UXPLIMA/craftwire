@@ -1,0 +1,1 @@
+{"jsonrpc":"2.0","id":8,"error":{"code":-32000,"message":"No screen is open","data":{"code":"NO_SCREEN_OPEN","hint":"Open a menu first, e.g. chat {action:\"command\", text:\"/builders crew\"}."}}}

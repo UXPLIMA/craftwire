@@ -1,0 +1,1 @@
+{"jsonrpc":"2.0","method":"event","params":{"type":"chat","time":1759670000000,"data":{"text":"<Sirac> hello","kind":"chat","sender":"Sirac"}}}
