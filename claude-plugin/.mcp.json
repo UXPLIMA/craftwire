@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "craftwire": {
+      "command": "npx",
+      "args": ["-y", "craftwire@0.1.0"]
+    }
+  }
+}

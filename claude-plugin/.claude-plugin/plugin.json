@@ -1,0 +1,9 @@
+{
+  "name": "craftwire",
+  "version": "0.1.0",
+  "description": "Craftwire by UXPLIMA: let Claude see and drive Minecraft (screenshots, camera, GUIs, chat, input) through the Craftwire Agent mod.",
+  "author": { "name": "UXPLIMA" },
+  "license": "MIT",
+  "repository": "https://github.com/uxplima/craftwire",
+  "keywords": ["minecraft", "fabric", "paper", "mcp"]
+}

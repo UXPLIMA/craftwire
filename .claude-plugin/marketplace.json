@@ -1,0 +1,17 @@
+{
+  "name": "uxplima",
+  "owner": {
+    "name": "UXPLIMA"
+  },
+  "metadata": {
+    "description": "UXPLIMA's Claude Code plugins for Minecraft development."
+  },
+  "plugins": [
+    {
+      "name": "craftwire",
+      "source": "./claude-plugin",
+      "description": "See and drive Minecraft from Claude Code: screenshots, camera, GUIs, chat, input.",
+      "version": "0.1.0"
+    }
+  ]
+}
