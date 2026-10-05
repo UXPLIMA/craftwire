@@ -1,5 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { deploy } from "../dev/deploy.js";
 import { definedOnly } from "../dev/server-manager.js";
 import { defineTool, ok, type ToolContext } from "./registry.js";
 
@@ -29,4 +30,20 @@ export function registerDevTools(server: McpServer, ctx: ToolContext): void {
           return ok(await c.servers.restart({ ...launch, serverDir: a.serverDir, timeoutMs: a.timeoutMs, takeOver: a.takeOver }));
       }
     });
+
+  defineTool(server, ctx, "plugin_deploy",
+    "Build a Paper plugin project (Gradle wrapper `build -x test` or Maven `package -DskipTests`, auto-detected) or take a ready jar, install it into the server's plugins/ (older jars of the same plugin move to plugins/.craftwire-backup/), restart the server (starting it if it is down) and report `loaded` (enabled, version) plus `problems` (its WARN/ERROR log lines). A failed build returns BUILD_FAILED with details.errors as file:line. restart:false on a running server stages the jar in plugins/update/ for the next start.",
+    {
+      projectDir: z.string().optional().describe("Plugin project root to build."),
+      jar: z.string().optional().describe("A ready plugin jar to install instead of building."),
+      buildCommand: z.string().optional().describe("Shell command run in projectDir instead of the detected build, e.g. 'gradlew.bat shadowJar'."),
+      jarGlob: z.string().optional().describe("Which built jar, relative to projectDir, e.g. 'build/libs/*-all.jar'. Needed when several plugins are built."),
+      javaHome: z.string().optional().describe("JAVA_HOME for the build."),
+      serverDir: z.string().optional().describe("Server folder. Optional when only one server is known."),
+      restart: z.boolean().default(true),
+      takeOver: z.boolean().default(false).describe("Allow stopping a server that was started outside Craftwire (ask the user first)."),
+      buildTimeoutMs: z.number().int().min(10_000).max(1_800_000).default(600_000),
+      timeoutMs: z.number().int().min(1000).max(900_000).default(300_000).describe("How long the restart waits for the server."),
+    },
+    async (a, c) => ok(await deploy(a, c.servers, c.agents)));
 }

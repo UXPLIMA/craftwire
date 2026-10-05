@@ -31,7 +31,7 @@ describe("craftwire CLI over stdio", () => {
     const names = (await client.listTools()).tools.map((t) => t.name).sort();
     expect(names).toEqual([
       "camera", "chat", "client_settings", "get_request_status", "gui_action", "gui_read",
-      "hud_read", "input", "list_instances", "logs", "player_state", "plugin_manage", "screenshot",
+      "hud_read", "input", "list_instances", "logs", "player_state", "plugin_deploy", "plugin_manage", "screenshot",
       "server_command", "server_eval", "server_info", "server_process", "wait_for", "world_edit", "world_query",
     ]);
   });

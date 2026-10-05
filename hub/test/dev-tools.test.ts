@@ -1,6 +1,12 @@
+import { spawn } from "node:child_process";
+import { existsSync, mkdirSync, mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { waitUntil } from "../src/dev/server-manager.js";
 import { json, startHub } from "./helpers/hub.js";
-import { fakeLaunch, makeServerDir } from "./helpers/servers.js";
+import { FAKE_PAPER, fakeLaunch, makeServerDir } from "./helpers/servers.js";
+import { makeZip } from "./helpers/zip.js";
 
 let hub: Awaited<ReturnType<typeof startHub>> | undefined;
 afterEach(async () => {
@@ -33,5 +39,58 @@ describe("server_process", () => {
     hub = await startHub({ javaMajor: 25 });
     const r = await hub.call("server_process", { action: "start", serverDir: makeServerDir({ eula: false }), ...fakeLaunch("ok") });
     expect(json(r)).toMatchObject({ code: "EULA_NOT_ACCEPTED", hint: expect.stringContaining("never accepts") });
+  });
+});
+
+describe("plugin_deploy", () => {
+  const NODE = `"${process.execPath}"`;
+  const pluginJar = (dir: string, file: string, name: string) => {
+    mkdirSync(dir, { recursive: true });
+    return makeZip(join(dir, file), { "plugin.yml": `name: ${name}\nversion: 1.0\n` });
+  };
+
+  it("installs a ready jar, restarts the server and reports the plugin enabled", async () => {
+    hub = await startHub({ writeHubJson: true, javaMajor: 25, agentWaitMs: 2000 });
+    const dir = makeServerDir({ craftwire: true });
+    await hub.call("server_process", { action: "start", serverDir: dir, ...fakeLaunch("agent") });
+    const first = json(await hub.call("plugin_deploy", { jar: pluginJar(mkdtempSync(join(tmpdir(), "cw-j-")), "demo-1.0.jar", "Demo") }));
+    expect(first).toMatchObject({ plugin: { name: "Demo" }, restarted: true, server: { state: "running", agent: "server-2" }, loaded: { enabled: true } });
+    const second = json(await hub.call("plugin_deploy", { jar: pluginJar(mkdtempSync(join(tmpdir(), "cw-j-")), "demo-1.1.jar", "Demo") }));
+    expect(second.install.replaced).toEqual([join(dir, "plugins", "demo-1.0.jar")]);
+    expect(existsSync(join(dir, "plugins", ".craftwire-backup", "demo-1.0.jar"))).toBe(true);
+  });
+
+  it("builds a project, then finds and installs its jar", async () => {
+    hub = await startHub({ writeHubJson: true, javaMajor: 25, agentWaitMs: 2000 });
+    const dir = makeServerDir({ craftwire: true });
+    await hub.call("server_process", { action: "start", serverDir: dir, ...fakeLaunch("agent") });
+    const project = mkdtempSync(join(tmpdir(), "cw-proj-"));
+    pluginJar(join(project, "build", "libs"), "built-1.0.jar", "Built");
+    const r = json(await hub.call("plugin_deploy", { projectDir: project, buildCommand: `${NODE} -e "process.exit(0)"` }));
+    expect(r).toMatchObject({ plugin: { name: "Built" }, build: { command: expect.stringContaining("process.exit(0)") }, loaded: { enabled: true } });
+  });
+
+  it("returns parsed compiler errors when the build fails", async () => {
+    hub = await startHub({ javaMajor: 25 });
+    const r = await hub.call("plugin_deploy", {
+      projectDir: mkdtempSync(join(tmpdir(), "cw-proj-")), serverDir: makeServerDir(),
+      buildCommand: `${NODE} -e "console.log('/p/src/Foo.java:7: error: boom'); process.exit(1)"`,
+    });
+    expect(json(r)).toMatchObject({ code: "BUILD_FAILED", details: { exitCode: 1, errors: [{ file: "/p/src/Foo.java", line: 7, message: "boom" }] } });
+  });
+
+  it("refuses to restart a server it did not start before running the build", async () => {
+    hub = await startHub({ writeHubJson: true, javaMajor: 25 });
+    const dir = makeServerDir();
+    const child = spawn(process.execPath, [FAKE_PAPER, "--mode=agent"], { cwd: dir, env: { ...process.env, CRAFTWIRE_HOME: hub.home }, stdio: "pipe" });
+    try {
+      await waitUntil(() => hub!.agents.instances().length === 1, 5000);
+      const project = mkdtempSync(join(tmpdir(), "cw-proj-"));
+      const r = await hub.call("plugin_deploy", { projectDir: project, buildCommand: `${NODE} -e "require('fs').writeFileSync('built.txt', '')"` });
+      expect(json(r).code).toBe("NOT_MANAGED");
+      expect(existsSync(join(project, "built.txt"))).toBe(false);
+    } finally {
+      child.kill();
+    }
   });
 });

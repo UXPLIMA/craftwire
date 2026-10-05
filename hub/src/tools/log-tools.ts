@@ -4,7 +4,7 @@ import type { AgentEvent } from "../protocol.js";
 import { defineTool, ok, type ToolContext } from "./registry.js";
 
 const LEVELS = ["TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL"] as const;
-const rank = (level: string) => {
+export const rank = (level: string) => {
   const i = LEVELS.indexOf(level as (typeof LEVELS)[number]);
   return i === -1 ? 2 : i;
 };
