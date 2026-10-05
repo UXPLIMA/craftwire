@@ -186,9 +186,29 @@ export class AgentServer extends EventEmitter {
       if (!hit) throw new CraftwireError("NO_INSTANCE", `No ${kind} instance matches "${selector}"`, "Call list_instances to see connected instances.");
       return hit;
     }
-    if (ofKind.length === 0) throw new CraftwireError("NO_INSTANCE", `No ${label} is connected`, `Start Minecraft with the Craftwire ${kind === "client" ? "Agent mod" : "plugin"} installed; it connects automatically.`);
+    if (ofKind.length === 0) {
+      throw new CraftwireError("NO_INSTANCE", `No ${label} is connected`, kind === "client"
+        ? "Start Minecraft with the Craftwire Agent mod installed; it connects automatically."
+        : "Start the Paper server with the Craftwire plugin installed; it connects automatically.");
+    }
     if (ofKind.length > 1) throw new CraftwireError("AMBIGUOUS_INSTANCE", `${ofKind.length} ${kind} instances are connected`, `Pass instance: one of ${ofKind.map((i) => `${i.id} (${i.name})`).join(", ")}.`);
     return ofKind[0]!;
+  }
+
+  /** Any instance: by selector, else the only server, else the only instance. */
+  resolveAny(selector?: string): InstanceInfo {
+    const all = this.instances();
+    if (selector) {
+      const s = selector.toLowerCase();
+      const hit = all.find((i) => i.id === selector) ?? all.find((i) => i.name.toLowerCase() === s);
+      if (!hit) throw new CraftwireError("NO_INSTANCE", `No instance matches "${selector}"`, "Call list_instances to see connected instances.");
+      return hit;
+    }
+    const servers = all.filter((i) => i.kind === "server");
+    if (servers.length === 1) return servers[0]!;
+    if (all.length === 1) return all[0]!;
+    if (all.length === 0) throw new CraftwireError("NO_INSTANCE", "Nothing is connected", "Start a Paper server with the Craftwire plugin, or Minecraft with the Craftwire Agent mod.");
+    throw new CraftwireError("AMBIGUOUS_INSTANCE", `${all.length} instances are connected`, `Pass instance: one of ${all.map((i) => `${i.id} (${i.name})`).join(", ")}.`);
   }
 
   request(instanceId: string, method: string, params: Record<string, unknown>, timeoutMs?: number): Promise<unknown> {

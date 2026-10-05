@@ -3,19 +3,12 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { CraftwireError } from "../errors.js";
-import { defineTool, ok, targetArgs, type ToolContext } from "./registry.js";
+import { defineTool, forward, ok, targetArgs, type ToolContext } from "./registry.js";
 
 const vec3 = { x: z.number(), y: z.number(), z: z.number() };
 
-async function forward(c: ToolContext, method: string, args: Record<string, unknown>, timeoutMs?: number): Promise<unknown> {
-  const { instance, operationId, ...params } = args as { instance?: string; operationId?: string } & Record<string, unknown>;
-  const inst = c.agents.resolve("client", instance);
-  const payload = operationId ? { ...params, operationId } : params;
-  return c.ops.run(operationId, () => c.agents.request(inst.id, method, payload, timeoutMs));
-}
-
 const fwd = (method: string, timeoutMs?: number) => async (args: Record<string, unknown>, c: ToolContext) =>
-  ok(await forward(c, method, args, timeoutMs));
+  ok(await forward(c, "client", method, args, timeoutMs));
 
 export function registerClientTools(server: McpServer, ctx: ToolContext): void {
   defineTool(server, ctx, "player_state",
@@ -88,7 +81,7 @@ export function registerClientTools(server: McpServer, ctx: ToolContext): void {
     },
     async (args, c): Promise<CallToolResult> => {
       const withAbsPath = args.savePath ? { ...args, savePath: resolvePath(args.savePath) } : args;
-      const r = (await forward(c, "screenshot", withAbsPath, 20_000)) as {
+      const r = (await forward(c, "client", "screenshot", withAbsPath, 20_000)) as {
         mime: string; data: string; width: number; height: number; fullWidth: number; fullHeight: number; savedPath?: string;
       };
       const meta = { width: r.width, height: r.height, fullWidth: r.fullWidth, fullHeight: r.fullHeight, savedPath: r.savedPath };
@@ -118,6 +111,6 @@ export function registerClientTools(server: McpServer, ctx: ToolContext): void {
         return ok({ messages });
       }
       if (!args.text) throw new CraftwireError("INVALID_PARAMS", "`text` is required for send/command", "Pass text, e.g. {action:'command', text:'/time set noon'}.");
-      return ok(await forward(c, "chat.send", { instance: args.instance, operationId: args.operationId, text: args.text, command: args.action === "command" }));
+      return ok(await forward(c, "client", "chat.send", { instance: args.instance, operationId: args.operationId, text: args.text, command: args.action === "command" }));
     });
 }

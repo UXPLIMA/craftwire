@@ -1,0 +1,1 @@
+{"jsonrpc":"2.0","method":"event","params":{"type":"log","time":1759670000000,"data":{"level":"INFO","logger":"net.minecraft.server.MinecraftServer","thread":"Server thread","message":"Done (4.500s)! For help, type \"help\""}}}

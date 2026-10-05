@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
-import type { AgentServer } from "../agents.js";
+import type { AgentKind, AgentServer } from "../agents.js";
 import type { AuditLog } from "../audit.js";
 import { CraftwireError, toToolError } from "../errors.js";
 import type { OperationTracker } from "../operations.js";
@@ -42,4 +42,12 @@ export function defineTool<S extends z.ZodRawShape>(
   };
   // The SDK's generic overloads do not infer through our wrapper; the shape is still validated by the SDK.
   server.registerTool(name, { description, inputSchema: shape }, handler as never);
+}
+
+/** Routes a tool call to one agent of `kind`; `instance` picks it, `operationId` makes retries idempotent. */
+export async function forward(c: ToolContext, kind: AgentKind, method: string, args: Record<string, unknown>, timeoutMs?: number): Promise<unknown> {
+  const { instance, operationId, ...params } = args as { instance?: string; operationId?: string } & Record<string, unknown>;
+  const inst = c.agents.resolve(kind, instance);
+  const payload = operationId ? { ...params, operationId } : params;
+  return c.ops.run(operationId, () => c.agents.request(inst.id, method, payload, timeoutMs));
 }
