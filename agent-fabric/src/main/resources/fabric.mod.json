@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "craftwire-agent",
+  "version": "${version}",
+  "name": "Craftwire Agent",
+  "description": "Lets AI agents (Claude Code and other MCP clients) see and drive Minecraft through the Craftwire hub. Press F8 to pause AI control.",
+  "authors": ["UXPLIMA"],
+  "contact": { "sources": "https://github.com/uxplima/craftwire" },
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "client": ["com.uxplima.craftwire.fabric.CraftwireClient"]
+  },
+  "mixins": ["craftwire-agent.mixins.json"],
+  "depends": {
+    "fabricloader": ">=0.19.5",
+    "minecraft": "~26.2",
+    "java": ">=25",
+    "fabric-api": "*"
+  }
+}

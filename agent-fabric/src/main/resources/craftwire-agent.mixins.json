@@ -1,0 +1,8 @@
+{
+  "required": true,
+  "package": "com.uxplima.craftwire.fabric.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "client": [],
+  "injectors": { "defaultRequire": 1 },
+  "overwrites": { "requireAnnotations": true }
+}

@@ -7,4 +7,4 @@ pluginManagement {
 }
 
 rootProject.name = 'craftwire'
-include 'agent-core'
+include 'agent-core', 'agent-fabric'

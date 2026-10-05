@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "id": "craftwire-agent-gametest",
+  "version": "0.0.0",
+  "environment": "client",
+  "entrypoints": {
+    "fabric-client-gametest": ["com.uxplima.craftwire.fabric.gametest.AgentGameTests"]
+  },
+  "depends": { "craftwire-agent": "*" }
+}
