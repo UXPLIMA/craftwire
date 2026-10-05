@@ -1,0 +1,86 @@
+plugins {
+    id 'java'
+}
+
+base {
+    archivesName = 'craftwire-paper'
+}
+
+evaluationDependsOn(':agent-core')
+
+repositories {
+    maven { name = 'PaperMC'; url = 'https://repo.papermc.io/repository/maven-public/' }
+    mavenCentral()
+}
+
+sourceSets {
+    integrationTest {}
+}
+
+dependencies {
+    compileOnly "io.papermc.paper:paper-api:${paper_api_version}"
+    compileOnly "org.apache.logging.log4j:log4j-core:${log4j_version}"
+    // GraalJS comes from Paper's library loader at runtime (plugin.yml `libraries`), never from this jar.
+    compileOnly "org.graalvm.polyglot:polyglot:${graal_version}"
+    implementation project(':agent-core')
+
+    testImplementation "io.papermc.paper:paper-api:${paper_api_version}"
+    testImplementation "org.apache.logging.log4j:log4j-core:${log4j_version}"
+    testImplementation "org.graalvm.polyglot:polyglot:${graal_version}"
+    testImplementation "org.graalvm.js:js-language:${graal_version}"
+    testImplementation platform('org.junit:junit-bom:5.13.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+    integrationTestImplementation platform('org.junit:junit-bom:5.13.4')
+    integrationTestImplementation 'org.junit.jupiter:junit-jupiter'
+    integrationTestImplementation 'org.junit.platform:junit-platform-launcher'
+    integrationTestImplementation 'com.google.code.gson:gson:2.13.2'
+    integrationTestImplementation 'org.java-websocket:Java-WebSocket:1.6.0'
+}
+
+jar {
+    // agent-core is bundled as plain classes; Gson and log4j are provided by Paper.
+    dependsOn ':agent-core:classes'
+    from project(':agent-core').sourceSets.main.output
+}
+
+processResources {
+    def props = [version: project.version.toString(), graalVersion: graal_version]
+    inputs.properties props
+    filesMatching('plugin.yml') { expand props }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 25
+    options.encoding = 'UTF-8'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+tasks.register('integrationTest', Test) {
+    description = 'Runs the plugin inside a real Paper server.'
+    group = 'verification'
+    testClassesDirs = sourceSets.integrationTest.output.classesDirs
+    classpath = sourceSets.integrationTest.runtimeClasspath
+    useJUnitPlatform()
+    dependsOn tasks.named('jar')
+    def pluginJar = tasks.named('jar').flatMap { it.archiveFile }
+    def itDir = layout.buildDirectory.dir('it')
+    inputs.files(pluginJar)
+    systemProperty 'craftwire.mcVersion', minecraft_version
+    systemProperty 'craftwire.paperBuild', paper_build
+    systemProperty 'craftwire.paperSha256', paper_sha256
+    systemProperty 'craftwire.version', project.version.toString()
+    doFirst {
+        systemProperty 'craftwire.pluginJars', pluginJar.get().asFile.absolutePath
+        systemProperty 'craftwire.itDir', itDir.get().asFile.absolutePath
+    }
+    outputs.upToDateWhen { false }
+    testLogging {
+        events 'passed', 'failed'
+        exceptionFormat 'full'
+    }
+}

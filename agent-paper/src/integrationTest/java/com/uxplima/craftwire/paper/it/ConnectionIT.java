@@ -1,0 +1,48 @@
+package com.uxplima.craftwire.paper.it;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+import com.google.gson.JsonObject;
+import org.junit.jupiter.api.Test;
+
+class ConnectionIT {
+    @Test
+    void helloIdentifiesThePaperAgent() throws Exception {
+        JsonObject h = ItEnv.get().hello;
+        assertEquals("server", h.get("agentKind").getAsString());
+        assertEquals(1, h.get("protocolVersion").getAsInt());
+        assertEquals("26.2", h.get("mcVersion").getAsString());
+        assertEquals("server", h.get("instanceName").getAsString());
+        assertEquals(System.getProperty("craftwire.version"), h.get("agentVersion").getAsString());
+    }
+
+    @Test
+    void startupLinesAreReplayedIncludingTheProductionWarning() throws Exception {
+        ItHub hub = ItEnv.get().hub;
+        hub.awaitLog(m -> m.contains("Craftwire is active — do not run on production servers"), 10_000);
+        // Logged after onLoad but before the plugin enabled and connected: only the backlog can deliver it.
+        hub.awaitLog(m -> m.startsWith("Preparing level"), 10_000);
+    }
+
+    @Test
+    void serverInfoReportsVersionsAndPlugins() throws Exception {
+        JsonObject info = ItEnv.get().hub.result("server.info", "{}").getAsJsonObject();
+        assertEquals("26.2", info.get("minecraftVersion").getAsString());
+        assertEquals(3, info.getAsJsonArray("tps").size());
+        assertTrue(info.getAsJsonArray("plugins").toString().contains("\"name\":\"Craftwire\""), info.toString());
+        assertEquals("world", info.getAsJsonArray("worlds").get(0).getAsJsonObject().get("name").getAsString());
+    }
+
+    @Test
+    void unknownMethodsAreStructuredErrors() throws Exception {
+        assertEquals("UNKNOWN_METHOD", ItEnv.get().hub.error("no.such.method", "{}").get("code").getAsString());
+    }
+
+    @Test
+    void reconnectReplaysTheBacklogToTheNewSession() throws Exception {
+        ItHub hub = ItEnv.get().hub;
+        hub.dropConnectionAndClearEvents();
+        hub.awaitHello(30_000, () -> true);
+        hub.awaitLog(m -> m.startsWith("Done ("), 10_000);
+    }
+}

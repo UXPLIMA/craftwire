@@ -1,0 +1,13 @@
+# Craftwire lets AI agents drive this server through the craftwire hub on 127.0.0.1.
+# Development servers only: anyone who can run the hub on this machine gets full control.
+
+# Name shown in list_instances. Empty = the server folder name.
+instance-name: ""
+# server_eval: run JavaScript with full Bukkit access.
+allow-eval: true
+# world_edit: change blocks, paste structures, restore snapshots.
+allow-world-edit: true
+# bot_spawn / bot_action (milestone M4).
+allow-bots: true
+# Largest box, in blocks, that one world_edit call may change.
+max-edit-volume: 1000000
