@@ -44,7 +44,10 @@ public final class ScriptEngine implements AutoCloseable {
         try {
             Context ctx = context();
             output.take();   // drop anything printed between calls (e.g. by a scheduled callback)
-            ScheduledFuture<?> kill = watchdog.schedule(() -> ctx.close(true), timeoutMs, TimeUnit.MILLISECONDS);
+            Watch watch = new Watch();
+            ScheduledFuture<?> kill = watchdog.schedule(() -> {
+                if (watch.fire()) ctx.close(true);
+            }, timeoutMs, TimeUnit.MILLISECONDS);
             try {
                 Value value = ctx.eval(Source.newBuilder("js", code, "eval.js").buildLiteral());
                 JsonObject r = new JsonObject();
@@ -59,10 +62,30 @@ public final class ScriptEngine implements AutoCloseable {
                 throw new AgentError("EVAL_ERROR", describe(e) + printed(output.take()),
                         "Fix the script and run it again. Globals set before the error are kept.");
             } finally {
-                if (!kill.cancel(false)) context = null;   // the watchdog fired: that context is closed
+                kill.cancel(false);
+                if (watch.finish()) context = null;   // the watchdog fired: that context is (being) closed
             }
         } finally {
             thread.setContextClassLoader(previous);
+        }
+    }
+
+    /**
+     * Decides, atomically, whether the watchdog or the finished eval got there first. Checking the
+     * ScheduledFuture is not enough: cancel() still succeeds while the watchdog task is running.
+     */
+    private static final class Watch {
+        private boolean done;
+        private boolean fired;
+
+        synchronized boolean fire() {
+            if (!done) fired = true;
+            return fired;
+        }
+
+        synchronized boolean finish() {
+            done = true;
+            return fired;
         }
     }
 

@@ -101,6 +101,15 @@ class ScriptEngineTest {
     }
 
     @Test
+    void theEvalRightAfterATimeoutGetsAFreshContext() {
+        // The watchdog may still be closing the old context when the timed-out eval returns.
+        for (int i = 0; i < 20; i++) {
+            assertEquals("TIMEOUT", assertThrows(AgentError.class, () -> engine.eval("while (true) {}", 100)).code());
+            assertEquals(2, result("1 + 1").getAsInt(), "iteration " + i);
+        }
+    }
+
+    @Test
     void errorsReportLineAndColumn() {
         AgentError e = assertThrows(AgentError.class, () -> engine.eval("let a = 1;\nfoo.bar()", 5000));
         assertEquals("EVAL_ERROR", e.code());
