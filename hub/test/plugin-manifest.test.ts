@@ -25,7 +25,7 @@ describe("Claude Code plugin packaging", () => {
   });
 
   it("skills have name and description front matter", () => {
-    for (const skill of ["craftwire", "minecraft-promo-shots"]) {
+    for (const skill of ["craftwire", "minecraft-promo-shots", "paper-plugin-dev"]) {
       const text = readFileSync(join(root, "claude-plugin/skills", skill, "SKILL.md"), "utf8");
       expect(text).toMatch(new RegExp(`^---\\nname: ${skill}\\ndescription: .+\\n---`, "m"));
     }

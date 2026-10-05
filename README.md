@@ -1,6 +1,6 @@
 # Craftwire
 
-Let AI agents (Claude Code and any MCP client) **see and drive Minecraft**: screenshots, a free camera, reading and clicking GUIs, chat and commands, HUD reading and input — and **drive a Paper server**: console commands, JavaScript against the Bukkit API, world reads and edits with undo snapshots, logs and plugin control. A plugin dev loop and bots follow in the next milestones.
+Let AI agents (Claude Code and any MCP client) **see and drive Minecraft**: screenshots, a free camera, reading and clicking GUIs, chat and commands, HUD reading and input — and **drive a Paper server**: console commands, JavaScript against the Bukkit API, world reads and edits with undo snapshots, logs and plugin control. It also runs a local server and builds and redeploys your plugin in one step (dev loop). Bots follow in the next milestone.
 
 By [UXPLIMA](https://github.com/uxplima) · MIT licensed · Minecraft 26.2 (Fabric client, Paper server)
 
@@ -16,7 +16,7 @@ By [UXPLIMA](https://github.com/uxplima) · MIT licensed · Minecraft 26.2 (Fabr
 
 Ask Claude: *"take a screenshot of what I'm looking at"*.
 
-> Windows: if the MCP server does not start, edit `.mcp.json` in the plugin to use `"command": "cmd", "args": ["/c", "npx", "-y", "craftwire@0.2.0"]`.
+> Windows: if the MCP server does not start, edit `.mcp.json` in the plugin to use `"command": "cmd", "args": ["/c", "npx", "-y", "craftwire@0.3.0"]`.
 
 ## Paper server
 
@@ -28,6 +28,17 @@ Drop `craftwire-paper-<version>.jar` into the server's `plugins/` folder and sta
 
 Ask Claude: *"what's the TPS, and which plugins logged errors since startup?"*.
 
+## Dev loop
+
+Point Claude at a server folder and a plugin project:
+
+- `server_process` starts, stops and restarts a local Paper server. JVM flags come from its start script. It never accepts the EULA for you.
+- `plugin_deploy` builds the project (Gradle or Maven, tests skipped) or takes a ready jar, swaps it into `plugins/` (old jar kept in `plugins/.craftwire-backup/`), restarts the server and reports whether the plugin enabled and what it logged. Compiler errors come back as `file:line`.
+
+Ask Claude: *"build my plugin, deploy it to ~/servers/test and tell me what broke"*.
+
+Something not connecting? Run `npx craftwire doctor` (add `--server <folder>` to check a server folder too).
+
 ## How it works
 
 `craftwire` (npm) is an MCP server over stdio. It listens on `127.0.0.1` only and writes its port and a random token to `~/.craftwire/hub.json`. The mod and the plugin read that file and connect out to the hub — the game and the server open no ports. Every tool call is logged to `~/.craftwire/logs/`.
@@ -37,10 +48,12 @@ Ask Claude: *"what's the TPS, and which plugins logged errors since startup?"*.
 - Hub: `list_instances` · `wait_for` · `get_request_status` · `logs`
 - Client (M1): `screenshot` · `camera` · `gui_read` · `gui_action` · `input` · `chat` · `hud_read` · `player_state` · `client_settings`
 - Server (M2): `server_command` · `server_eval` · `world_query` · `world_edit` · `server_info` · `plugin_manage`
+- Dev loop (M3): `server_process` · `plugin_deploy` · CLI `craftwire doctor`
 
 ## Development
 
 - Hub: `cd hub && npm install && npm test`
 - Agents: `./gradlew :agent-core:test :agent-fabric:test :agent-fabric:runClientGameTest`
 - Paper plugin: `./gradlew :agent-paper:test :agent-paper:integrationTest` (downloads Paper 26.2 and runs the plugin in a real server)
+- Dev-loop E2E (real Paper server): `./gradlew :agent-paper:build :test-fixtures:build`, then `cd hub && npm run test:e2e`
 - Dev client with the mod: `./gradlew :agent-fabric:runClient`

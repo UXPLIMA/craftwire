@@ -1,6 +1,6 @@
 ---
 name: craftwire
-description: Use when driving Minecraft or a Paper server through the craftwire MCP tools (screenshot, camera, gui_*, input, chat, server_command, server_eval, world_query, world_edit, logs, wait_for) — covers the reliable order of calls, menus, server scripting, safe world edits and recovering from errors.
+description: Use when driving Minecraft or a Paper server through the craftwire MCP tools (screenshot, camera, gui_*, input, chat, server_command, server_eval, world_query, world_edit, logs, wait_for, server_process, plugin_deploy) — covers the reliable order of calls, menus, server scripting, safe world edits and recovering from errors.
 ---
 
 # Driving Minecraft with Craftwire
@@ -29,6 +29,11 @@ If `gui_action` returns `SLOT_OUT_OF_RANGE` or `NO_SCREEN_OPEN`, the screen chan
 - `server_eval` for anything without a command: `server`, `player(name)`, `plugin(name)`, `loc(x,y,z)`, `Java.type(...)`, `print(...)`. Scripts run on the server thread with a 5 s default timeout, so keep loops small. Keep values on `globalThis`; top-level `let/const` cannot be re-declared on the next run.
 - `world_query` before editing. `world_edit` edits over 32768 blocks return a `snapshotId`; `world_edit {action:"restore", id}` undoes them. Take an explicit `snapshot` before any risky change.
 - `logs {level:"WARN"}` after (re)enabling a plugin; stack traces arrive folded into one entry.
+
+## Dev loop (local server)
+- `server_process {action:"start"|"stop"|"restart"|"status", serverDir}` runs a local Paper server under the hub; `start` returns when `Done (` was printed and the Craftwire plugin connected.
+- `plugin_deploy {projectDir}` (or `{jar}`) builds, installs and restarts, then reports `loaded` and `problems`. See the `paper-plugin-dev` skill for the full loop.
+- Never accept the EULA for the user. Ask before `takeOver:true` — it stops a server the user started.
 
 ## Player commands through `chat`
 - `chat {action:"command"}` strips one leading `/`, so WorldEdit commands keep their double slash: send `//pos1`.
