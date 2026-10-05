@@ -7,7 +7,9 @@ import com.uxplima.craftwire.core.HubClient;
 import com.uxplima.craftwire.core.HubConfig;
 import com.uxplima.craftwire.core.LogCapture;
 import com.uxplima.craftwire.core.OperationCache;
+import com.uxplima.craftwire.paper.handlers.EvalHandler;
 import com.uxplima.craftwire.paper.handlers.Handlers;
+import com.uxplima.craftwire.paper.script.ScriptEngine;
 import java.nio.file.Path;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -18,6 +20,7 @@ public final class CraftwirePlugin extends JavaPlugin {
     private HubClient hub;
     private AgentConfig config;
     private Sync sync;
+    private ScriptEngine scripts;
 
     @Override
     public void onLoad() {
@@ -31,6 +34,7 @@ public final class CraftwirePlugin extends JavaPlugin {
         config = AgentConfig.from(getConfig(), serverFolderName());
         sync = new Sync(this);
         getLogger().warning("Craftwire is active — do not run on production servers");
+        scripts = new ScriptEngine(getClass().getClassLoader(), EvalHandler.PRELUDE);
         Handlers.registerAll(this);
         getServer().getPluginManager().registerEvents(new EventBridge(this), this);
         hub = new HubClient(() -> HubConfig.load(HubConfig.defaultHome()), this::hello, dispatcher, new HubClient.Listener() {
@@ -43,6 +47,7 @@ public final class CraftwirePlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (scripts != null) scripts.close();
         if (hub != null) hub.close();
         if (logs != null) logs.uninstall();
     }
@@ -53,6 +58,7 @@ public final class CraftwirePlugin extends JavaPlugin {
 
     private void onHubConnected(String instanceId) {
         getLogger().info("Connected to the Craftwire hub as " + instanceId);
+        scripts.resetSession();   // a new hub session starts with fresh script globals
         logs.attach((data, time) -> hub.notifyEvent("log", data, time));
     }
 
@@ -75,6 +81,10 @@ public final class CraftwirePlugin extends JavaPlugin {
 
     public AgentConfig agentConfig() {
         return config;
+    }
+
+    public ScriptEngine scripts() {
+        return scripts;
     }
 
     public void emit(String type, JsonObject data) {
