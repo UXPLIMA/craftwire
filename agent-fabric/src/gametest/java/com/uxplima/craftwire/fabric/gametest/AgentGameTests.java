@@ -12,6 +12,11 @@ public final class AgentGameTests implements FabricClientGameTest {
             LifecycleChecks.run(ctx, sp);
             StateChecks.run(ctx, sp);
             GuiChecks.run(ctx, sp);
+            try {
+                CaptureChecks.run(ctx, sp);
+            } catch (java.io.IOException e) {
+                throw new java.io.UncheckedIOException(e);
+            }
         }
     }
 }

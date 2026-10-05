@@ -1,0 +1,185 @@
+package com.uxplima.craftwire.fabric.handlers;
+
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.uxplima.craftwire.core.AgentError;
+import com.uxplima.craftwire.fabric.ClientScheduler;
+import com.uxplima.craftwire.fabric.CraftwireAgent;
+import com.uxplima.craftwire.fabric.Params;
+import com.uxplima.craftwire.fabric.camera.CameraOverride;
+import com.uxplima.craftwire.fabric.mixin.HudAccessor;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.Base64;
+import java.util.concurrent.CompletableFuture;
+import javax.imageio.IIOImage;
+import javax.imageio.ImageIO;
+import javax.imageio.ImageWriteParam;
+import javax.imageio.ImageWriter;
+import javax.imageio.stream.MemoryCacheImageOutputStream;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.Screenshot;
+
+final class ScreenshotHandler {
+    private ScreenshotHandler() {}
+
+    private record Saved(boolean hudHidden, CameraOverride.Pose pose, int fov) {
+        static Saved of(Minecraft mc) {
+            return new Saved(((HudAccessor) mc.gui.hud).craftwire$isHidden(), CameraOverride.INSTANCE.get(), mc.options.fov().get());
+        }
+
+        void restore(Minecraft mc) {
+            ((HudAccessor) mc.gui.hud).craftwire$setHidden(hudHidden);
+            if (pose == null) CameraOverride.INSTANCE.clear();
+            else CameraOverride.INSTANCE.set(pose);
+            if (mc.options.fov().get() != fov) mc.options.fov().set(fov);
+        }
+    }
+
+    static CompletableFuture<JsonElement> capture(JsonObject p, CraftwireAgent agent) {
+        boolean hud = Params.optBool(p, "hud").orElse(true);
+        int maxSize = Params.optInt(p, "maxSize").orElse(1600);
+        String savePath = Params.optString(p, "savePath").orElse(null);
+        String format = Params.optString(p, "format").orElse("auto");
+        JsonObject camera = p.has("camera") && p.get("camera").isJsonObject() ? p.getAsJsonObject("camera") : null;
+        ClientScheduler s = agent.scheduler();
+
+        // Validate everything before touching game state, so a bad request never leaves the HUD hidden.
+        CameraOverride.Pose pose = null;
+        Integer fov = null;
+        if (camera != null) {
+            for (String k : new String[] {"x", "y", "z", "yaw", "pitch"}) {
+                if (!camera.has(k)) throw Params.invalid("camera." + k + " is required");
+            }
+            pose = new CameraOverride.Pose(camera.get("x").getAsDouble(), camera.get("y").getAsDouble(), camera.get("z").getAsDouble(),
+                    camera.get("yaw").getAsFloat(), camera.get("pitch").getAsFloat());
+            fov = camera.has("fov") ? camera.get("fov").getAsInt() : null;
+        }
+        final CameraOverride.Pose capturePose = pose;
+        final Integer captureFov = fov;
+
+        CompletableFuture<Saved> prepared = s.call(() -> {
+            Minecraft mc = Minecraft.getInstance();
+            Saved saved = Saved.of(mc);
+            agent.setCaptureInProgress(true);
+            if (!hud) ((HudAccessor) mc.gui.hud).craftwire$setHidden(true);
+            if (capturePose != null) CameraOverride.INSTANCE.set(capturePose);
+            if (captureFov != null) mc.options.fov().set(captureFov);
+            return saved;
+        });
+
+        return prepared.thenCompose(saved -> s.delay(3)
+                        .thenCompose(v -> grab(s))
+                        // Always restore (success or failure) and only then complete, so callers observe restored state.
+                        .handle((file, err) -> s.call(() -> {
+                            saved.restore(Minecraft.getInstance());
+                            agent.setCaptureInProgress(false);
+                            return Boolean.TRUE;
+                        }).thenApply(done -> {
+                            if (err != null) throw new java.util.concurrent.CompletionException(err);
+                            return file;
+                        }))
+                        .thenCompose(f -> f))
+                .thenApplyAsync(file -> encode(file, maxSize, savePath, format));
+    }
+
+    private static CompletableFuture<Path> grab(ClientScheduler s) {
+        CompletableFuture<Path> out = new CompletableFuture<>();
+        s.call(() -> {
+            Minecraft mc = Minecraft.getInstance();
+            Screenshot.takeScreenshot(mc.gameRenderer.mainRenderTarget(), image -> {
+                try {
+                    Path tmp = Files.createTempFile("craftwire-", ".png");
+                    image.writeToFile(tmp);
+                    out.complete(tmp);
+                } catch (IOException | RuntimeException e) {
+                    out.completeExceptionally(e);
+                } finally {
+                    image.close();
+                }
+            });
+            return Boolean.TRUE;
+        }).exceptionally(e -> {
+            out.completeExceptionally(e);
+            return Boolean.FALSE;
+        });
+        return out;
+    }
+
+    private static JsonElement encode(Path file, int maxSize, String savePath, String format) {
+        try {
+            BufferedImage full = ImageIO.read(file.toFile());
+            String saved = null;
+            try {
+                if (savePath != null) {
+                    Path target = Path.of(savePath).toAbsolutePath();
+                    try {
+                        if (target.getParent() != null) Files.createDirectories(target.getParent());
+                        Files.copy(file, target, StandardCopyOption.REPLACE_EXISTING);
+                    } catch (IOException e) {
+                        throw new AgentError("SAVE_FAILED", "Could not write " + target + ": " + e.getMessage(),
+                                "Pass a writable savePath; missing directories are created automatically.");
+                    }
+                    saved = target.toString();
+                }
+            } finally {
+                Files.deleteIfExists(file);
+            }
+            double scale = Math.min(1.0, maxSize / (double) Math.max(full.getWidth(), full.getHeight()));
+            int w = Math.max(1, (int) Math.round(full.getWidth() * scale));
+            int h = Math.max(1, (int) Math.round(full.getHeight() * scale));
+            BufferedImage small = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
+            Graphics2D g = small.createGraphics();
+            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+            g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+            g.drawImage(full, 0, 0, w, h, null);
+            g.dispose();
+
+            byte[] bytes = png(small);
+            String mime = "image/png";
+            if ("jpeg".equals(format) || ("auto".equals(format) && bytes.length > 1_500_000)) {
+                bytes = jpeg(small, 0.9f);
+                mime = "image/jpeg";
+            }
+            JsonObject o = new JsonObject();
+            o.addProperty("mime", mime);
+            o.addProperty("data", Base64.getEncoder().encodeToString(bytes));
+            o.addProperty("width", w);
+            o.addProperty("height", h);
+            o.addProperty("fullWidth", full.getWidth());
+            o.addProperty("fullHeight", full.getHeight());
+            if (saved != null) o.addProperty("savedPath", saved);
+            return o;
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    private static byte[] png(BufferedImage img) throws IOException {
+        ByteArrayOutputStream buf = new ByteArrayOutputStream();
+        ImageIO.write(img, "png", buf);
+        return buf.toByteArray();
+    }
+
+    private static byte[] jpeg(BufferedImage img, float quality) throws IOException {
+        ImageWriter writer = ImageIO.getImageWritersByFormatName("jpeg").next();
+        ByteArrayOutputStream buf = new ByteArrayOutputStream();
+        try (MemoryCacheImageOutputStream out = new MemoryCacheImageOutputStream(buf)) {
+            writer.setOutput(out);
+            ImageWriteParam param = writer.getDefaultWriteParam();
+            param.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
+            param.setCompressionQuality(quality);
+            writer.write(null, new IIOImage(img, null, null), param);
+        } finally {
+            writer.dispose();
+        }
+        return buf.toByteArray();
+    }
+}
