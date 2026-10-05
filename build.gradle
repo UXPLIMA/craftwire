@@ -1,0 +1,4 @@
+allprojects {
+    group = 'com.uxplima.craftwire'
+    version = project.property('craftwire_version')
+}
