@@ -10,7 +10,7 @@ import { groupLogs, type LogLine, rank } from "../tools/log-tools.js";
 import { parseBuildErrors } from "./build-errors.js";
 import { type PluginJarInfo, pluginInfoOfJar, pluginJarsNamed } from "./jar.js";
 import { samePath } from "./paths.js";
-import { notManagedError, type ServerManager } from "./server-manager.js";
+import { killTree, notManagedError, type ServerManager } from "./server-manager.js";
 
 export interface DetectedBuild {
   tool: "gradle" | "maven";
@@ -65,19 +65,6 @@ export function runBuild(projectDir: string, command: string, o: { timeoutMs: nu
       resolvePromise({ command, exitCode: code, ms: Date.now() - started, timedOut, output: output.toArray() });
     });
   });
-}
-
-export function killTree(pid: number | undefined): void {
-  if (pid === undefined) return;
-  if (process.platform === "win32") {
-    spawn("taskkill", ["/pid", String(pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" });
-    return;
-  }
-  try {
-    process.kill(-pid, "SIGKILL");
-  } catch {
-    // already gone
-  }
 }
 
 const SKIP_DIRS = new Set(["node_modules", ".git", ".gradle", ".idea"]);

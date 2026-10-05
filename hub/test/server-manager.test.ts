@@ -74,6 +74,16 @@ describe("ServerManager", () => {
     expect(await servers.stop(dir)).toMatchObject({ forced: true });
   });
 
+  it("sees through a java launcher: reports the JVM's pid and a forced stop kills the whole tree", async () => {
+    const { servers, agents } = await setup({ stopTimeoutMs: 1000 });
+    const dir = makeServerDir({ craftwire: true });
+    const s = await servers.start({ serverDir: dir, java: process.execPath, jvmArgs: [FAKE_PAPER, "--launcher", "--mode=agent", "--nostop"], jar: "server.jar" });
+    const jvmPid = agents.instances()[0]!.pid!;
+    expect(s.pid).toBe(jvmPid);
+    expect(await servers.stop(dir)).toMatchObject({ forced: true });
+    expect(await waitUntil(() => !pidAlive(jvmPid), 5000)).toBe(true);
+  });
+
   it("waits for the Craftwire agent when the plugin is installed", async () => {
     const { servers, agents } = await setup();
     const dir = makeServerDir({ craftwire: true });

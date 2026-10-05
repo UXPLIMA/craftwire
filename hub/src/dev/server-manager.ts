@@ -102,6 +102,20 @@ export function pidAlive(pid: number): boolean {
   }
 }
 
+/** Kills a process and its children (taskkill /T on Windows, the process group elsewhere). */
+export function killTree(pid: number | undefined): void {
+  if (pid === undefined) return;
+  if (process.platform === "win32") {
+    spawn("taskkill", ["/pid", String(pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" });
+    return;
+  }
+  try {
+    process.kill(-pid, "SIGKILL");
+  } catch {
+    // already gone
+  }
+}
+
 export async function waitUntil(check: () => boolean, ms: number, everyMs = 250): Promise<boolean> {
   const end = Date.now() + ms;
   while (Date.now() < end) {
@@ -241,6 +255,8 @@ export class ServerManager {
       env: { ...process.env, CRAFTWIRE_HOME: this.opts.home },
       stdio: ["pipe", "pipe", "pipe"],
       windowsHide: true,
+      // POSIX: own process group so a forced stop can kill launcher and JVM together.
+      detached: process.platform !== "win32",
     });
     m.child = child;
     child.stdin.on("error", () => {});
@@ -296,7 +312,8 @@ export class ServerManager {
       let forced = false;
       if ((await race<"exit" | "timeout">([m.exited.then(() => "exit" as const)], this.opts.stopTimeoutMs ?? 90_000, "timeout")) === "timeout") {
         forced = true;
-        m.child.kill("SIGKILL");
+        // `java` may be a launcher (Oracle's javapath java.exe) whose child is the real JVM: kill the tree.
+        killTree(m.child.pid);
         await m.exited;
       }
       return { serverDir: dir, stopped: true, external: false, forced, exitCode: m.exitCode ?? null };
@@ -325,7 +342,9 @@ export class ServerManager {
 
   private snapshot(m: Managed, tail: number): ServerStatus {
     const s: ServerStatus = { serverDir: m.dir, state: m.state, consoleTail: tail > 0 ? m.console.toArray().slice(-tail) : [] };
-    if (m.child?.pid !== undefined && isLive(m)) s.pid = m.child.pid;
+    // The agent reports the JVM's own pid; the spawned process may only be a java launcher.
+    const jvmPid = m.agent ? this.opts.agents.instances().find((i) => i.id === m.agent)?.pid : undefined;
+    if (isLive(m) && (jvmPid ?? m.child?.pid) !== undefined) s.pid = jvmPid ?? m.child!.pid;
     if (m.startedAt !== undefined) s.startedAt = m.startedAt;
     if (m.readyMs !== undefined) s.readyMs = m.readyMs;
     if (m.exitCode !== undefined) s.exitCode = m.exitCode;

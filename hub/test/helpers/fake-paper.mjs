@@ -1,11 +1,23 @@
 // Stands in for a Paper server in hub tests: prints Paper's startup and Done lines and obeys "stop" on stdin.
 // --mode=ok|agent|crash|hang|nostop. In agent mode it also connects to the hub the way the Craftwire plugin does.
+// --nostop ignores "stop" in any mode. --launcher behaves like Oracle's javapath java.exe: it starts the real
+// process as a child with the same stdio and waits for it.
+import { spawn } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
+import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
 
+if (process.argv.includes("--launcher")) {
+  const args = process.argv.slice(2).filter((a) => a !== "--launcher");
+  const child = spawn(process.execPath, [fileURLToPath(import.meta.url), ...args], { stdio: "inherit" });
+  child.on("exit", (code) => process.exit(code ?? 1));
+  await new Promise(() => {});
+}
+
 const mode = (process.argv.find((a) => a.startsWith("--mode=")) ?? "--mode=ok").slice("--mode=".length);
+const ignoresStop = mode === "nostop" || process.argv.includes("--nostop");
 const say = (line) => new Promise((resolve) => process.stdout.write(line + "\n", resolve));
 let socket;
 
@@ -51,7 +63,7 @@ if (mode === "crash") {
   process.exit(1);
 }
 createInterface({ input: process.stdin }).on("line", (line) => {
-  if (line.trim() === "stop" && mode !== "nostop") void shutdown();
+  if (line.trim() === "stop" && !ignoresStop) void shutdown();
 });
 if (mode === "agent") await connectAgent();
 if (mode !== "hang") await say('Done (1.234s)! For help, type "help"');
