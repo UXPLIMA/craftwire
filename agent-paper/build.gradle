@@ -7,6 +7,7 @@ base {
 }
 
 evaluationDependsOn(':agent-core')
+evaluationDependsOn(':test-fixtures')
 
 repositories {
     maven { name = 'PaperMC'; url = 'https://repo.papermc.io/repository/maven-public/' }
@@ -66,16 +67,17 @@ tasks.register('integrationTest', Test) {
     testClassesDirs = sourceSets.integrationTest.output.classesDirs
     classpath = sourceSets.integrationTest.runtimeClasspath
     useJUnitPlatform()
-    dependsOn tasks.named('jar')
+    dependsOn tasks.named('jar'), ':test-fixtures:jar'
     def pluginJar = tasks.named('jar').flatMap { it.archiveFile }
+    def fixtureJar = project(':test-fixtures').tasks.named('jar').flatMap { it.archiveFile }
     def itDir = layout.buildDirectory.dir('it')
-    inputs.files(pluginJar)
+    inputs.files(pluginJar, fixtureJar)
     systemProperty 'craftwire.mcVersion', minecraft_version
     systemProperty 'craftwire.paperBuild', paper_build
     systemProperty 'craftwire.paperSha256', paper_sha256
     systemProperty 'craftwire.version', project.version.toString()
     doFirst {
-        systemProperty 'craftwire.pluginJars', pluginJar.get().asFile.absolutePath
+        systemProperty 'craftwire.pluginJars', [pluginJar.get().asFile, fixtureJar.get().asFile]*.absolutePath.join(File.pathSeparator)
         systemProperty 'craftwire.itDir', itDir.get().asFile.absolutePath
     }
     outputs.upToDateWhen { false }

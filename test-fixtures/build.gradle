@@ -1,0 +1,27 @@
+plugins {
+    id 'java'
+}
+
+base {
+    archivesName = 'craftwire-test-fixtures'
+}
+
+repositories {
+    maven { name = 'PaperMC'; url = 'https://repo.papermc.io/repository/maven-public/' }
+    mavenCentral()
+}
+
+dependencies {
+    compileOnly "io.papermc.paper:paper-api:${paper_api_version}"
+}
+
+processResources {
+    def props = [version: project.version.toString()]
+    inputs.properties props
+    filesMatching('plugin.yml') { expand props }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 25
+    options.encoding = 'UTF-8'
+}
