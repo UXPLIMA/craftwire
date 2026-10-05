@@ -5,6 +5,7 @@ import com.uxplima.craftwire.core.Dispatcher;
 import com.uxplima.craftwire.core.Hello;
 import com.uxplima.craftwire.core.HubClient;
 import com.uxplima.craftwire.core.HubConfig;
+import com.uxplima.craftwire.core.LogCapture;
 import com.uxplima.craftwire.core.OperationCache;
 import com.uxplima.craftwire.fabric.handlers.Handlers;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
@@ -22,6 +23,7 @@ public final class CraftwireAgent {
     private final Dispatcher dispatcher = new Dispatcher(new OperationCache(300_000, System::currentTimeMillis));
     private final ClientScheduler scheduler = new ClientScheduler();
     private HubClient hub;
+    private LogCapture logs;
     private volatile boolean connected;
     private volatile boolean captureInProgress;
     private Boolean savedPauseOnLostFocus;
@@ -35,6 +37,7 @@ public final class CraftwireAgent {
     }
 
     public void start() {
+        logs = LogCapture.install(1000);
         Handlers.registerAll(this);
         KillSwitch killSwitch = new KillSwitch(this);
         ScreenWatcher screens = new ScreenWatcher(this);
@@ -62,6 +65,7 @@ public final class CraftwireAgent {
     public void onHubConnected(String instanceId) {
         connected = true;
         LOGGER.info("[craftwire] connected to hub as {}", instanceId);
+        if (hub != null) logs.attach((data, time) -> hub.notifyEvent("log", data, time));
         Minecraft.getInstance().execute(() -> {
             Minecraft mc = Minecraft.getInstance();
             if (savedPauseOnLostFocus == null) savedPauseOnLostFocus = mc.options.pauseOnLostFocus;
@@ -71,12 +75,17 @@ public final class CraftwireAgent {
 
     public void onHubDisconnected() {
         connected = false;
+        if (logs != null) logs.detach();
         Minecraft.getInstance().execute(() -> {
             if (savedPauseOnLostFocus != null) {
                 Minecraft.getInstance().options.pauseOnLostFocus = savedPauseOnLostFocus;
                 savedPauseOnLostFocus = null;
             }
         });
+    }
+
+    public LogCapture logs() {
+        return logs;
     }
 
     public boolean isConnected() {

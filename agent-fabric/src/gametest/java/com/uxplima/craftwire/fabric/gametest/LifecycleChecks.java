@@ -23,6 +23,12 @@ final class LifecycleChecks {
         ctx.waitTicks(2);
         check(ctx.computeOnClient(mc -> mc.options.pauseOnLostFocus), "pauseOnLostFocus should be restored on disconnect");
 
+        // Client log lines are captured from mod start, so the hub's `logs` tool can read them after a connect.
+        CraftwireAgent.LOGGER.info("craftwire gametest marker");
+        check(agent.logs() != null && agent.logs().backlog().stream()
+                        .anyMatch(e -> e.data().get("message").getAsString().equals("craftwire gametest marker")),
+                "client log lines should be captured");
+
         // F8 kill switch toggles the dispatcher.
         ctx.getInput().pressKey(GLFW.GLFW_KEY_F8);
         ctx.waitTicks(2);
