@@ -10,6 +10,7 @@ import com.uxplima.craftwire.core.OperationCache;
 import com.uxplima.craftwire.paper.handlers.EvalHandler;
 import com.uxplima.craftwire.paper.handlers.Handlers;
 import com.uxplima.craftwire.paper.script.ScriptEngine;
+import com.uxplima.craftwire.paper.world.SnapshotStore;
 import java.nio.file.Path;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -21,6 +22,7 @@ public final class CraftwirePlugin extends JavaPlugin {
     private AgentConfig config;
     private Sync sync;
     private ScriptEngine scripts;
+    private SnapshotStore snapshots;
 
     @Override
     public void onLoad() {
@@ -35,6 +37,7 @@ public final class CraftwirePlugin extends JavaPlugin {
         sync = new Sync(this);
         getLogger().warning("Craftwire is active — do not run on production servers");
         scripts = new ScriptEngine(getClass().getClassLoader(), EvalHandler.PRELUDE);
+        snapshots = new SnapshotStore(getDataFolder().toPath().resolve("snapshots"));
         Handlers.registerAll(this);
         getServer().getPluginManager().registerEvents(new EventBridge(this), this);
         hub = new HubClient(() -> HubConfig.load(HubConfig.defaultHome()), this::hello, dispatcher, new HubClient.Listener() {
@@ -85,6 +88,14 @@ public final class CraftwirePlugin extends JavaPlugin {
 
     public ScriptEngine scripts() {
         return scripts;
+    }
+
+    public SnapshotStore snapshots() {
+        return snapshots;
+    }
+
+    public Path structuresDir() {
+        return getDataFolder().toPath().resolve("structures");
     }
 
     public void emit(String type, JsonObject data) {
