@@ -13,5 +13,6 @@ public final class Handlers {
         d.register("server.info", p -> s.global(ServerInfoHandler::read));
         d.register("server.command", p -> CommandHandler.handle(p, s));
         d.register("server.eval", p -> EvalHandler.handle(p, plugin));
+        d.register("world.query", p -> WorldQueryHandler.handle(p, s));
     }
 }
