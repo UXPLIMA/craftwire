@@ -1,6 +1,6 @@
 ---
 name: craftwire
-description: Use when driving Minecraft through the craftwire MCP tools (screenshot, camera, gui_read, gui_action, input, chat, hud_read, player_state, wait_for) — covers the reliable order of calls, menu automation and recovering from errors.
+description: Use when driving Minecraft or a Paper server through the craftwire MCP tools (screenshot, camera, gui_*, input, chat, server_command, server_eval, world_query, world_edit, logs, wait_for) — covers the reliable order of calls, menus, server scripting, safe world edits and recovering from errors.
 ---
 
 # Driving Minecraft with Craftwire
@@ -22,6 +22,16 @@ If `gui_action` returns `SLOT_OUT_OF_RANGE` or `NO_SCREEN_OPEN`, the screen chan
 - `savePath` writes the full-resolution PNG (relative paths are relative to the current project); the image you see is downscaled to `maxSize`.
 - For a fixed angle use `camera {action:"set", …}` once, then take several screenshots; `camera {action:"reset"}` afterwards.
 - The camera is render-only and should stay within render distance of the player.
+
+## Server (Paper + Craftwire plugin)
+- `server_info` first: TPS, plugins, worlds.
+- `server_command` returns the console feedback. Raise `collectMs` (max 5000) for plugins that answer late. Use the `minecraft:` prefix when a plugin overrides a vanilla command (e.g. `minecraft:tp`); gamerules are snake_case in 26.x (`advance_time`).
+- `server_eval` for anything without a command: `server`, `player(name)`, `plugin(name)`, `loc(x,y,z)`, `Java.type(...)`, `print(...)`. Scripts run on the server thread with a 5 s default timeout, so keep loops small. Keep values on `globalThis`; top-level `let/const` cannot be re-declared on the next run.
+- `world_query` before editing. `world_edit` edits over 32768 blocks return a `snapshotId`; `world_edit {action:"restore", id}` undoes them. Take an explicit `snapshot` before any risky change.
+- `logs {level:"WARN"}` after (re)enabling a plugin; stack traces arrive folded into one entry.
+
+## Player commands through `chat`
+- `chat {action:"command"}` strips one leading `/`, so WorldEdit commands keep their double slash: send `//pos1`.
 
 ## Errors
 Every error has `code`, `message`, `hint` — follow the hint. `PAUSED_BY_USER` means the human pressed F8: stop and ask them. Use `operationId` on actions you may retry (clicks, commands) so a retry never runs twice.

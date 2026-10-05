@@ -1,6 +1,6 @@
 {
   "name": "craftwire",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "MCP hub that lets AI agents see and drive Minecraft (Craftwire by UXPLIMA)",
   "license": "MIT",
   "type": "module",
