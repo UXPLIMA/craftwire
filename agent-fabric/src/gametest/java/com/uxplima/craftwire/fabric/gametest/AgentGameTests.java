@@ -10,6 +10,7 @@ public final class AgentGameTests implements FabricClientGameTest {
         try (TestSingleplayerContext sp = ctx.worldBuilder().create()) {
             sp.getConnection().waitForChunksRender();
             LifecycleChecks.run(ctx, sp);
+            StateChecks.run(ctx, sp);
         }
     }
 }

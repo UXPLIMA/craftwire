@@ -6,6 +6,9 @@ public final class Handlers {
     private Handlers() {}
 
     public static void registerAll(CraftwireAgent agent) {
-        // Tasks 10–13 register their handlers here.
+        var s = agent.scheduler();
+        agent.dispatcher().register("player.state", p -> s.call(PlayerStateHandler::read));
+        agent.dispatcher().register("chat.send", p -> s.call(() -> ChatSendHandler.send(p)));
+        agent.dispatcher().register("hud.read", p -> s.call(HudReadHandler::read));
     }
 }
