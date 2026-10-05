@@ -1,10 +1,11 @@
 #!/usr/bin/env node
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { AgentServer } from "./agents.js";
 import { AuditLog } from "./audit.js";
 import { craftwireHome, loadOrCreateToken, writeHubConfig } from "./config.js";
 import { ServerManager } from "./dev/server-manager.js";
+import { formatChecks, runDoctor } from "./doctor.js";
 import { OperationTracker } from "./operations.js";
 import { createCraftwireServer } from "./server.js";
 import { HUB_VERSION } from "./version.js";
@@ -40,7 +41,19 @@ async function main(): Promise<void> {
   log(`hub ${HUB_VERSION} listening on 127.0.0.1:${port} (state: ${home})`);
 }
 
-main().catch((e: unknown) => {
+async function doctor(args: string[]): Promise<void> {
+  const at = args.indexOf("--server");
+  const serverDir = at >= 0 ? args[at + 1] : undefined;
+  const checks = await runDoctor({ home: craftwireHome(), ...(serverDir ? { serverDir: resolve(serverDir) } : {}) });
+  process.stdout.write(`craftwire doctor ${HUB_VERSION}\n${formatChecks(checks)}`);
+  process.exit(checks.some((c) => c.status === "fail") ? 1 : 0);
+}
+
+const argv = process.argv.slice(2);
+const fatal = (e: unknown) => {
   log(`fatal: ${e instanceof Error ? e.stack ?? e.message : String(e)}`);
   process.exit(1);
-});
+};
+if (argv[0] === "doctor") doctor(argv.slice(1)).catch(fatal);
+else if (argv[0] === "--version") process.stdout.write(`${HUB_VERSION}\n`);
+else main().catch(fatal);

@@ -1,4 +1,4 @@
-import { execSync, spawn } from "node:child_process";
+import { execFileSync, execSync, spawn } from "node:child_process";
 import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -6,6 +6,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { HUB_VERSION } from "../src/version.js";
 import { connectFakeAgent } from "./helpers/fakeAgent.js";
 
 const hubDir = join(__dirname, "..");
@@ -34,6 +35,11 @@ describe("craftwire CLI over stdio", () => {
       "hud_read", "input", "list_instances", "logs", "player_state", "plugin_deploy", "plugin_manage", "screenshot",
       "server_command", "server_eval", "server_info", "server_process", "wait_for", "world_edit", "world_query",
     ]);
+  });
+
+  it("doctor reports the running hub", () => {
+    const out = execFileSync(process.execPath, [join(hubDir, "dist", "cli.js"), "doctor"], { env: { ...process.env, CRAFTWIRE_HOME: home }, encoding: "utf8" });
+    expect(out).toContain(`[ok] hub ${HUB_VERSION} is running`);
   });
 
   it("writes hub.json and accepts an agent using it", async () => {
