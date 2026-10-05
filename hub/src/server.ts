@@ -1,4 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { registerClientTools } from "./tools/client-tools.js";
 import { registerHubTools } from "./tools/hub-tools.js";
 import type { ToolContext } from "./tools/registry.js";
 import { HUB_VERSION } from "./version.js";
@@ -13,5 +14,6 @@ const INSTRUCTIONS = [
 export function createCraftwireServer(ctx: ToolContext): McpServer {
   const server = new McpServer({ name: "craftwire", version: HUB_VERSION }, { instructions: INSTRUCTIONS });
   registerHubTools(server, ctx);
+  registerClientTools(server, ctx);
   return server;
 }
