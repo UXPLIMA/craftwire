@@ -25,15 +25,16 @@ const age = (file: string, secondsAgo: number) => {
 };
 
 describe("detectBuild", () => {
+  // Explicit .\ path: Claude Code sets NoDefaultCurrentDirectoryInExePath, so cmd would not find a bare gradlew.bat.
   it("prefers the Gradle wrapper, skips tests and fits the platform", () => {
     const d = touch(tmp(), "gradlew", "gradlew.bat", "build.gradle.kts");
-    expect(detectBuild(d, "win32")).toEqual({ tool: "gradle", command: "gradlew.bat build -x test --console=plain" });
+    expect(detectBuild(d, "win32")).toEqual({ tool: "gradle", command: ".\\gradlew.bat build -x test --console=plain" });
     expect(detectBuild(d, "linux")).toEqual({ tool: "gradle", command: "sh ./gradlew build -x test --console=plain" });
   });
 
   it("falls back to gradle, then Maven, then nothing", () => {
     expect(detectBuild(touch(tmp(), "build.gradle"), "linux")?.command).toBe("gradle build -x test --console=plain");
-    expect(detectBuild(touch(tmp(), "pom.xml", "mvnw.cmd"), "win32")?.command).toBe("mvnw.cmd -B package -DskipTests");
+    expect(detectBuild(touch(tmp(), "pom.xml", "mvnw.cmd"), "win32")?.command).toBe(".\\mvnw.cmd -B package -DskipTests");
     expect(detectBuild(touch(tmp(), "pom.xml"), "linux")).toEqual({ tool: "maven", command: "mvn -B package -DskipTests" });
     expect(detectBuild(tmp(), "linux")).toBeUndefined();
   });

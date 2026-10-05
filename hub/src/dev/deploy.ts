@@ -16,14 +16,17 @@ export interface DetectedBuild {
   command: string;
 }
 
-/** Gradle (wrapper first) or Maven, packaging without running tests. */
+/**
+ * Gradle (wrapper first) or Maven, packaging without running tests. Wrappers get an explicit .\ path on Windows:
+ * with NoDefaultCurrentDirectoryInExePath set (Claude Code sets it) cmd does not look in the current folder.
+ */
 export function detectBuild(projectDir: string, platform: NodeJS.Platform = process.platform): DetectedBuild | undefined {
   const has = (f: string) => existsSync(join(projectDir, f));
   const win = platform === "win32";
-  const gradlew = win ? (has("gradlew.bat") ? "gradlew.bat" : undefined) : has("gradlew") ? "sh ./gradlew" : undefined;
+  const gradlew = win ? (has("gradlew.bat") ? ".\\gradlew.bat" : undefined) : has("gradlew") ? "sh ./gradlew" : undefined;
   if (gradlew) return { tool: "gradle", command: `${gradlew} build -x test --console=plain` };
   if (has("build.gradle") || has("build.gradle.kts")) return { tool: "gradle", command: "gradle build -x test --console=plain" };
-  const mvnw = win ? (has("mvnw.cmd") ? "mvnw.cmd" : undefined) : has("mvnw") ? "sh ./mvnw" : undefined;
+  const mvnw = win ? (has("mvnw.cmd") ? ".\\mvnw.cmd" : undefined) : has("mvnw") ? "sh ./mvnw" : undefined;
   if (mvnw) return { tool: "maven", command: `${mvnw} -B package -DskipTests` };
   if (has("pom.xml")) return { tool: "maven", command: "mvn -B package -DskipTests" };
   return undefined;
@@ -213,7 +216,7 @@ export async function deploy(a: DeployArgs, servers: ServerManager, agents: Agen
     const projectDir = resolve(a.projectDir);
     if (!existsSync(projectDir)) throw new CraftwireError("PROJECT_NOT_FOUND", `${projectDir} does not exist`, "Pass projectDir: the plugin project's root folder.");
     const command = a.buildCommand ?? detectBuild(projectDir)?.command;
-    if (!command) throw new CraftwireError("BUILD_NOT_DETECTED", `No Gradle or Maven build in ${projectDir}`, "Pass buildCommand, e.g. 'gradlew.bat shadowJar'.");
+    if (!command) throw new CraftwireError("BUILD_NOT_DETECTED", `No Gradle or Maven build in ${projectDir}`, "Pass buildCommand, e.g. '.\\gradlew.bat shadowJar' (Windows) or './gradlew shadowJar'.");
     const build = await runBuild(projectDir, command, { timeoutMs: a.buildTimeoutMs, ...(a.javaHome ? { javaHome: a.javaHome } : {}) });
     if (build.timedOut) {
       throw new CraftwireError("BUILD_FAILED", `${command} did not finish within ${a.buildTimeoutMs} ms`, "Raise buildTimeoutMs, or run the build once by hand to warm the caches.", { command, outputTail: build.output.slice(-60) });
