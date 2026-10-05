@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, utimesSync, writeFileS
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { detectBuild, expandGlob, findBuiltJar, installPluginJar, pluginProblems, runBuild } from "../src/dev/deploy.js";
+import { detectBuild, expandGlob, findBuiltJar, installPluginJar, pluginProblems, runBuild, withLockRetry } from "../src/dev/deploy.js";
 import { pluginInfoOfJar } from "../src/dev/jar.js";
 import { makeZip } from "./helpers/zip.js";
 
@@ -79,24 +79,42 @@ describe("jar discovery", () => {
 });
 
 describe("installPluginJar", () => {
-  it("replaces the old jar of the same plugin and keeps a backup", () => {
+  it("replaces the old jar of the same plugin and keeps a backup", async () => {
     const server = tmp();
     const old = jar(join(server, "plugins/demo-1.0.jar"), "Demo", "1.0");
     jar(join(server, "plugins/other.jar"), "Other");
     const fresh = jar(join(tmp(), "demo-1.1.jar"), "Demo", "1.1");
-    const r = installPluginJar(server, fresh, pluginInfoOfJar(fresh)!, { running: false });
+    const r = await installPluginJar(server, fresh, pluginInfoOfJar(fresh)!, { running: false });
     expect(r).toEqual({ installed: join(server, "plugins", "demo-1.1.jar"), replaced: [old], backupDir: join(server, "plugins", ".craftwire-backup"), needsRestart: false });
     expect(readdirSync(join(server, "plugins")).sort()).toEqual([".craftwire-backup", "demo-1.1.jar", "other.jar"]);
     expect(existsSync(join(server, "plugins", ".craftwire-backup", "demo-1.0.jar"))).toBe(true);
   });
 
-  it("stages the jar in plugins/update under the old name while the server runs (jars are locked on Windows)", () => {
+  it("stages the jar in plugins/update under the old name while the server runs (jars are locked on Windows)", async () => {
     const server = tmp();
     const old = jar(join(server, "plugins/demo-1.0.jar"), "Demo", "1.0");
     const fresh = jar(join(tmp(), "demo-1.1.jar"), "Demo", "1.1");
-    const r = installPluginJar(server, fresh, pluginInfoOfJar(fresh)!, { running: true });
+    const r = await installPluginJar(server, fresh, pluginInfoOfJar(fresh)!, { running: true });
     expect(r).toEqual({ installed: join(server, "plugins", "update", "demo-1.0.jar"), replaced: [], needsRestart: true });
     expect(existsSync(old)).toBe(true);
+  });
+});
+
+describe("withLockRetry", () => {
+  const locked = () => Object.assign(new Error("EBUSY: resource busy or locked"), { code: "EBUSY" });
+
+  it("retries while Windows still holds the file lock", async () => {
+    let calls = 0;
+    const r = await withLockRetry(() => { if (++calls < 3) throw locked(); return "done"; }, { timeoutMs: 2000, everyMs: 10 });
+    expect(r).toBe("done");
+    expect(calls).toBe(3);
+  });
+
+  it("gives up with FILE_LOCKED, and does not retry other errors", async () => {
+    await expect(withLockRetry(() => { throw locked(); }, { timeoutMs: 50, everyMs: 10 })).rejects.toMatchObject({ code: "FILE_LOCKED" });
+    let calls = 0;
+    await expect(withLockRetry(() => { calls++; throw new Error("ENOENT"); }, { timeoutMs: 1000, everyMs: 10 })).rejects.toThrow("ENOENT");
+    expect(calls).toBe(1);
   });
 });
 

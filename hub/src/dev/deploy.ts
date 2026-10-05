@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, readdirSync, renameSync, statSync } from "node:fs";
 import { basename, delimiter, dirname, join, resolve } from "node:path";
 import { createInterface } from "node:readline";
+import { setTimeout as sleep } from "node:timers/promises";
 import type { AgentServer } from "../agents.js";
 import { CraftwireError } from "../errors.js";
 import { RingBuffer } from "../ringbuffer.js";
@@ -156,25 +157,47 @@ export interface InstallResult {
  * While the server runs its jars are open (locked on Windows), so the jar is staged in plugins/update/
  * under the old jar's name, which Paper swaps in on the next start.
  */
-export function installPluginJar(serverDir: string, jar: string, plugin: PluginJarInfo, o: { running: boolean }): InstallResult {
+const LOCK_CODES = new Set(["EBUSY", "EPERM", "EACCES"]);
+
+/**
+ * Runs a file operation, retrying while Windows still holds a lock on the file
+ * (a JVM that just exited, an antivirus scan). Other errors are thrown at once.
+ */
+export async function withLockRetry<T>(fn: () => T, o: { timeoutMs?: number; everyMs?: number } = {}): Promise<T> {
+  const end = Date.now() + (o.timeoutMs ?? 30_000);
+  for (;;) {
+    try {
+      return fn();
+    } catch (e) {
+      const code = (e as NodeJS.ErrnoException).code;
+      if (!code || !LOCK_CODES.has(code)) throw e;
+      if (Date.now() >= end) {
+        throw new CraftwireError("FILE_LOCKED", (e as Error).message, "A process still holds the jar: is the server (or another server using this folder) still running? Stop it and retry.");
+      }
+      await sleep(o.everyMs ?? 500);
+    }
+  }
+}
+
+export async function installPluginJar(serverDir: string, jar: string, plugin: PluginJarInfo, o: { running: boolean }): Promise<InstallResult> {
   const pluginsDir = join(serverDir, "plugins");
   mkdirSync(pluginsDir, { recursive: true });
   const existing = pluginJarsNamed(pluginsDir, plugin.name).filter((p) => !samePath(p, jar));
   if (o.running) {
     const target = existing.length ? join(pluginsDir, "update", basename(existing[0]!)) : join(pluginsDir, basename(jar));
     mkdirSync(dirname(target), { recursive: true });
-    copyFileSync(jar, target);
+    await withLockRetry(() => copyFileSync(jar, target));
     return { installed: target, replaced: [], needsRestart: true };
   }
   const installed = join(pluginsDir, basename(jar));
   if (existing.length === 0) {
-    if (!samePath(installed, jar)) copyFileSync(jar, installed);
+    if (!samePath(installed, jar)) await withLockRetry(() => copyFileSync(jar, installed));
     return { installed, replaced: [], needsRestart: false };
   }
   const backupDir = join(pluginsDir, ".craftwire-backup");
   mkdirSync(backupDir, { recursive: true });
-  for (const old of existing) renameSync(old, join(backupDir, basename(old)));
-  copyFileSync(jar, installed);
+  for (const old of existing) await withLockRetry(() => renameSync(old, join(backupDir, basename(old))));
+  await withLockRetry(() => copyFileSync(jar, installed));
   return { installed, replaced: existing, backupDir, needsRestart: false };
 }
 
@@ -243,13 +266,13 @@ export async function deploy(a: DeployArgs, servers: ServerManager, agents: Agen
   result.plugin = plugin.version === undefined ? { name: plugin.name } : { name: plugin.name, version: plugin.version };
 
   if (!a.restart) {
-    const install = installPluginJar(serverDir, jarPath, plugin, { running: before !== "none" });
+    const install = await installPluginJar(serverDir, jarPath, plugin, { running: before !== "none" });
     return { ...result, install, restarted: false, ...(install.needsRestart ? { hint: "Restart the server (server_process {action:'restart'}) to load the new jar." } : {}) };
   }
 
   let install: InstallResult | undefined;
   const status = await servers.restart({ serverDir, timeoutMs: a.timeoutMs, takeOver: a.takeOver }, async () => {
-    install = installPluginJar(serverDir, jarPath, plugin, { running: false });
+    install = await installPluginJar(serverDir, jarPath, plugin, { running: false });
   });
   result.install = install;
   result.restarted = true;
