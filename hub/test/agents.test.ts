@@ -99,9 +99,10 @@ describe("AgentServer routing", () => {
     const { server, port } = await start();
     const agent = await connectFakeAgent(port, { token: TOKEN });
     agent.onRequest("slow", () => new Promise(() => {}));
-    const pending = server.request(agent.instanceId, "slow", {}, 5000);
+    // Attach the expectation before closing, so the rejection is never momentarily unhandled.
+    const rejected = expect(server.request(agent.instanceId, "slow", {}, 5000)).rejects.toMatchObject({ code: "AGENT_DISCONNECTED" });
     await agent.close();
-    await expect(pending).rejects.toMatchObject({ code: "AGENT_DISCONNECTED" });
+    await rejected;
     expect(server.instances()).toEqual([]);
   });
 
