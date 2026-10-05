@@ -114,4 +114,19 @@ class HubClientTest {
         Thread.sleep(300);
         assertFalse(client.isConnected());
     }
+
+    @Test
+    void notifyEventKeepsTheGivenTimestamp() throws Exception {
+        int port = TestHub.freePort();
+        hub = new TestHub(port, TOKEN).startAndWait();
+        clientFor(new AtomicReference<>(new HubConfig(port, TOKEN)));
+        hub.next();   // hello
+        assertTrue(connected.await(5, TimeUnit.SECONDS));
+        JsonObject d = new JsonObject();
+        d.addProperty("message", "replayed");
+        client.notifyEvent("log", d, 1234L);
+        JsonObject ev = hub.next();
+        assertEquals("log", ev.getAsJsonObject("params").get("type").getAsString());
+        assertEquals(1234L, ev.getAsJsonObject("params").get("time").getAsLong());
+    }
 }

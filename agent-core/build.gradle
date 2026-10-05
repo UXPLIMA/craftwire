@@ -9,8 +9,11 @@ repositories {
 dependencies {
     // Gson ships with Minecraft and Paper; never bundle it.
     compileOnly 'com.google.code.gson:gson:2.13.2'
+    // log4j-core ships with Minecraft and Paper; LogCapture plugs into it, never bundle it.
+    compileOnly "org.apache.logging.log4j:log4j-core:${log4j_version}"
 
     testImplementation 'com.google.code.gson:gson:2.13.2'
+    testImplementation "org.apache.logging.log4j:log4j-core:${log4j_version}"
     testImplementation platform('org.junit:junit-bom:5.13.4')
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'

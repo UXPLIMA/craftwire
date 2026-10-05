@@ -65,8 +65,12 @@ public final class HubClient implements AutoCloseable {
     }
 
     public void notifyEvent(String type, JsonObject data) {
+        notifyEvent(type, data, System.currentTimeMillis());
+    }
+
+    public void notifyEvent(String type, JsonObject data, long time) {
         WebSocket ws = socket;
-        if (ws != null && instanceId != null) send(ws, RpcCodec.event(type, data, System.currentTimeMillis()));
+        if (ws != null && instanceId != null) send(ws, RpcCodec.event(type, data, time));
     }
 
     private void connect() {
