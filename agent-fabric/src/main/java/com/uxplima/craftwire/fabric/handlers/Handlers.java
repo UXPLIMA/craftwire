@@ -14,5 +14,7 @@ public final class Handlers {
         agent.dispatcher().register("gui.action", p -> GuiActionHandler.act(p, s));
         agent.dispatcher().register("camera", p -> s.call(() -> CameraHandler.handle(p)));
         agent.dispatcher().register("screenshot", p -> ScreenshotHandler.capture(p, agent));
+        agent.dispatcher().register("input", p -> s.call(() -> InputHandler.handle(p, s)));
+        agent.dispatcher().register("client.settings", p -> s.call(() -> ClientSettingsHandler.handle(p)));
     }
 }
