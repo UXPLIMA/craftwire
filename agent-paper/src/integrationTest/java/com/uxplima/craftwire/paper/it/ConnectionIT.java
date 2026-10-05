@@ -3,6 +3,7 @@ package com.uxplima.craftwire.paper.it;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.google.gson.JsonObject;
+import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 
 class ConnectionIT {
@@ -14,6 +15,10 @@ class ConnectionIT {
         assertEquals("26.2", h.get("mcVersion").getAsString());
         assertEquals("server", h.get("instanceName").getAsString());
         assertEquals(System.getProperty("craftwire.version"), h.get("agentVersion").getAsString());
+        Path expected = Path.of(System.getProperty("craftwire.itDir"), "server");
+        assertEquals(expected.toRealPath(), Path.of(h.get("serverDir").getAsString()).toRealPath());
+        long pid = h.get("pid").getAsLong();
+        assertTrue(ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false), "pid " + pid + " is not alive");
     }
 
     @Test

@@ -18,6 +18,8 @@ public final class RpcCodec {
         params.addProperty("protocolVersion", PROTOCOL_VERSION);
         params.addProperty("mcVersion", h.mcVersion());
         params.addProperty("instanceName", h.instanceName());
+        if (h.serverDir() != null) params.addProperty("serverDir", h.serverDir());
+        if (h.pid() != null) params.addProperty("pid", h.pid());
         JsonObject o = envelope();
         o.addProperty("id", 0);
         o.addProperty("method", "hello");

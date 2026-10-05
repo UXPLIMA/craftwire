@@ -56,7 +56,8 @@ public final class CraftwirePlugin extends JavaPlugin {
     }
 
     private Hello hello() {
-        return new Hello("server", getPluginMeta().getVersion(), Bukkit.getMinecraftVersion(), config.instanceName());
+        return new Hello("server", getPluginMeta().getVersion(), Bukkit.getMinecraftVersion(), config.instanceName(),
+                Path.of("").toAbsolutePath().toString(), ProcessHandle.current().pid());
     }
 
     private void onHubConnected(String instanceId) {

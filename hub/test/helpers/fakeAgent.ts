@@ -12,7 +12,7 @@ export interface FakeAgent {
 
 export async function connectFakeAgent(
   port: number,
-  opts: { token: string; kind?: "client" | "server"; name?: string; protocolVersion?: number },
+  opts: { token: string; kind?: "client" | "server"; name?: string; protocolVersion?: number; agentVersion?: string; serverDir?: string; pid?: number },
 ): Promise<FakeAgent> {
   const socket = new WebSocket(`ws://127.0.0.1:${port}/`);
   const handlers = new Map<string, Handler>();
@@ -28,8 +28,10 @@ export async function connectFakeAgent(
     socket.send(JSON.stringify({
       jsonrpc: "2.0", id: 0, method: "hello",
       params: {
-        token: opts.token, agentKind: opts.kind ?? "client", agentVersion: "0.1.0",
+        token: opts.token, agentKind: opts.kind ?? "client", agentVersion: opts.agentVersion ?? "0.1.0",
         protocolVersion: opts.protocolVersion ?? 1, mcVersion: "26.2", instanceName: opts.name ?? "Tester",
+        ...(opts.serverDir !== undefined ? { serverDir: opts.serverDir } : {}),
+        ...(opts.pid !== undefined ? { pid: opts.pid } : {}),
       },
     }));
   });

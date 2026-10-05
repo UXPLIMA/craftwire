@@ -3,9 +3,9 @@ import type { AddressInfo } from "node:net";
 import { WebSocketServer, type WebSocket } from "ws";
 import { tokensEqual } from "./config.js";
 import { CraftwireError } from "./errors.js";
-import { type AgentEvent, EventNotification, HelloRequest, RpcResponse } from "./protocol.js";
+import { type AgentEvent, EventNotification, HelloRequest, RpcResponse, StatusRequest } from "./protocol.js";
 import { RingBuffer } from "./ringbuffer.js";
-import { PROTOCOL_VERSION } from "./version.js";
+import { HUB_VERSION, PROTOCOL_VERSION } from "./version.js";
 
 export type AgentKind = "client" | "server";
 
@@ -16,6 +16,25 @@ export interface InstanceInfo {
   agentVersion: string;
   mcVersion: string;
   connectedAt: number;
+  /** Server agents: the server's working directory and JVM pid (agents >= 0.3.0). */
+  serverDir?: string;
+  pid?: number;
+}
+
+export interface RejectedAgent {
+  time: number;
+  code: string;
+  agentKind: string;
+  agentVersion: string;
+  instanceName: string;
+  protocolVersion: number;
+}
+
+export interface HubStatus {
+  hubVersion: string;
+  protocolVersion: number;
+  instances: InstanceInfo[];
+  rejected: RejectedAgent[];
 }
 
 interface Pending {
@@ -49,6 +68,7 @@ export class AgentServer extends EventEmitter {
   private wss?: WebSocketServer;
   private readonly live = new Map<string, Instance>();
   private readonly counters: Record<AgentKind, number> = { client: 0, server: 0 };
+  private readonly rejected = new RingBuffer<RejectedAgent>(20);
 
   constructor(private readonly opts: AgentServerOptions) {
     super();
@@ -94,6 +114,11 @@ export class AgentServer extends EventEmitter {
         socket.close(CLOSE_BAD_HANDSHAKE, "invalid JSON");
         return;
       }
+      const status = StatusRequest.safeParse(parsed);
+      if (status.success) {
+        this.answerStatus(socket, status.data);
+        return;
+      }
       const hello = HelloRequest.safeParse(parsed);
       if (!hello.success) {
         socket.close(CLOSE_BAD_HANDSHAKE, "first message must be hello");
@@ -101,6 +126,10 @@ export class AgentServer extends EventEmitter {
       }
       const { id, params } = hello.data;
       const fail = (code: string, message: string, hint: string, closeCode: number) => {
+        this.rejected.push({
+          time: Date.now(), code, agentKind: params.agentKind, agentVersion: params.agentVersion,
+          instanceName: params.instanceName, protocolVersion: params.protocolVersion,
+        });
         socket.send(JSON.stringify({ jsonrpc: "2.0", id, error: { code: -32001, message, data: { code, hint } } }));
         socket.close(closeCode, code);
       };
@@ -126,6 +155,8 @@ export class AgentServer extends EventEmitter {
         agentVersion: params.agentVersion,
         mcVersion: params.mcVersion,
         connectedAt: Date.now(),
+        ...(params.serverDir !== undefined ? { serverDir: params.serverDir } : {}),
+        ...(params.pid !== undefined ? { pid: params.pid } : {}),
       };
       const inst: Instance = { info, socket, pending: new Map(), events: new RingBuffer(this.opts.bufferSize ?? 5000), nextId: 1 };
       this.live.set(info.id, inst);
@@ -134,6 +165,23 @@ export class AgentServer extends EventEmitter {
       socket.send(JSON.stringify({ jsonrpc: "2.0", id, result: { instanceId: info.id } }));
       this.emit("connected", info);
     });
+  }
+
+  private answerStatus(socket: WebSocket, req: StatusRequest): void {
+    if (!tokensEqual(req.params.token, this.opts.token)) {
+      socket.send(JSON.stringify({
+        jsonrpc: "2.0", id: req.id,
+        error: { code: -32001, message: "Invalid token", data: { code: "UNAUTHORIZED", hint: "hub.json changed; run the command again." } },
+      }));
+      socket.close(CLOSE_UNAUTHORIZED, "UNAUTHORIZED");
+      return;
+    }
+    const result: HubStatus = { hubVersion: HUB_VERSION, protocolVersion: PROTOCOL_VERSION, instances: this.instances(), rejected: this.rejectedAgents() };
+    socket.send(JSON.stringify({ jsonrpc: "2.0", id: req.id, result }), () => socket.close(1000, "status"));
+  }
+
+  rejectedAgents(): RejectedAgent[] {
+    return this.rejected.toArray();
   }
 
   private onMessage(inst: Instance, text: string): void {

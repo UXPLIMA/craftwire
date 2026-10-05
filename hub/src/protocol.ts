@@ -9,6 +9,8 @@ export const HelloParams = z.object({
   protocolVersion: z.number().int(),
   mcVersion: z.string(),
   instanceName: z.string(),
+  serverDir: z.string().optional(),
+  pid: z.number().int().positive().optional(),
 });
 export type HelloParams = z.infer<typeof HelloParams>;
 
@@ -18,6 +20,14 @@ export const HelloRequest = z.object({
   method: z.literal("hello"),
   params: HelloParams,
 });
+
+export const StatusRequest = z.object({
+  jsonrpc: z.literal("2.0"),
+  id: RpcId,
+  method: z.literal("status"),
+  params: z.object({ token: z.string().min(1) }),
+});
+export type StatusRequest = z.infer<typeof StatusRequest>;
 
 export const RpcErrorObject = z.object({
   code: z.number().int(),
@@ -43,5 +53,5 @@ export const EventNotification = z.object({
   params: EventParams,
 });
 
-export const AgentMessage = z.union([HelloRequest, RpcResponse, EventNotification]);
+export const AgentMessage = z.union([HelloRequest, StatusRequest, RpcResponse, EventNotification]);
 export type AgentMessage = z.infer<typeof AgentMessage>;

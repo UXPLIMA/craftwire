@@ -35,6 +35,13 @@ class ProtocolFixturesTest {
     }
 
     @Test
+    void serverHelloCarriesServerDirAndPid() throws Exception {
+        JsonObject fixture = JsonParser.parseString(Files.readString(FIXTURES.resolve("valid-hello-server.json"))).getAsJsonObject();
+        String encoded = RpcCodec.hello("a".repeat(64), new Hello("server", "0.3.0", "26.2", "server", "/srv/paper", 4242L));
+        assertEquals(fixture, JsonParser.parseString(encoded));
+    }
+
+    @Test
     void errorMatchesFixtureShape() throws Exception {
         JsonObject fixture = JsonParser.parseString(Files.readString(FIXTURES.resolve("valid-response-error.json"))).getAsJsonObject();
         JsonObject data = fixture.getAsJsonObject("error").getAsJsonObject("data");

@@ -1,0 +1,1 @@
+{"jsonrpc":"2.0","id":0,"method":"hello","params":{"token":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","agentKind":"server","agentVersion":"0.3.0","protocolVersion":1,"mcVersion":"26.2","instanceName":"server","serverDir":"/srv/paper","pid":4242}}
