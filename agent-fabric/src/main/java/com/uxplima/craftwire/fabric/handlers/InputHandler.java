@@ -17,7 +17,6 @@ import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Options;
 import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.util.Mth;
 
 final class InputHandler {
     private InputHandler() {}
@@ -80,7 +79,7 @@ final class InputHandler {
         if (p.has("look") && p.get("look").isJsonObject()) {
             JsonObject look = p.getAsJsonObject("look");
             if (look.has("yaw")) player.setYRot(player.getYRot() + look.get("yaw").getAsFloat());
-            if (look.has("pitch")) player.setXRot(Mth.clamp(player.getXRot() + look.get("pitch").getAsFloat(), -90f, 90f));
+            if (look.has("pitch")) player.setXRot(Math.clamp(player.getXRot() + look.get("pitch").getAsFloat(), -90f, 90f));   // JDK, not Mth: Mth.clamp(FFF) is gone in 26.4
         }
         Params.optInt(p, "hotbar").ifPresent(h -> {
             if (h < 1 || h > 9) throw Params.invalid("hotbar must be 1-9");
