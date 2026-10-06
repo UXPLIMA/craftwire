@@ -28,12 +28,12 @@ beforeAll(async () => {
 afterAll(async () => { await client?.close(); });
 
 describe("craftwire CLI over stdio", () => {
-  it("exposes all M1–M4 tools", async () => {
+  it("exposes every built-in tool", async () => {
     const names = (await client.listTools()).tools.map((t) => t.name).sort();
     expect(names).toEqual([
       "bot_action", "bot_remove", "bot_spawn", "camera", "chat", "client_process", "client_settings", "events", "exceptions", "get_request_status", "gui_action", "gui_read",
-      "hud_read", "input", "list_instances", "logs", "player_state", "plugin_deploy", "plugin_manage", "scenario_run", "screenshot",
-      "server_command", "server_eval", "server_info", "server_process", "wait_for", "world_edit", "world_query", "world_render",
+      "hud_read", "input", "list_instances", "logs", "player_state", "plugin_deploy", "plugin_manage", "profile", "scenario_run", "screenshot",
+      "server_command", "server_eval", "server_info", "server_process", "trace", "wait_for", "world_edit", "world_query", "world_render",
     ]);
   });
 

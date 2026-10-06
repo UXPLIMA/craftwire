@@ -5,6 +5,7 @@ export const TOOL_GROUPS: Record<string, readonly string[]> = {
   server: ["server_command", "server_eval", "world_query", "world_edit", "world_render", "server_info", "plugin_manage", "events"],
   dev: ["server_process", "plugin_deploy", "client_process", "scenario_run"],
   bots: ["bot_spawn", "bot_action", "bot_remove"],
+  debug: ["profile", "trace"],
   extensions: [],
 };
 
@@ -14,7 +15,7 @@ const BUILT_IN = new Set(Object.values(TOOL_GROUPS).flat());
 const READS = new Set([
   "list_instances", "get_request_status", "wait_for", "logs", "exceptions",
   "screenshot", "gui_read", "hud_read", "player_state",
-  "world_query", "world_render", "server_info",
+  "world_query", "world_render", "server_info", "profile", "trace",
 ]);
 
 /** Tools that read for some actions only: the actions that change nothing. */
