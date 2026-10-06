@@ -30,6 +30,7 @@ public final class ScriptEngine implements AutoCloseable {
     });
     private Engine engine;
     private Context context;
+    private volatile boolean resetRequested;
 
     public ScriptEngine(ClassLoader loader, String prelude) {
         this.loader = loader;
@@ -42,6 +43,10 @@ public final class ScriptEngine implements AutoCloseable {
         ClassLoader previous = thread.getContextClassLoader();
         thread.setContextClassLoader(loader);   // Truffle discovers GraalJS through the context class loader
         try {
+            if (resetRequested) {
+                resetRequested = false;
+                resetSession();
+            }
             Context ctx = context();
             output.take();   // drop anything printed between calls (e.g. by a scheduled callback)
             Watch watch = new Watch();
@@ -87,6 +92,14 @@ public final class ScriptEngine implements AutoCloseable {
             done = true;
             return fired;
         }
+    }
+
+    /**
+     * Starts the next eval with fresh globals, without waiting for one that is running now. For callers that must
+     * not block, such as the hub connection's thread on reconnect.
+     */
+    public void requestReset() {
+        resetRequested = true;
     }
 
     public synchronized void resetSession() {

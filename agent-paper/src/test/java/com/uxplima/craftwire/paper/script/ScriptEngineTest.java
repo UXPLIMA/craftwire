@@ -35,6 +35,20 @@ class ScriptEngineTest {
     }
 
     @Test
+    void aResetRequestedDuringALongEvalDoesNotWaitForIt() throws Exception {
+        result("globalThis.kept = 1");
+        Thread running = new Thread(() -> engine.eval("const end = Date.now() + 1500; while (Date.now() < end) {} 'done'", 5000));
+        running.start();
+        Thread.sleep(200);   // the eval holds the engine now
+        long t0 = System.nanoTime();
+        engine.requestReset();   // the hub reconnected: called from the WebSocket thread
+        long ms = (System.nanoTime() - t0) / 1_000_000;
+        running.join();
+        assertTrue(ms < 200, "requestReset must not wait for the running eval: " + ms + " ms");
+        assertEquals("undefined", result("typeof kept").getAsString(), "the next eval starts a fresh session");
+    }
+
+    @Test
     void convertsJsValuesToJson() {
         assertEquals(JsonParser.parseString("{\"a\":1,\"b\":[true,\"x\",null],\"c\":null,\"d\":1.5}"),
                 result("({a: 1, b: [true, 'x', null], c: undefined, d: 1.5})"));

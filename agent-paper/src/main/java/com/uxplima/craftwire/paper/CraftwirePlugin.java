@@ -74,7 +74,7 @@ public final class CraftwirePlugin extends JavaPlugin {
 
     private void onHubConnected(String instanceId) {
         getLogger().info("Connected to the Craftwire hub as " + instanceId);
-        scripts.resetSession();   // a new hub session starts with fresh script globals
+        scripts.requestReset();   // a new hub session starts with fresh script globals; never wait on a running eval here
         logs.attach((data, time) -> hub.notifyEvent("log", data, time));
     }
 
