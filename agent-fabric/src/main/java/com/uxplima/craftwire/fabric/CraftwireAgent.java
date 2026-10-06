@@ -9,6 +9,7 @@ import com.uxplima.craftwire.core.HubClient;
 import com.uxplima.craftwire.core.HubConfig;
 import com.uxplima.craftwire.core.LogCapture;
 import com.uxplima.craftwire.core.OperationCache;
+import com.uxplima.craftwire.core.profile.ProfileTools;
 import com.uxplima.craftwire.fabric.handlers.Handlers;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.loader.api.FabricLoader;
@@ -45,6 +46,7 @@ public final class CraftwireAgent {
             });
         }
     }, extensionThreads, this::sendTools, (msg, t) -> LOGGER.error(msg, t));
+    private final ProfileTools profiling = new ProfileTools(new FabricProfiling());
     private HubClient hub;
     private LogCapture logs;
     private volatile boolean connected;
@@ -63,6 +65,8 @@ public final class CraftwireAgent {
         logs = LogCapture.install(1000);
         Handlers.registerAll(this);
         dispatcher.register("ext.call", extensions::call);
+        dispatcher.register("profile.run", profiling::profile);
+        dispatcher.register("trace.run", profiling::trace);
         registerExtensions();
         KillSwitch killSwitch = new KillSwitch(this);
         ScreenWatcher screens = new ScreenWatcher(this);

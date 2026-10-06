@@ -54,6 +54,12 @@ public final class OwnerIndex {
         return new Builder();
     }
 
+    /** The mod whose mixin handler this method is, or null when it is no (known) mixin handler. */
+    public Owner injectedBy(String method) {
+        Matcher m = MIXIN.matcher(method);
+        return m.find() ? mixinIds.get(m.group(1)) : null;
+    }
+
     public Owner owner(String className, String method) {
         Matcher m = MIXIN.matcher(method);
         if (m.find()) {

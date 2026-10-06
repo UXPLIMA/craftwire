@@ -85,13 +85,7 @@ public final class ProfileReport {
         Owner[] frameOwners = new Owner[stack.size()];
         for (int i = 0; i < stack.size(); i++) frameOwners[i] = index.owner(stack.get(i).className(), stack.get(i).method());
 
-        Owner owner = frameOwners[0];
-        for (Owner o : frameOwners) {
-            if (o.isAddon()) {
-                owner = o;
-                break;
-            }
-        }
+        Owner owner = claim(stack, frameOwners);
         owners.merge(owner, 1, Integer::sum);
         samples.add(new Sample(timeNanos, owner));
 
@@ -109,6 +103,21 @@ public final class ProfileReport {
             entries.computeIfAbsent(key, k -> new Entry(o, f.qualified(), eventOf.apply(f),
                     caller == null ? null : caller.qualified(), caller != null && isScheduler(caller))).n++;
         }
+    }
+
+    /**
+     * Whose time a sample is. The innermost frame of a plugin's or mod's own class claims it, with everything it
+     * called (a listener's world lookups are the plugin's cost). A mixin handler only claims the work it does itself:
+     * a mod that wraps the game loop does not own the game. Java and library frames count for their caller.
+     */
+    private Owner claim(List<Frame> stack, Owner[] frameOwners) {
+        for (int i = 0; i < stack.size(); i++) {
+            if (frameOwners[i].isAddon() && index.injectedBy(stack.get(i).method()) == null) return frameOwners[i];
+        }
+        for (Owner o : frameOwners) {
+            if (o != Owner.JAVA && o != Owner.LIBRARY) return o;
+        }
+        return frameOwners[0];
     }
 
     private static boolean isScheduler(Frame f) {

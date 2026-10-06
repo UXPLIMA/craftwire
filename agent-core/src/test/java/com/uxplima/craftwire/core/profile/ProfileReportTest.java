@@ -69,6 +69,29 @@ class ProfileReportTest {
     }
 
     @Test
+    void aMixinWrapperClaimsOnlyTheWorkItDoesItself() {
+        Owner sodium = new Owner("sodium", Owner.MOD);
+        OwnerIndex idx = OwnerIndex.builder().mixinId("sodium", sodium).build();
+        ProfileReport r = new ProfileReport(idx);
+        // Vanilla rendering inside a mod's wrapOperation around the game loop: the game's time.
+        r.add(stack("net.minecraft.client.renderer.LevelRenderer.render",
+                "net.minecraft.client.Minecraft.wrapMethod$zno000$sodium$onRun", "net.minecraft.client.Minecraft.run"), 0);
+        // The handler's own work (and the Java it calls): the mod's time.
+        r.add(stack("java.util.HashMap.get", "net.minecraft.client.Minecraft.handler$zzb000$sodium$onTick",
+                "net.minecraft.client.Minecraft.tick"), 0);
+        JsonArray byOwner = r.json(5).getAsJsonArray("owners");
+        assertEquals(50.0, find(byOwner, "owner", "minecraft").get("percent").getAsDouble());
+        assertEquals(50.0, find(byOwner, "owner", "sodium").get("percent").getAsDouble());
+    }
+
+    @Test
+    void javaAndLibraryFramesCountForTheirCaller() {
+        ProfileReport r = new ProfileReport(owners);
+        r.add(stack("java.util.HashMap.get", "it.unimi.dsi.fastutil.Long2ObjectMap.get", "net.minecraft.world.level.Level.tick"), 0);
+        assertEquals("minecraft", r.json(5).getAsJsonArray("owners").get(0).getAsJsonObject().get("owner").getAsString());
+    }
+
+    @Test
     void entryPointsNameTheListenerEventAndTheSchedulerTask() {
         ProfileReport r = new ProfileReport(owners);
         r.add(concat(stack("com.shop.Prices.lookup", "com.shop.ShopListener.onMove (Lorg/bukkit/event/player/PlayerMoveEvent;)V"), SERVER_LOOP), 0);
