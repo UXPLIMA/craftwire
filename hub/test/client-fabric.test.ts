@@ -23,18 +23,37 @@ describe("Fabric loader profile", () => {
     expect(mergeLibraries(mojang, fabric).map((x) => x.url)).toEqual(["m/gson", "f/asm"]);
   });
 
-  it("builds the download of each Fabric library from its Maven repository", () => {
-    const [f] = fabricLibraryFiles({
+  it("builds the download of each Fabric library from its Maven repository", async () => {
+    const [f] = await fabricLibraryFiles({
       mainClass: "net.fabricmc.loader.impl.launch.knot.KnotClient", arguments: {},
-      libraries: [{ name: "net.fabricmc:fabric-loader:0.19.5", url: "https://maven.fabricmc.net/", sha1: "a".repeat(40), size: 9 }],
+      libraries: [{ name: "net.fabricmc:sponge-mixin:0.17.4", url: "https://maven.fabricmc.net/", sha1: "a".repeat(40), size: 9 }],
     }, "/l");
-    expect(f!.file.url).toBe("https://maven.fabricmc.net/net/fabricmc/fabric-loader/0.19.5/fabric-loader-0.19.5.jar");
-    expect(slash(f!.file.dest)).toBe("/l/net/fabricmc/fabric-loader/0.19.5/fabric-loader-0.19.5.jar");
+    expect(f!.file.url).toBe("https://maven.fabricmc.net/net/fabricmc/sponge-mixin/0.17.4/sponge-mixin-0.17.4.jar");
+    expect(slash(f!.file.dest)).toBe("/l/net/fabricmc/sponge-mixin/0.17.4/sponge-mixin-0.17.4.jar");
   });
 
-  it("needs a sha1 for every Fabric library", () => {
-    expect(() => fabricLibraryFiles({ mainClass: "x", arguments: {}, libraries: [{ name: "a:b:1", url: "https://maven.fabricmc.net/" }] }, "/l"))
-      .toThrow(/no sha1/);
+  it("takes a missing sha1 from the Maven repository and keeps it for offline starts", async () => {
+    const { mkdtempSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const dir = mkdtempSync(join(tmpdir(), "cw-sha-"));
+    const profile = { mainClass: "x", arguments: {}, libraries: [{ name: "net.fabricmc:fabric-loader:0.19.5", url: "https://maven.fabricmc.net/" }] };
+    const asked: string[] = [];
+    const online = (async (url: string) => { asked.push(url); return new Response("ff9e65cffca4a67f31523e1807fe0855940fcbfa\n"); }) as unknown as typeof fetch;
+    const [f] = await fabricLibraryFiles(profile, dir, { fetchImpl: online });
+    expect(asked).toEqual(["https://maven.fabricmc.net/net/fabricmc/fabric-loader/0.19.5/fabric-loader-0.19.5.jar.sha1"]);
+    expect(f!.file.sha1).toBe("ff9e65cffca4a67f31523e1807fe0855940fcbfa");
+    const offline = (async () => { throw new Error("ENOTFOUND"); }) as unknown as typeof fetch;
+    expect((await fabricLibraryFiles(profile, dir, { fetchImpl: offline }))[0]!.file.sha1).toBe("ff9e65cffca4a67f31523e1807fe0855940fcbfa");
+  });
+
+  it("refuses a sha1 file that is not a sha1", async () => {
+    const { mkdtempSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const html = (async () => new Response("<html>not found</html>")) as unknown as typeof fetch;
+    await expect(fabricLibraryFiles({ mainClass: "x", arguments: {}, libraries: [{ name: "a:b:1", url: "https://maven.fabricmc.net/" }] },
+      mkdtempSync(join(tmpdir(), "cw-sha-")), { fetchImpl: html })).rejects.toMatchObject({ code: "DOWNLOAD_FAILED" });
   });
 
   it("points Fabric API at the pinned version on Fabric's Maven", () => {

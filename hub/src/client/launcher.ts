@@ -23,6 +23,23 @@ export function defaultJava(env: NodeJS.ProcessEnv = process.env, platform: Node
   return "java";
 }
 
+/** Where to look for Java when none is given: JAVA_HOME's, then `java` on PATH. */
+export function javaCandidates(env: NodeJS.ProcessEnv = process.env, platform: NodeJS.Platform = process.platform, exists: (p: string) => boolean = existsSync): string[] {
+  return [...new Set([defaultJava(env, platform, exists), "java"])];
+}
+
+/** The first candidate whose major version is at least `need` (JAVA_HOME is often an older JDK than PATH's). */
+export async function pickJava(candidates: string[], probe: (java: string) => Promise<number>, need: number): Promise<string> {
+  const found: string[] = [];
+  for (const java of candidates) {
+    const major = await probe(java).catch(() => undefined);
+    if (major !== undefined && major >= need) return java;
+    found.push(`${java} (${major === undefined ? "not runnable" : `Java ${major}`})`);
+  }
+  throw new CraftwireError("JAVA_TOO_OLD", `Minecraft ${PINS.minecraft} needs Java ${need}+; found ${found.join(", ")}`,
+    `Install Java ${need}+, or pass java: the path to one.`);
+}
+
 /** On a Linux machine without a display the client runs under xvfb-run; elsewhere it runs as is. */
 export function withDisplay(cmd: Command, platform: NodeJS.Platform = process.platform, env: NodeJS.ProcessEnv = process.env,
   hasXvfb: () => boolean = () => spawnSync("xvfb-run", ["--help"], { stdio: "ignore" }).error === undefined): Command {
@@ -49,19 +66,16 @@ export async function prepareClient(p: PrepareInput, o: FetchOptions = {}): Prom
   };
 
   const version = await fetchVersion(PINS.minecraft, dirs.versions, o);
-  const java = p.java ?? defaultJava();
-  const major = await probeJavaMajor(java);
-  const need = version.javaVersion.majorVersion;
-  if (major < need) throw new CraftwireError("JAVA_TOO_OLD", `${java} is Java ${major}; Minecraft ${PINS.minecraft} needs Java ${need}+`, `Pass java: the path to a Java ${need}+ executable.`);
+  const java = await pickJava(p.java !== undefined ? [p.java] : javaCandidates(), probeJavaMajor, version.javaVersion.majorVersion);
 
   const fabric = await fetchFabricProfile(PINS.minecraft, PINS.loader, dirs.versions, o);
-  const libraries = mergeLibraries(namedLibraryFiles(version, os, dirs.libraries), fabricLibraryFiles(fabric, dirs.libraries));
+  const libraries = mergeLibraries(namedLibraryFiles(version, os, dirs.libraries), await fabricLibraryFiles(fabric, dirs.libraries, o));
   const clientJar: FileSpec = { ...version.downloads.client, dest: join(dirs.versions, version.id, `${version.id}.jar`) };
-  const log = version.logging?.client?.file;
-  const logFile: FileSpec | undefined = log ? { url: log.url, sha1: log.sha1, dest: join(dirs.assets, "log_configs", log.id) } : undefined;
+  // Mojang's logging config (version.logging) prints log4j XML for launcher log viewers; without it the game logs
+  // plain lines, which is what status logTail and crash diagnosis read.
   const fabricApi = fabricApiFile(dirs.fabricApi);
   const index = await fetchAssetIndex(version, dirs.assets, o);
-  const files = [clientJar, ...libraries, fabricApi, ...(logFile ? [logFile] : []), ...assetFiles(index, join(dirs.assets, "objects"), p.sounds)];
+  const files = [clientJar, ...libraries, fabricApi, ...assetFiles(index, join(dirs.assets, "objects"), p.sounds)];
   const downloadedBytes = await fetchAll(files, { ...o, onProgress: p.onProgress });
 
   const gameDir = prepareInstance(p.root, { username: p.username, agentJar: agent, fabricApiJar: fabricApi.dest, extraMods: p.mods });
@@ -69,7 +83,6 @@ export async function prepareClient(p: PrepareInput, o: FetchOptions = {}): Prom
     version, fabric, os, java,
     classpath: [...libraries.map((l) => l.dest), clientJar.dest], pathSep: delimiter,
     gameDir, assetsDir: dirs.assets, nativesDir: dirs.natives, libraryDir: dirs.libraries,
-    ...(logFile ? { logConfig: logFile.dest } : {}),
     username: p.username, ...(p.server !== undefined ? { server: p.server } : {}),
     width: p.width, height: p.height, hidden: !p.visible, launcherVersion: HUB_VERSION,
   });

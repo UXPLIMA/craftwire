@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { CraftwireError } from "../errors.js";
 import type { FetchOptions, FileSpec } from "./download.js";
 import { PINS } from "./pins.js";
@@ -33,16 +33,39 @@ export function libraryKey(coord: string): string {
   return [group, artifact, ...(classifier ? [classifier] : [])].join(":");
 }
 
-export function fabricLibraryFiles(p: FabricProfile, libDir: string): NamedFile[] {
-  return p.libraries.map((lib) => {
-    if (!lib.sha1) throw new CraftwireError("DOWNLOAD_FAILED", `Fabric's profile has no sha1 for ${lib.name}`, "Update craftwire.");
+/**
+ * The profile's libraries as downloads. Some entries (the loader itself) carry no sha1; it then comes from the
+ * `.sha1` file the Maven repository publishes next to the jar, kept beside the jar for offline starts.
+ */
+export async function fabricLibraryFiles(p: FabricProfile, libDir: string, o: FetchOptions = {}): Promise<NamedFile[]> {
+  const out: NamedFile[] = [];
+  for (const lib of p.libraries) {
     const path = mavenPath(lib.name);
     const base = lib.url.endsWith("/") ? lib.url : `${lib.url}/`;
-    return {
-      name: lib.name,
-      file: { url: `${base}${path}`, sha1: lib.sha1, ...(lib.size !== undefined ? { size: lib.size } : {}), dest: join(libDir, ...path.split("/")) },
-    };
-  });
+    const url = `${base}${path}`;
+    const dest = join(libDir, ...path.split("/"));
+    const sha1 = lib.sha1 ?? (await mavenSha1(url, `${dest}.sha1`, o));
+    out.push({ name: lib.name, file: { url, sha1, ...(lib.size !== undefined ? { size: lib.size } : {}), dest } });
+  }
+  return out;
+}
+
+async function mavenSha1(jarUrl: string, keep: string, o: FetchOptions): Promise<string> {
+  const valid = (s: string) => /^[0-9a-f]{40}$/.test(s);
+  try {
+    const res = await (o.fetchImpl ?? fetch)(`${jarUrl}.sha1`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const sum = (await res.text()).trim().split(/\s+/)[0]!.toLowerCase();
+    if (!valid(sum)) throw new CraftwireError("DOWNLOAD_FAILED", `${jarUrl}.sha1 is not a sha1`, "Retry later; the repository answered something unexpected.");
+    mkdirSync(dirname(keep), { recursive: true });
+    writeFileSync(keep, sum);
+    return sum;
+  } catch (e) {
+    if (e instanceof CraftwireError) throw e;
+    const kept = existsSync(keep) ? readFileSync(keep, "utf8").trim() : "";
+    if (valid(kept)) return kept;
+    throw new CraftwireError("DOWNLOAD_FAILED", `${jarUrl}.sha1: ${(e as Error).message}`, "Check the network connection, then retry.");
+  }
 }
 
 /** Mojang's libraries plus Fabric's; where both ship one (e.g. ASM), Fabric's version wins, as in every Fabric launcher. */
