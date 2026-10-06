@@ -14,6 +14,7 @@ def compatProjects = rootProject.mcVersions.collect { ":paper-compat-${rootProje
 def itProps = rootProject.mcProps(project.findProperty('mc') ?: rootProject.baseMc)
 
 evaluationDependsOn(':agent-core')
+evaluationDependsOn(':craftwire-api')
 evaluationDependsOn(':test-fixtures')
 
 repositories {
@@ -51,8 +52,10 @@ dependencies {
 
 jar {
     // agent-core is bundled as plain classes; Gson and log4j are provided by Paper.
-    dependsOn ':agent-core:classes'
+    dependsOn ':agent-core:classes', ':craftwire-api:classes'
     from project(':agent-core').sourceSets.main.output
+    // The extension API: plugins compile against it and use these classes (softdepend: [Craftwire]).
+    from project(':craftwire-api').sourceSets.main.output
     // Every supported version's server code; ServerCompat picks one at runtime.
     compatProjects.each { path ->
         dependsOn "${path}:classes"

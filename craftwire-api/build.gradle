@@ -1,0 +1,39 @@
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+}
+
+// What plugins and mods compile against (compileOnly): the Craftwire agents bring these classes at runtime.
+java {
+    withSourcesJar()
+    withJavadocJar()
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 21
+    options.encoding = 'UTF-8'
+}
+
+jar {
+    archiveBaseName = 'craftwire-api'
+}
+
+javadoc {
+    // Every public type is documented; accessor-style methods need no @return boilerplate.
+    options.addStringOption('Xdoclint:all,-missing', '-quiet')
+}
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            artifactId = 'craftwire-api'
+            from components.java
+            pom {
+                name = 'Craftwire API'
+                description = 'Add your own tools to Craftwire from a Paper plugin or a Fabric mod.'
+                url = 'https://github.com/uxplima/craftwire'
+                licenses { license { name = 'MIT'; url = 'https://opensource.org/licenses/MIT' } }
+            }
+        }
+    }
+}

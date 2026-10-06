@@ -8,7 +8,13 @@ pluginManagement {
 }
 
 rootProject.name = 'craftwire'
-include 'agent-core', 'agent-fabric', 'agent-paper', 'test-fixtures'
+
+// -PapiOnly builds just the public API (JitPack, plugin developers): no Minecraft, Loom or paperweight needed.
+if (providers.gradleProperty('apiOnly').isPresent()) {
+    include 'craftwire-api'
+    return
+}
+include 'craftwire-api', 'agent-core', 'agent-fabric', 'agent-paper', 'test-fixtures'
 include 'compat-check'
 project(':compat-check').projectDir = file('tools/compat-check')
 

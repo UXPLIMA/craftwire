@@ -5,6 +5,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { trackExceptions } from "../../src/exceptions.js";
+import { ExtensionRegistry } from "../../src/extensions.js";
 import { AgentServer } from "../../src/agents.js";
 import { AuditLog } from "../../src/audit.js";
 import { ClientManager, type PrepareClient } from "../../src/client/client-manager.js";
@@ -31,7 +32,7 @@ export async function startHub(opts: { writeHubJson?: boolean; javaMajor?: numbe
     agents, home, servers, prepare: opts.prepareClient ?? noClient, ...(opts.clientRoot ? { root: opts.clientRoot } : {}),
     stopTimeoutMs: opts.clientStopTimeoutMs ?? 2000, quitTimeoutMs: 500, readyPollMs: 50,
   });
-  const ctx = { agents, ops: new OperationTracker(), audit: new AuditLog(join(home, "logs")), servers, clients, exceptions: trackExceptions(agents) };
+  const ctx = { agents, ops: new OperationTracker(), audit: new AuditLog(join(home, "logs")), servers, clients, exceptions: trackExceptions(agents), extensions: new ExtensionRegistry(agents) };
   const server = createCraftwireServer(ctx);
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   await server.connect(serverTransport);

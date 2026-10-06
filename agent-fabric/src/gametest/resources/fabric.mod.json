@@ -4,7 +4,8 @@
   "version": "0.0.0",
   "environment": "client",
   "entrypoints": {
-    "fabric-client-gametest": ["com.uxplima.craftwire.fabric.gametest.AgentGameTests"]
+    "fabric-client-gametest": ["com.uxplima.craftwire.fabric.gametest.AgentGameTests"],
+    "craftwire": ["com.uxplima.craftwire.fabric.gametest.GametestTools"]
   },
   "depends": { "craftwire-agent": "*" }
 }

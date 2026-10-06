@@ -20,6 +20,7 @@ public final class AgentGameTests implements FabricClientGameTest {
                 throw new java.io.UncheckedIOException(e);
             }
             InputSettingsChecks.run(ctx, sp);
+            ExtensionChecks.run(ctx);
         }
     }
 }

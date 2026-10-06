@@ -1,0 +1,5 @@
+# JitPack builds only the extension API: com.github.uxplima.craftwire:craftwire-api:<tag>
+jdk:
+  - openjdk21
+install:
+  - ./gradlew -PapiOnly :craftwire-api:publishToMavenLocal --console=plain

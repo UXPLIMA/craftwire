@@ -13,6 +13,8 @@ repositories {
 
 dependencies {
     // Paper API only, so the fixture plugin runs on every supported version.
+    // Craftwire brings the API classes at runtime (softdepend), exactly as a real plugin would use it.
+    compileOnly project(':craftwire-api')
     compileOnly "io.papermc.paper:paper-api:${rootProject.mcProps(rootProject.baseMc).paper_dev_bundle}"
 }
 

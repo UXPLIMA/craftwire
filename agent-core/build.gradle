@@ -7,6 +7,8 @@ repositories {
 }
 
 dependencies {
+    // The public API plugins and mods compile against; each agent jar bundles its classes.
+    api project(':craftwire-api')
     // Gson ships with Minecraft and Paper; never bundle it.
     compileOnly 'com.google.code.gson:gson:2.13.2'
     // log4j-core ships with Minecraft and Paper; LogCapture plugs into it, never bundle it.

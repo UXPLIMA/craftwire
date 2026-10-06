@@ -7,6 +7,7 @@ import { prepareClient } from "./client/launcher.js";
 import { hubPort, loadOrCreateToken, readHubConfig, writeHubConfig, type HubConfig } from "./config.js";
 import { ServerManager } from "./dev/server-manager.js";
 import { trackExceptions } from "./exceptions.js";
+import { ExtensionRegistry } from "./extensions.js";
 import { OperationTracker } from "./operations.js";
 import type { ToolContext } from "./tools/registry.js";
 
@@ -34,6 +35,7 @@ export async function startHub(home: string, log: (msg: string) => void): Promis
   const clients = new ClientManager({ agents, home, servers, prepare: (p) => prepareClient(p) });
   const ctx: ToolContext = {
     agents, servers, clients, ops: new OperationTracker(), audit: new AuditLog(join(home, "logs")), exceptions: trackExceptions(agents),
+    extensions: new ExtensionRegistry(agents),
   };
   let closing: Promise<void> | undefined;
   return {

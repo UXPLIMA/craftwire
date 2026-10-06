@@ -72,6 +72,10 @@ A scenario is a plugin test written as JSON: bots run commands and click menus, 
     { "expect_no_exceptions": {} } ] }
 ```
 
+### Give the AI your plugin's own tools
+
+A plugin or mod can add its own tools through a small API (`craftwire-api`, no dependencies), for example `myshop_coins` to read a player's balance, or a tool that sets up a test auction in one call. They appear next to the built-in tools, run on the game thread, and are removed when the plugin is disabled. See [docs/extensions.md](docs/extensions.md).
+
 ### Let the AI run its own client
 
 You don't have to keep the game open. `client_process` starts a Minecraft client the hub runs itself:

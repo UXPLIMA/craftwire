@@ -19,6 +19,7 @@ public final class Handlers {
         d.register("plugin.manage", p -> PluginManageHandler.handle(p, plugin));
         d.register("events", p -> s.global(() -> EventsHandler.handle(p, plugin)));
         d.register("wait", p -> WaitHandler.handle(p, plugin));
+        d.register("ext.call", p -> plugin.extensions().call(p));
         d.register("bot.spawn", p -> BotHandler.spawn(p, plugin));
         d.register("bot.remove", p -> BotHandler.remove(p, plugin));
         d.register("bot.action", p -> BotHandler.action(p, plugin));

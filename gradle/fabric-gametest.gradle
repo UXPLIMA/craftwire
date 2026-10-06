@@ -24,6 +24,7 @@ dependencies {
     implementation "net.fabricmc.fabric-api:fabric-api:${props.fabric_api_version}"
     implementation files(agentJar)
     gametestCompileOnly project(':agent-core')
+    gametestCompileOnly project(':craftwire-api')
 
     // Optional: more mods in the test client, e.g. -PextraClientMods=C:/mods/sodium.jar (';'-separated).
     if (project.hasProperty('extraClientMods')) {

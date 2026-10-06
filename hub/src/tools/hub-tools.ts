@@ -26,10 +26,13 @@ function matches(condition: Condition, pattern: RegExp | undefined, ev: AgentEve
 
 export function registerHubTools(server: McpServer, ctx: ToolContext): void {
   defineTool(server, ctx, "list_instances",
-    "List connected Minecraft clients and servers (id, name, versions). Call this first; other tools take `instance` from here.",
+    "List connected Minecraft clients and servers (id, name, versions, and `tools` that plugins or mods added through the Craftwire API). Call this first; other tools take `instance` from here.",
     {},
     async (_args, c) => {
-      const instances = c.agents.instances();
+      const instances = c.agents.instances().map((i) => {
+        const tools = c.extensions.namesFor(i.id);
+        return tools.length > 0 ? { ...i, tools } : i;
+      });
       return ok(instances.length
         ? { instances }
         : { instances, hint: "Nothing is connected. Start Minecraft with the Craftwire Agent mod (and/or a Paper server with the Craftwire plugin); they connect to this hub automatically." });

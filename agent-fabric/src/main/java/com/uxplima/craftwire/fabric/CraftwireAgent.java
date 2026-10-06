@@ -1,6 +1,8 @@
 package com.uxplima.craftwire.fabric;
 
 import com.google.gson.JsonObject;
+import com.uxplima.craftwire.api.CraftwireEntrypoint;
+import com.uxplima.craftwire.core.ExtensionTools;
 import com.uxplima.craftwire.core.Dispatcher;
 import com.uxplima.craftwire.core.Hello;
 import com.uxplima.craftwire.core.HubClient;
@@ -10,6 +12,11 @@ import com.uxplima.craftwire.core.OperationCache;
 import com.uxplima.craftwire.fabric.handlers.Handlers;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.loader.api.FabricLoader;
+import net.fabricmc.loader.api.entrypoint.EntrypointContainer;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import net.minecraft.SharedConstants;
 import net.minecraft.client.Minecraft;
 import org.slf4j.Logger;
@@ -22,6 +29,22 @@ public final class CraftwireAgent {
 
     private final Dispatcher dispatcher = new Dispatcher(new OperationCache(300_000, System::currentTimeMillis));
     private final ClientScheduler scheduler = new ClientScheduler();
+    private final ExecutorService extensionThreads = Executors.newCachedThreadPool(r -> {
+        Thread t = new Thread(r, "craftwire-extension");
+        t.setDaemon(true);
+        return t;
+    });
+    private final ExtensionTools extensions = new ExtensionTools(new ExtensionTools.GameThread() {
+        @Override public <T> CompletableFuture<T> run(Callable<T> work) {
+            return Minecraft.getInstance().submit(() -> {
+                try {
+                    return work.call();
+                } catch (Exception e) {
+                    throw new java.util.concurrent.CompletionException(e);
+                }
+            });
+        }
+    }, extensionThreads, this::sendTools, (msg, t) -> LOGGER.error(msg, t));
     private HubClient hub;
     private LogCapture logs;
     private volatile boolean connected;
@@ -39,6 +62,8 @@ public final class CraftwireAgent {
     public void start() {
         logs = LogCapture.install(1000);
         Handlers.registerAll(this);
+        dispatcher.register("ext.call", extensions::call);
+        registerExtensions();
         KillSwitch killSwitch = new KillSwitch(this);
         ScreenWatcher screens = new ScreenWatcher(this);
         ClientTickEvents.END_CLIENT_TICK.register(mc -> {
@@ -73,6 +98,7 @@ public final class CraftwireAgent {
         connected = true;
         LOGGER.info("[craftwire] connected to hub as {}", instanceId);
         if (hub != null) logs.attach((data, time) -> hub.notifyEvent("log", data, time));
+        sendTools();
         Minecraft.getInstance().execute(() -> {
             Minecraft mc = Minecraft.getInstance();
             if (savedPauseOnLostFocus == null) savedPauseOnLostFocus = mc.options.pauseOnLostFocus;
@@ -89,6 +115,25 @@ public final class CraftwireAgent {
                 savedPauseOnLostFocus = null;
             }
         });
+    }
+
+    /** Mods that declare a "craftwire" entrypoint add their tools, named after their mod id. */
+    private void registerExtensions() {
+        for (EntrypointContainer<CraftwireEntrypoint> c : FabricLoader.getInstance().getEntrypointContainers("craftwire", CraftwireEntrypoint.class)) {
+            String modId = c.getProvider().getMetadata().getId();
+            try {
+                c.getEntrypoint().registerTools(extensions.registryFor(modId));
+            } catch (RuntimeException | LinkageError e) {
+                LOGGER.error("[craftwire] {} could not register its Craftwire tools", modId, e);
+            }
+        }
+    }
+
+    /** Tells the hub which extension tools this client has (on connect, and whenever they change). */
+    private void sendTools() {
+        JsonObject d = new JsonObject();
+        d.add("tools", extensions.list());
+        emit("tools", d);
     }
 
     public LogCapture logs() {

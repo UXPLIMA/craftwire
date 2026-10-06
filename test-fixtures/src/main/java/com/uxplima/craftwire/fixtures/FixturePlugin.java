@@ -28,6 +28,8 @@ public final class FixturePlugin extends JavaPlugin implements Listener {
     @Override
     public void onEnable() {
         getServer().getPluginManager().registerEvents(this, this);
+        // Without Craftwire installed the plugin still works; the API classes are only touched when it is.
+        if (getServer().getPluginManager().getPlugin("Craftwire") != null) FixtureTools.register(this);
     }
 
     @Override

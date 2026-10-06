@@ -45,6 +45,10 @@ If `gui_action` returns `SLOT_OUT_OF_RANGE` or `NO_SCREEN_OPEN`, the screen chan
 - `scenario_run {files:[…]}` or `{scenario:{…}}` runs plugin tests written as JSON steps (see `paper-plugin-dev`).
 - Never accept the EULA for the user. Ask before `takeOver:true` — it stops a server the user started.
 
+## Plugin and mod tools
+- `list_instances` shows `tools` that plugins or mods added (named `<plugin>_<tool>`). Prefer them for that plugin's own state; they run on the game thread.
+- A plugin under development can add tools for its tests: see docs/extensions.md in the Craftwire repo.
+
 ## Player commands through `chat`
 - `chat {action:"command"}` strips one leading `/`, so WorldEdit commands keep their double slash: send `//pos1`.
 

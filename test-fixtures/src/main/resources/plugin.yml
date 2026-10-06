@@ -3,6 +3,7 @@ version: '${version}'
 main: com.uxplima.craftwire.fixtures.FixturePlugin
 api-version: '26.2'
 description: Test-only plugin for the Craftwire integration tests.
+softdepend: [Craftwire]
 commands:
   cwfixture:
     description: Replies now and again two ticks later.

@@ -32,6 +32,8 @@ dependencies {
 
     implementation project(':agent-core')
     include project(':agent-core')
+    // The extension API mods compile against; shipped inside the agent so they find it at runtime.
+    include project(':craftwire-api')
 
     testImplementation platform('org.junit:junit-bom:5.13.4')
     testImplementation 'org.junit.jupiter:junit-jupiter'

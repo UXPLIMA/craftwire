@@ -1,4 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { bindExtensionTools } from "./extensions.js";
 import { registerBotTools } from "./tools/bot-tools.js";
 import { registerClientProcessTools } from "./tools/client-process-tools.js";
 import { registerClientTools } from "./tools/client-tools.js";
@@ -31,6 +32,8 @@ export function createCraftwireServer(ctx: ToolContext): McpServer {
   registerDevTools(server, ctx);
   registerBotTools(server, ctx);
   registerScenarioTools(server, ctx, () => createCraftwireServer(ctx));
+  // Last, so a plugin's tool can never take a built-in name.
+  bindExtensionTools(server, ctx);
   registerClientProcessTools(server, ctx);
   return server;
 }

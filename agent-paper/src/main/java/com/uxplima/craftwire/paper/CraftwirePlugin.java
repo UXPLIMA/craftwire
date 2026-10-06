@@ -27,6 +27,7 @@ public final class CraftwirePlugin extends JavaPlugin {
     private SnapshotStore snapshots;
     private BotManager bots;
     private EventTap events;
+    private PaperExtensions extensions;
 
     @Override
     public void onLoad() {
@@ -44,6 +45,8 @@ public final class CraftwirePlugin extends JavaPlugin {
         snapshots = new SnapshotStore(getDataFolder().toPath().resolve("snapshots"));
         bots = new BotManager(this);
         bots.start();
+        extensions = new PaperExtensions(this, this::sendTools);
+        extensions.start();
         Handlers.registerAll(this);
         getServer().getPluginManager().registerEvents(new EventBridge(this), this);
         if (config.recordEvents()) {
@@ -68,6 +71,7 @@ public final class CraftwirePlugin extends JavaPlugin {
     @Override
     public void onDisable() {
         if (events != null) events.stop();
+        if (extensions != null) extensions.stop();
         if (bots != null) bots.shutdown();
         if (scripts != null) scripts.close();
         if (hub != null) hub.close();
@@ -83,6 +87,19 @@ public final class CraftwirePlugin extends JavaPlugin {
         getLogger().info("Connected to the Craftwire hub as " + instanceId);
         scripts.requestReset();   // a new hub session starts with fresh script globals; never wait on a running eval here
         logs.attach((data, time) -> hub.notifyEvent("log", data, time));
+        sendTools();
+    }
+
+    /** Tells the hub which extension tools this server has (on connect, and whenever they change). */
+    private void sendTools() {
+        if (hub == null || extensions == null) return;
+        JsonObject d = new JsonObject();
+        d.add("tools", extensions.list());
+        hub.notifyEvent("tools", d);
+    }
+
+    public PaperExtensions extensions() {
+        return extensions;
     }
 
     private void onHubDisconnected() {

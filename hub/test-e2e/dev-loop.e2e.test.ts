@@ -84,6 +84,22 @@ describe("dev loop against a real Paper server", () => {
     expect(json(await hub.call("plugin_manage", { action: "info", name: "CraftwireFixture" })).enabled).toBe(true);
   });
 
+  it("a plugin's own tools from the Craftwire API show up in MCP and run on the server", async () => {
+    const deadline = Date.now() + 10_000;
+    let names: string[] = [];
+    while (Date.now() < deadline && !names.includes("craftwirefixture_greet")) {
+      names = (await hub.client.listTools()).tools.map((t) => t.name);
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    expect(names).toEqual(expect.arrayContaining(["craftwirefixture_greet", "craftwirefixture_refuse", "craftwirefixture_crash"]));
+    expect(json(await hub.call("craftwirefixture_greet", { name: "Alex" }))).toMatchObject({ greeting: "Hello Alex", mainThread: true });
+    expect(json(await hub.call("craftwirefixture_refuse", {}))).toMatchObject({ code: "FIXTURE_REFUSED", hint: "Ask nicely." });
+    const crash = json(await hub.call("craftwirefixture_crash", {}));
+    expect(crash.code).toBe("EXTENSION_FAILED");
+    const bugs = json(await hub.call("exceptions", {})).exceptions;
+    expect(bugs.some((b: { type: string; message: string }) => b.type === "java.lang.IllegalStateException" && b.message === "fixture tool crashed")).toBe(true);
+  });
+
   it("drives a bot through a plugin menu", async () => {
     const spawned = json(await hub.call("bot_spawn", { names: ["E2eBot"] }));
     expect(spawned.bots[0].name).toBe("E2eBot");
