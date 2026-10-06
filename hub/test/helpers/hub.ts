@@ -14,7 +14,7 @@ import { createCraftwireServer } from "../../src/server.js";
 
 export const TOKEN = "a".repeat(64);
 
-export async function startHub(opts: { writeHubJson?: boolean; javaMajor?: number; agentWaitMs?: number; stopTimeoutMs?: number; prepareClient?: PrepareClient; clientStopTimeoutMs?: number } = {}) {
+export async function startHub(opts: { writeHubJson?: boolean; javaMajor?: number; agentWaitMs?: number; stopTimeoutMs?: number; prepareClient?: PrepareClient; clientRoot?: string; clientStopTimeoutMs?: number } = {}) {
   const home = mkdtempSync(join(tmpdir(), "cw-hub-"));
   const agents = new AgentServer({ token: TOKEN, port: 0, requestTimeoutMs: 2000 });
   const port = await agents.listen();
@@ -27,7 +27,7 @@ export async function startHub(opts: { writeHubJson?: boolean; javaMajor?: numbe
   });
   const noClient: PrepareClient = async () => { throw new Error("no client in this test"); };
   const clients = new ClientManager({
-    agents, home, servers, prepare: opts.prepareClient ?? noClient,
+    agents, home, servers, prepare: opts.prepareClient ?? noClient, ...(opts.clientRoot ? { root: opts.clientRoot } : {}),
     stopTimeoutMs: opts.clientStopTimeoutMs ?? 2000, quitTimeoutMs: 500, readyPollMs: 50,
   });
   const server = createCraftwireServer({ agents, ops: new OperationTracker(), audit: new AuditLog(join(home, "logs")), servers, clients });

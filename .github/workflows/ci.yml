@@ -88,7 +88,13 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: hub/package-lock.json
-      - run: ./gradlew :agent-paper:build :test-fixtures:build
+      - run: ./gradlew :agent-paper:build :agent-fabric:build :test-fixtures:build
+      # client_process runs its client under xvfb-run on a machine without a display.
+      - run: sudo apt-get update && sudo apt-get install -y xvfb
+      - uses: actions/cache@v4
+        with:
+          path: hub/.e2e/client-cache
+          key: client-cache-${{ hashFiles('gradle.properties') }}
       - run: npm ci
         working-directory: hub
       - run: npm run test:e2e
@@ -97,4 +103,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: dev-loop-e2e-logs
-          path: hub/.e2e/server/logs/
+          path: |
+            hub/.e2e/server/logs/
+            hub/.e2e/client-server/logs/
+            hub/.e2e/client-cache/instances/*/logs/
