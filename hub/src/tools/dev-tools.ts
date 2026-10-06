@@ -36,7 +36,7 @@ export function registerDevTools(server: McpServer, ctx: ToolContext): void {
     {
       projectDir: z.string().optional().describe("Plugin project root to build."),
       jar: z.string().optional().describe("A ready plugin jar to install instead of building."),
-      buildCommand: z.string().optional().describe("Shell command run in projectDir instead of the detected build, e.g. '.\\gradlew.bat shadowJar' on Windows (a bare gradlew.bat is not found from Claude Code's shell)."),
+      buildCommand: z.string().optional().describe("Shell command run in projectDir instead of the detected build, e.g. '.\\gradlew.bat shadowJar' on Windows (a bare gradlew.bat is not found from the hub's shell)."),
       jarGlob: z.string().optional().describe("Which built jar, relative to projectDir, e.g. 'build/libs/*-all.jar'. Needed when several plugins are built."),
       javaHome: z.string().optional().describe("JAVA_HOME for the build."),
       serverDir: z.string().optional().describe("Server folder. Optional when only one server is known."),

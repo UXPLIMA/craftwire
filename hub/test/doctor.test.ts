@@ -58,7 +58,7 @@ describe("craftwire doctor", () => {
     try {
       const h = home();
       writeHubConfig({ port: (wss.address() as { port: number }).port, token: TOKEN }, h);
-      expect(find(await runDoctor({ home: h, javaMajor: java25 }), "older than 0.3.0")).toMatchObject({ status: "warn", fix: expect.stringContaining("Restart Claude Code") });
+      expect(find(await runDoctor({ home: h, javaMajor: java25 }), "older than 0.3.0")).toMatchObject({ status: "warn", fix: expect.stringContaining("Restart your AI client") });
     } finally {
       await new Promise((r) => wss.close(r));
     }

@@ -55,16 +55,16 @@ export async function runDoctor(o: DoctorOptions): Promise<Check[]> {
     cfg = undefined;
   }
   if (!cfg || typeof cfg.port !== "number" || typeof cfg.token !== "string") {
-    checks.push({ status: "warn", label: `${file} is missing or unreadable`, fix: "The hub writes it when it starts: open Claude Code with the craftwire plugin enabled (check /mcp)." });
+    checks.push({ status: "warn", label: `${file} is missing or unreadable`, fix: "The hub writes it when it starts: open your AI client with craftwire set up (Claude Code: the plugin, check /mcp; others: npx craftwire setup)." });
   } else {
     checks.push({ status: "ok", label: `hub.json: port ${cfg.port}` });
     try {
       checks.push(...hubChecks(await hubStatus(cfg.port, cfg.token)));
     } catch (e) {
       if ((e as Error).message === OLD_HUB) {
-        checks.push({ status: "warn", label: `a hub older than 0.3.0 is running on 127.0.0.1:${cfg.port}`, fix: `Restart Claude Code (or the process running the hub) so it uses craftwire ${HUB_VERSION}.` });
+        checks.push({ status: "warn", label: `a hub older than 0.3.0 is running on 127.0.0.1:${cfg.port}`, fix: `Restart your AI client (or the process running the hub) so it uses craftwire ${HUB_VERSION}.` });
       } else {
-        checks.push({ status: "warn", label: `no hub answers on 127.0.0.1:${cfg.port}`, fix: "The hub runs inside Claude Code: open Claude Code with the craftwire plugin enabled (check /mcp)." });
+        checks.push({ status: "warn", label: `no hub answers on 127.0.0.1:${cfg.port}`, fix: "The hub runs inside your AI client: open it with craftwire set up (Claude Code: the plugin, check /mcp; others: npx craftwire setup)." });
       }
     }
   }
@@ -84,7 +84,7 @@ export async function runDoctor(o: DoctorOptions): Promise<Check[]> {
 function hubChecks(s: HubStatus): Check[] {
   const out: Check[] = [s.hubVersion === HUB_VERSION
     ? { status: "ok", label: `hub ${s.hubVersion} is running` }
-    : { status: "warn", label: `hub ${s.hubVersion} is running, this command is ${HUB_VERSION}`, fix: "Restart Claude Code so both use the same version." }];
+    : { status: "warn", label: `hub ${s.hubVersion} is running, this command is ${HUB_VERSION}`, fix: "Restart your AI client so both use the same version." }];
   if (s.instances.length === 0) out.push({ status: "warn", label: "no game or server is connected", fix: "Start Minecraft with the Craftwire Agent mod, or a Paper server with the Craftwire plugin." });
   for (const i of s.instances) {
     const what = `${i.id} (${i.name}, ${i.kind === "client" ? "mod" : "plugin"} ${i.agentVersion}, Minecraft ${i.mcVersion})`;

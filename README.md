@@ -1,68 +1,208 @@
-# Craftwire
+<p align="center">
+  <img src="docs/images/banner.jpg" alt="Craftwire: let AI agents see and drive Minecraft" width="100%">
+</p>
 
-Let AI agents (Claude Code and any MCP client) **see and drive Minecraft**: screenshots, a free camera, reading and clicking GUIs, chat and commands, HUD reading and input — and **drive a Paper server**: console commands, JavaScript against the Bukkit API, world reads and edits with undo snapshots, logs and plugin control. It also runs a local server and builds and redeploys your plugin in one step (dev loop). Server-side bots stand in for players when you test plugins.
+<p align="center">
+  <a href="https://github.com/uxplima/craftwire/releases"><img alt="Release" src="https://img.shields.io/github/v/release/uxplima/craftwire?color=4c9a2a"></a>
+  <a href="https://www.npmjs.com/package/craftwire"><img alt="npm" src="https://img.shields.io/npm/v/craftwire?color=cb3837"></a>
+  <a href="https://github.com/uxplima/craftwire/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/uxplima/craftwire/actions/workflows/ci.yml/badge.svg"></a>
+  <img alt="Minecraft 26.2" src="https://img.shields.io/badge/Minecraft-26.2-62b47a">
+  <img alt="MIT" src="https://img.shields.io/badge/license-MIT-blue">
+</p>
 
-By [UXPLIMA](https://github.com/uxplima) · MIT licensed · Minecraft 26.2 (Fabric client, Paper server)
+**Craftwire** is an MCP server that gives AI agents eyes and hands in Minecraft. The agent takes screenshots from any angle, reads and clicks menus, chats, presses keys and reads the HUD on a **Fabric client**. On a **Paper server** it runs console commands and JavaScript against the Bukkit API, reads and edits the world, spawns bots that play like real players, and builds, deploys and restarts your plugin in one step.
 
-## Quick start (Claude Code)
+It works with Claude Code, Codex, Gemini CLI, Antigravity, Cursor, Windsurf, VS Code, Claude Desktop and any other MCP client that runs local servers.
 
-1. Install the plugin:
-   ```
-   /plugin marketplace add uxplima/craftwire
-   /plugin install craftwire@uxplima
-   ```
-2. Install **Craftwire Agent** (`craftwire-agent-fabric-<version>.jar` from [Releases](https://github.com/uxplima/craftwire/releases); Fabric mod, requires Fabric API) into your Minecraft 26.2 profile.
-3. Start Minecraft and join a world. A green **⚡ Craftwire connected** appears top-left. **F8** pauses AI control at any time.
+Every picture on this page was taken by Craftwire itself, through the tools below, on a throwaway test server.
 
-Ask Claude: *"take a screenshot of what I'm looking at"*.
+## What it can do
 
-> Windows: if the MCP server does not start, edit `.mcp.json` in the plugin to use `"command": "cmd", "args": ["/c", "npx", "-y", "craftwire@0.4.1"]`.
+### See the game from any angle
 
-## Paper server
+`screenshot` captures what the player sees, or renders from any camera pose without moving the player. Terrain behind the player is rendered too, with or without Sodium. Use it to check a build from above, frame a scene for a promo shot, or watch a test from the side.
 
-Drop `craftwire-paper-<version>.jar` (from [Releases](https://github.com/uxplima/craftwire/releases)) into the server's `plugins/` folder and start it; it connects to the hub on its own.
+<img src="docs/images/camera.jpg" alt="The same scene from above, from behind and from the front, all rendered without moving the player" width="100%">
 
-- The first start downloads GraalJS (for `server_eval`) through Paper's library loader, so it needs network access once.
-- `plugins/Craftwire/config.yml` has four switches: `allow-eval`, `allow-world-edit`, `allow-bots` and `max-edit-volume`. A disabled capability answers `PERMISSION_DISABLED`.
-- **Development servers only.** Anyone who can run the hub on the machine gets full control of the server; the plugin logs a warning on every start.
+### Read and click menus like a player
 
-Ask Claude: *"what's the TPS, and which plugins logged errors since startup?"*.
+`gui_read` returns the open screen as data: every slot with its item, name and lore, plus buttons and text fields. `gui_action` hovers, clicks, drags and types. Plugin menus built from chests work like any other screen.
 
-## Dev loop
+<img src="docs/images/gui.jpg" alt="A plugin kit menu with the VIP item hovered" width="100%">
 
-Point Claude at a server folder and a plugin project:
+```jsonc
+// gui_read, trimmed
+{
+  "open": true, "title": "Kit Selector", "type": "ContainerScreen",
+  "hovered": { "slot": 16, "item": { "id": "minecraft:golden_apple", "name": "VIP", "lore": ["Requires the VIP rank", "Locked"] } },
+  "slots": [
+    { "slot": 14, "id": "minecraft:diamond_pickaxe", "name": "Miner", "lore": ["Efficiency V pickaxe", "Click to select", "..."] },
+    { "slot": 22, "id": "minecraft:barrier", "name": "Close", "lore": [] }
+  ]
+}
+```
 
-- `server_process` starts, stops and restarts a local Paper server. JVM flags come from its start script. It never accepts the EULA for you.
-- `plugin_deploy` builds the project (Gradle or Maven, tests skipped) or takes a ready jar, swaps it into `plugins/` (old jar kept in `plugins/.craftwire-backup/`), restarts the server and reports whether the plugin enabled and what it logged. Compiler errors come back as `file:line`.
+### Bots that plugins treat as players
 
-Ask Claude: *"build my plugin, deploy it to ~/servers/test and tell me what broke"*.
+`bot_spawn` puts fake players on the Paper server. They join with a join event and a tab-list entry. `bot_action` makes them chat, run commands (and returns what the server answered), walk, look, use items, attack, and open and click plugin menus. Plugins see the same events a real client would cause, so you can test a shop, a minigame or a permission check without a second account.
 
-Something not connecting? Run `npx craftwire doctor` (add `--server <folder>` to check a server folder too).
+<img src="docs/images/bots.jpg" alt="Three bots named BuilderBot, MinerBot and ScoutBot standing in a meadow, holding items" width="100%">
 
-## Bots
+### Drive the server and your plugin dev loop
 
-`bot_spawn` puts fake players on a Paper server running the Craftwire plugin. They join like real players, so plugins see join, chat, command, click and damage events from them.
+- `server_command` runs console commands and returns their output. `server_eval` runs JavaScript with the full Bukkit API.
+- `world_query` and `world_edit` read and change blocks, and take snapshots you can restore.
+- `server_process` starts, stops and restarts a local Paper server. It never accepts the EULA for you.
+- `plugin_deploy` builds your plugin (Gradle or Maven), swaps the jar, restarts the server and reports whether the plugin enabled and what it logged. Compiler errors come back as `file:line`.
 
-`bot_action` makes a bot chat, run commands (and returns the replies it received), walk to a point, look, use items and blocks, attack, and read and click plugin menus. `bot_remove` logs them out.
+> *"Build my plugin, deploy it to ~/servers/test, spawn two bots, have one open /shop and buy the first item, and tell me what the plugin answered."*
 
-Ask Claude: *"spawn two bots, have one open /shop and buy the first item, and tell me what the plugin answered"*.
+## Install
 
-## How it works
+You need three parts:
+- **The hub**, which your AI client starts. It is the `craftwire` npm package and needs Node.js 20 or newer.
+- **The agent mod** for the Minecraft client (`craftwire-agent-fabric-<version>.jar`). It is a Fabric mod and needs Fabric API.
+- **The plugin** for a Paper server (`craftwire-paper-<version>.jar`), if you want the server tools.
 
-`craftwire` (npm) is an MCP server over stdio. It listens on `127.0.0.1` only and writes its port and a random token to `~/.craftwire/hub.json`. The mod and the plugin read that file and connect out to the hub — the game and the server open no ports. Every tool call is logged to `~/.craftwire/logs/`.
+Both jars are on [Releases](https://github.com/uxplima/craftwire/releases), for Minecraft 26.2.
+
+### 1. Connect your AI client
+
+<details open>
+<summary><b>Claude Code</b>: plugin (hub, skills and updates in one)</summary>
+
+```
+/plugin marketplace add uxplima/craftwire
+/plugin install craftwire@uxplima
+```
+</details>
+
+<details>
+<summary><b>Codex</b></summary>
+
+```
+npx craftwire setup codex
+```
+This adds `[mcp_servers.craftwire]` to `~/.codex/config.toml` and copies the Craftwire skills to `~/.codex/skills/`.
+</details>
+
+<details>
+<summary><b>Gemini CLI</b></summary>
+
+```
+npx craftwire setup gemini
+```
+This adds `craftwire` to `~/.gemini/settings.json` and copies the skills to `~/.gemini/skills/`.
+</details>
+
+<details>
+<summary><b>Antigravity</b></summary>
+
+```
+npx craftwire setup antigravity
+```
+This adds `craftwire` to `~/.gemini/config/mcp_config.json`.
+</details>
+
+<details>
+<summary><b>Cursor</b> · <b>Windsurf</b> · <b>VS Code</b> · <b>Claude Desktop</b></summary>
+
+```
+npx craftwire setup cursor          # ~/.cursor/mcp.json
+npx craftwire setup windsurf        # ~/.codeium/windsurf/mcp_config.json
+npx craftwire setup vscode          # user mcp.json (Copilot agent mode)
+npx craftwire setup claude-desktop  # claude_desktop_config.json
+```
+</details>
+
+<details>
+<summary><b>Any other MCP client</b></summary>
+
+Run it over stdio: command `npx`, arguments `-y craftwire`. On Windows use `cmd /c npx -y craftwire`.
+</details>
+
+`npx craftwire setup` with no client lists the ones it finds on your computer. Add `--dry-run` to see the change without writing it. Setup only touches the `craftwire` entry, and it backs the old file up as `.bak` first. Manual configs for every client are in [docs/clients.md](docs/clients.md). Restart the client afterwards.
+
+### 2. Add the game side
+
+- **Client:** put the agent mod and Fabric API in your Fabric profile's `mods/` folder and start the game. When the hub is running, a green **⚡ Craftwire connected** appears in the top-left corner. **F8** pauses AI control at any time.
+- **Server:** put the plugin in the Paper server's `plugins/` folder and start it. The plugin connects to the hub on its own. The first start downloads GraalJS (for `server_eval`), so it needs network access once.
+
+Then ask your AI: *"take a screenshot of what I'm looking at"* or *"what's the TPS, and which plugins logged errors since startup?"*.
 
 ## Tools
 
-- Hub: `list_instances` · `wait_for` · `get_request_status` · `logs`
-- Client (M1): `screenshot` · `camera` · `gui_read` · `gui_action` · `input` · `chat` · `hud_read` · `player_state` · `client_settings`
-- Server (M2): `server_command` · `server_eval` · `world_query` · `world_edit` · `server_info` · `plugin_manage`
-- Dev loop (M3): `server_process` · `plugin_deploy` · CLI `craftwire doctor`
-- Bots (M4): `bot_spawn` · `bot_action` · `bot_remove`
+| Area | Tools |
+|---|---|
+| Hub | `list_instances` · `wait_for` · `get_request_status` · `logs` |
+| Client | `screenshot` · `camera` · `gui_read` · `gui_action` · `input` · `chat` · `hud_read` · `player_state` · `client_settings` |
+| Server | `server_command` · `server_eval` · `world_query` · `world_edit` · `server_info` · `plugin_manage` |
+| Dev loop | `server_process` · `plugin_deploy` |
+| Bots | `bot_spawn` · `bot_action` · `bot_remove` |
+| CLI | `npx craftwire setup` · `npx craftwire doctor` |
+
+Skills that teach the agent the workflows ship with the Claude Code plugin, and `setup` installs them for Codex and Gemini CLI:
+- `craftwire`: the tools in general.
+- `paper-plugin-dev`: the plugin dev loop.
+- `fabric-mod-dev`: Fabric mod development.
+- `minecraft-promo-shots`: promo screenshots.
+
+## How it works
+
+```
+AI client ──stdio──▶ craftwire hub ◀──WebSocket (127.0.0.1)── Fabric agent mod (your game)
+                                    ◀──────────────────────── Paper plugin (your server)
+```
+
+The hub listens on `127.0.0.1` only. It writes its port and a random token to `~/.craftwire/hub.json`, and the mod and the plugin read that file to connect to it. The game and the server open no ports of their own. Every tool call is logged to `~/.craftwire/logs/`.
+
+## Security
+
+- **Use it on development servers only.** Anyone who can run the hub on your computer gets full control of the game and the server: console commands, JavaScript, world edits. The plugin logs a warning on every start.
+- The `plugins/Craftwire/config.yml` file has a switch for each risky feature: `allow-eval`, `allow-world-edit`, `allow-bots` and `max-edit-volume`. A disabled feature answers `PERMISSION_DISABLED`.
+- Bots skip the login checks (whitelist and bans). Their player data is deleted when they leave.
+- **F8** in the game stops all AI input until you press it again.
+
+## FAQ
+
+<details>
+<summary><b>Nothing connects. Where do I start?</b></summary>
+
+Run `npx craftwire doctor`. It checks Node.js, Java, the running hub, and the games and servers connected to it, including their versions. Add `--server <folder>` to check a server folder as well: the server jar, the EULA and the plugin.
+</details>
+
+<details>
+<summary><b>Can I use two AI clients at once?</b></summary>
+
+No, use one at a time. Each client starts its own hub, and the mod and the plugin follow the newest hub in `hub.json`. Close the other client, or remove `craftwire` from its config. See [docs/clients.md](docs/clients.md#one-ai-client-at-a-time).
+</details>
+
+<details>
+<summary><b>Does it work with ChatGPT?</b></summary>
+
+No. ChatGPT only connects to remote HTTPS MCP servers, and the hub never leaves `127.0.0.1` by design. Use Codex, OpenAI's coding agent, instead: `npx craftwire setup codex`.
+</details>
+
+<details>
+<summary><b>Does it work on online servers, or with other mods?</b></summary>
+
+- The client mod works on any server you join. Screenshots, menus and input happen on your own client.
+- The server tools need the Craftwire plugin, so they only work on servers you run.
+- The camera and screenshots are tested with Sodium.
+</details>
+
+<details>
+<summary><b>On Windows the server does not start in my client.</b></summary>
+
+Many clients start commands without a shell and cannot find `npx`. `craftwire setup` already writes the `cmd /c npx` form for this. If you write the config by hand, use `"command": "cmd", "args": ["/c", "npx", "-y", "craftwire"]`.
+</details>
 
 ## Development
 
 - Hub: `cd hub && npm install && npm test`
 - Agents: `./gradlew :agent-core:test :agent-fabric:test :agent-fabric:runClientGameTest`
 - Paper plugin: `./gradlew :agent-paper:test :agent-paper:integrationTest` (downloads Paper 26.2 and runs the plugin in a real server)
-- Dev-loop E2E (real Paper server): `./gradlew :agent-paper:build :test-fixtures:build`, then `cd hub && npm run test:e2e`
+- Dev-loop E2E with a real Paper server: run `./gradlew :agent-paper:build :test-fixtures:build`, then `cd hub && npm run test:e2e`
 - Dev client with the mod: `./gradlew :agent-fabric:runClient`
+
+By [UXPLIMA](https://github.com/uxplima) · MIT licensed
