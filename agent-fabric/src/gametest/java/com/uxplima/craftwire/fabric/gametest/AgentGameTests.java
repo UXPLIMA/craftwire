@@ -14,6 +14,7 @@ public final class AgentGameTests implements FabricClientGameTest {
             GuiChecks.run(ctx, sp);
             try {
                 CaptureChecks.run(ctx, sp);
+                CameraRenderChecks.run(ctx, sp);
             } catch (java.io.IOException e) {
                 throw new java.io.UncheckedIOException(e);
             }

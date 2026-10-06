@@ -43,11 +43,18 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - run: sudo apt-get update && sudo apt-get install -y xvfb
       - run: xvfb-run -a -s "-screen 0 1920x1080x24" ./gradlew :agent-fabric:runClientGameTest
+      # Again with Sodium, which culls terrain on its own (camera override shots must still show the subject).
+      - run: |
+          curl -fsSL -o /tmp/sodium.jar "https://cdn.modrinth.com/data/AANobbMI/versions/xJZxADzI/sodium-fabric-0.9.2%2Bmc26.2.jar"
+          echo "16a5e91db49750f8c046ecca3b8f2af5a28ea6f9b6581b42f123ca8fda20864f  /tmp/sodium.jar" | sha256sum -c -
+          xvfb-run -a -s "-screen 0 1920x1080x24" ./gradlew :agent-fabric:runClientGameTest -PextraClientMods=/tmp/sodium.jar
       - if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: gametest-logs
-          path: agent-fabric/build/run/**/logs/
+          path: |
+            agent-fabric/build/run/**/logs/
+            agent-fabric/build/run/**/craftwire-camera-shots/
 
   paper-it:
     runs-on: ubuntu-latest

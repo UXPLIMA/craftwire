@@ -38,6 +38,11 @@ dependencies {
     testImplementation platform('org.junit:junit-bom:5.13.4')
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+    // Optional: run the client game tests with more mods, e.g. -PextraClientMods=C:/mods/sodium.jar (';'-separated).
+    if (project.hasProperty('extraClientMods')) {
+        runtimeOnly files(project.property('extraClientMods').toString().split(';'))
+    }
 }
 
 processResources {

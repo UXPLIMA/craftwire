@@ -17,7 +17,12 @@ public abstract class CameraMixin {
 
     @Shadow protected abstract void setRotation(float yRot, float xRot);
 
-    @Inject(method = "update", at = @At("TAIL"))
+    /**
+     * Right after the camera follows its entity, before update() builds the culling frustum from the camera pose.
+     * Applying the pose any later leaves terrain culled from the player's view: vanilla and Sodium both cull with
+     * that frustum, so everything behind the player would be missing from override shots.
+     */
+    @Inject(method = "update", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Camera;alignWithEntity(F)V", shift = At.Shift.AFTER))
     private void craftwire$applyOverride(DeltaTracker deltaTracker, CallbackInfo ci) {
         CameraOverride.Pose p = CameraOverride.INSTANCE.get();
         if (p == null) return;

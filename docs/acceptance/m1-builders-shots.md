@@ -32,7 +32,7 @@ No M2 server tool was strictly required. Player commands through `chat` were eno
 1. **Camera override renders wrong under Sodium (must fix).** With `camera set/frame_area`, Sodium still culls chunk sections from the player's position. Terrain appeared cut away and the subject was missing.
    - Workaround used: `gamemode spectator` plus `minecraft:tp x y z yaw pitch` as the camera.
    - Fix options: Sodium compatibility (feed the override position to its render section manager), or have the `camera` tool fall back to moving a spectator player when Sodium is present.
-   - Vanilla, as in the gametests, is fine.
+   - **Fixed in 0.4.1.** Vanilla had the same fault; the gametests checked only the camera position, not the picture. `Camera.update()` builds its culling frustum from the pose right after `alignWithEntity`, and vanilla and Sodium both cull terrain with that frustum. The override was applied at the end of `update()`, so culling still followed the player. It is now applied right after `alignWithEntity`. `CameraRenderChecks` checks real frames, and CI runs it with and without Sodium 0.9.2.
 2. **Chat lines in `hud:true` shots.** Command feedback ("Teleported …") shows up in HUD shots. Add `client_settings {chatVisible}` or a `screenshot {chat:false}` option.
 3. **Skill notes.**
    - The `chat` tool strips one leading `/`, so WorldEdit commands must be sent as `//pos1`.
