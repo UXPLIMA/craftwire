@@ -49,7 +49,7 @@ export function withDisplay(cmd: Command, platform: NodeJS.Platform = process.pl
   if (platform !== "linux" || env.DISPLAY || env.WAYLAND_DISPLAY) return cmd;
   if (hasXvfb()) return { command: "xvfb-run", args: ["-a", "env", "SDL_VIDEO_FORCE_EGL=1", cmd.command, ...cmd.args] };
   throw new CraftwireError("NO_DISPLAY", "This Linux machine has no display for the game window",
-    "Install Xvfb (e.g. apt install xvfb); client_process then runs the client under xvfb-run.");
+    "Install Xvfb and EGL (e.g. apt install xvfb libegl1 libegl-mesa0); client_process then runs the client under xvfb-run.");
 }
 
 /**

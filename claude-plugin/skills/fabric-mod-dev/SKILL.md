@@ -33,7 +33,7 @@ No server needed? Pass `world` instead: `client_process {action:"start", mods:[â
 4. Repeat.
 
 ## Automate it
-For checks that should run on every change, write Fabric **client game tests** (`fabricApi { configureTests { enableClientGameTests = true } }`; `./gradlew runClientGameTest`). They start a client, create a world, and run your test class headless in CI with `xvfb-run` (from 26.3 also set `SDL_VIDEO_FORCE_EGL=1`: the game otherwise finds no OpenGL visual under Xvfb and hangs). Assert on real frames when the look matters: take a screenshot in the test, and check pixel colours of a known marker block.
+For checks that should run on every change, write Fabric **client game tests** (`fabricApi { configureTests { enableClientGameTests = true } }`; `./gradlew runClientGameTest`). They start a client, create a world, and run your test class headless in CI with `xvfb-run` (from 26.3 also install `libegl1 libegl-mesa0` and set `SDL_VIDEO_FORCE_EGL=1`: the game otherwise finds no OpenGL visual under Xvfb and hangs). Assert on real frames when the look matters: take a screenshot in the test, and check pixel colours of a known marker block.
 
 ## Notes
 - F8 in the client pauses AI control: every call then fails with `PAUSED_BY_USER` until the user presses F8 again.

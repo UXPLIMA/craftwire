@@ -39,7 +39,7 @@ jobs:
     needs: java
     # A game that cannot open its window waits forever instead of exiting.
     timeout-minutes: 30
-    # From 26.3 the game (SDL3) asks for an sRGB-capable GLX visual, which Xvfb does not have; EGL works.
+    # From 26.3 the game (SDL3) asks for an sRGB-capable GLX visual, which Xvfb does not have; EGL (libegl1, libegl-mesa0) works.
     env:
       SDL_VIDEO_FORCE_EGL: '1'
     strategy:
@@ -53,7 +53,7 @@ jobs:
           distribution: temurin
           java-version: 25
       - uses: gradle/actions/setup-gradle@v4
-      - run: sudo apt-get update && sudo apt-get install -y xvfb
+      - run: sudo apt-get update && sudo apt-get install -y xvfb libegl1 libegl-mesa0
       - id: v
         run: |
           echo "id=v$(echo '${{ matrix.mc }}' | tr . _)" >> "$GITHUB_OUTPUT"
@@ -117,7 +117,7 @@ jobs:
           cache-dependency-path: hub/package-lock.json
       - run: ./gradlew :agent-paper:jar :agent-fabric:jar :test-fixtures:jar
       # client_process runs its client under xvfb-run on a machine without a display.
-      - run: sudo apt-get update && sudo apt-get install -y xvfb
+      - run: sudo apt-get update && sudo apt-get install -y xvfb libegl1 libegl-mesa0
       - uses: actions/cache@v4
         with:
           path: hub/.e2e/client-cache
