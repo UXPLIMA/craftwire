@@ -5,6 +5,8 @@ import { fileURLToPath } from "node:url";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { AgentServer } from "./agents.js";
 import { AuditLog } from "./audit.js";
+import { ClientManager } from "./client/client-manager.js";
+import { prepareClient } from "./client/launcher.js";
 import { ConfigError, craftwireHome, hubPort, loadOrCreateToken, writeHubConfig } from "./config.js";
 import { ServerManager } from "./dev/server-manager.js";
 import { formatChecks, runDoctor } from "./doctor.js";
@@ -25,14 +27,15 @@ async function main(): Promise<void> {
   agents.on("disconnected", (i) => log(`${i.id} disconnected`));
 
   const servers = new ServerManager({ agents, home });
-  const server = createCraftwireServer({ agents, ops: new OperationTracker(), audit: new AuditLog(join(home, "logs")), servers });
+  const clients = new ClientManager({ agents, home, servers, prepare: (p) => prepareClient(p) });
+  const server = createCraftwireServer({ agents, ops: new OperationTracker(), audit: new AuditLog(join(home, "logs")), servers, clients });
   const transport = new StdioServerTransport();
   let stopping = false;
   const shutdown = () => {
     if (stopping) return;
     stopping = true;
-    // Servers started by server_process get a graceful stop so their worlds are saved.
-    void servers.shutdown().finally(() => agents.close()).finally(() => process.exit(0));
+    // Clients first (they may be on these servers), then servers, which get a graceful stop so their worlds are saved.
+    void clients.shutdown().finally(() => servers.shutdown()).finally(() => agents.close()).finally(() => process.exit(0));
   };
   transport.onclose = shutdown;
   // StdioServerTransport does not report stdin EOF; without this the hub outlives Claude Code and keeps its port.
