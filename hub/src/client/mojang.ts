@@ -78,15 +78,19 @@ export function argumentList(entries: Argument[], os: Os, features: Record<strin
   return out;
 }
 
-/** Libraries allowed on `os`. Native libraries are plain jars here; LWJGL extracts what it needs itself. */
-export function libraryFiles(v: VersionJson, os: Os, libDir: string): FileSpec[] {
-  const out: FileSpec[] = [];
+/** Libraries allowed on `os`, with their coordinates. Native libraries are plain jars; LWJGL extracts what it needs itself. */
+export function namedLibraryFiles(v: VersionJson, os: Os, libDir: string): { name: string; file: FileSpec }[] {
+  const out: { name: string; file: FileSpec }[] = [];
   for (const lib of v.libraries) {
     const a = lib.downloads?.artifact;
     if (!a || !allowed(lib.rules, os, {})) continue;
-    out.push({ url: a.url, sha1: a.sha1, ...(a.size !== undefined ? { size: a.size } : {}), dest: join(libDir, ...a.path.split("/")) });
+    out.push({ name: lib.name, file: { url: a.url, sha1: a.sha1, ...(a.size !== undefined ? { size: a.size } : {}), dest: join(libDir, ...a.path.split("/")) } });
   }
   return out;
+}
+
+export function libraryFiles(v: VersionJson, os: Os, libDir: string): FileSpec[] {
+  return namedLibraryFiles(v, os, libDir).map((l) => l.file);
 }
 
 /** Asset objects by hash. Sounds (.ogg, most of the ~460 MB) are skipped unless asked; the game runs without them. */
