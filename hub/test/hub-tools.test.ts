@@ -51,6 +51,33 @@ describe("hub tools", () => {
     expect(json(res).code).toBe("INVALID_PARAMS");
   });
 
+  it("wait_for sends server conditions to the server agent and returns what held", async () => {
+    hub = await startHub();
+    const server = await connectFakeAgent(hub.port, { token: TOKEN, kind: "server", name: "server" });
+    let got: Record<string, unknown> | undefined;
+    server.onRequest("wait", (p) => { got = p; return { matched: true, condition: "block", elapsedMs: 420, value: "minecraft:stone" }; });
+    const res = json(await hub.call("wait_for", { condition: "block", x: 1, y: 64, z: -2, is: "stone", timeoutMs: 2000 }));
+    expect(got).toEqual({ condition: "block", x: 1, y: 64, z: -2, is: "stone", timeoutMs: 2000 });
+    expect(res).toEqual({ matched: true, instance: "server-1", condition: "block", elapsedMs: 420, value: "minecraft:stone" });
+  });
+
+  it("wait_for reports a server condition's last value on timeout", async () => {
+    hub = await startHub();
+    const server = await connectFakeAgent(hub.port, { token: TOKEN, kind: "server", name: "server" });
+    server.onRequest("wait", () => ({ matched: false, condition: "inventory", elapsedMs: 300, last: 2 }));
+    const res = await hub.call("wait_for", { condition: "inventory", player: "Bot1", item: "diamond", count: 3, timeoutMs: 300 });
+    expect(res.isError).toBe(true);
+    expect(json(res)).toMatchObject({ code: "TIMEOUT", details: { last: 2, elapsedMs: 300 } });
+  });
+
+  it("wait_for checks a server condition's required fields before sending it", async () => {
+    hub = await startHub();
+    await connectFakeAgent(hub.port, { token: TOKEN, kind: "server", name: "server" });
+    const res = json(await hub.call("wait_for", { condition: "player_near", player: "Bot1", timeoutMs: 100 }));
+    expect(res.code).toBe("INVALID_PARAMS");
+    expect(res.message).toMatch(/x, y, z/);
+  });
+
   it("writes an audit line per call", async () => {
     hub = await startHub();
     await hub.call("list_instances");

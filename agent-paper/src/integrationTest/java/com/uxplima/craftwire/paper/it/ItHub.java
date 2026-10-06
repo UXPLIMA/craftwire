@@ -50,6 +50,11 @@ final class ItHub extends WebSocketServer {
     }
 
     JsonObject call(String method, String paramsJson, long timeoutMs) throws Exception {
+        return send(method, paramsJson).get(timeoutMs, TimeUnit.MILLISECONDS);
+    }
+
+    /** Sends a request without waiting for it: for calls that block until something else happens. */
+    CompletableFuture<JsonObject> send(String method, String paramsJson) {
         int id = ids.getAndIncrement();
         CompletableFuture<JsonObject> f = new CompletableFuture<>();
         pending.put(id, f);
@@ -59,7 +64,7 @@ final class ItHub extends WebSocketServer {
         req.addProperty("method", method);
         req.add("params", JsonParser.parseString(paramsJson));
         conn.send(req.toString());
-        return f.get(timeoutMs, TimeUnit.MILLISECONDS);
+        return f;
     }
 
     JsonElement result(String method, String paramsJson) throws Exception {

@@ -3,6 +3,7 @@ package com.uxplima.craftwire.paper.handlers;
 import com.uxplima.craftwire.core.Dispatcher;
 import com.uxplima.craftwire.paper.CraftwirePlugin;
 import com.uxplima.craftwire.paper.Sync;
+import com.uxplima.craftwire.paper.wait.WaitHandler;
 
 public final class Handlers {
     private Handlers() {}
@@ -17,6 +18,7 @@ public final class Handlers {
         d.register("world.edit", p -> WorldEditHandler.handle(p, plugin));
         d.register("plugin.manage", p -> PluginManageHandler.handle(p, plugin));
         d.register("events", p -> s.global(() -> EventsHandler.handle(p, plugin)));
+        d.register("wait", p -> WaitHandler.handle(p, plugin));
         d.register("bot.spawn", p -> BotHandler.spawn(p, plugin));
         d.register("bot.remove", p -> BotHandler.remove(p, plugin));
         d.register("bot.action", p -> BotHandler.action(p, plugin));

@@ -28,7 +28,7 @@ import org.bukkit.util.Vector;
  * its own getters (numbers, text, enums, ids, places, items, entities). Getters that return opaque objects, throw,
  * or belong to Event itself are left out. Getter lists are computed once per event class.
  */
-final class EventSnapshot {
+public final class EventSnapshot {
     private EventSnapshot() {}
 
     private static final int MAX_TEXT = 200;
@@ -64,7 +64,7 @@ final class EventSnapshot {
     }
 
     /** The player an event is about, if any (from its getters), for filtering. */
-    static String playerOf(JsonObject snapshot) {
+    public static String playerOf(JsonObject snapshot) {
         return snapshot.has("player") ? snapshot.get("player").getAsString() : null;
     }
 

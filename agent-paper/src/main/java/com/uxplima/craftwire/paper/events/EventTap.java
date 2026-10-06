@@ -20,6 +20,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.logging.Level;
@@ -67,11 +69,14 @@ public final class EventTap implements Listener {
     private final Set<HandlerList> onRequest = Collections.synchronizedSet(Collections.newSetFromMap(new IdentityHashMap<>()));
     /** Event classes found while preparing, by simple name (for `listeners` and `watch`). */
     private final Map<String, List<Class<? extends Event>>> known = new ConcurrentHashMap<>();
+    private final List<Subscription> subscriptions = new CopyOnWriteArrayList<>();
+
+    private record Subscription(Class<? extends Event> type, HandlerList handlers, Consumer<JsonObject> sink) {}
 
     public EventTap(Plugin plugin) {
         this.plugin = plugin;
         this.recorder = new EventRecorder(5000, 20, System::currentTimeMillis);
-        this.listener = new RegisteredListener(this, (l, e) -> recorder.record(e), EventPriority.MONITOR, plugin, false);
+        this.listener = new RegisteredListener(this, (l, e) -> onEvent(e), EventPriority.MONITOR, plugin, false);
     }
 
     public void start() {
@@ -129,7 +134,7 @@ public final class EventTap implements Listener {
     }
 
     /** Also records event types that are skipped by default (see ON_REQUEST). */
-    public JsonObject watch(List<String> types) {
+    public synchronized JsonObject watch(List<String> types) {
         JsonArray watched = new JsonArray();
         for (String t : types) {
             Class<? extends Event> c = resolve(t);
@@ -142,6 +147,38 @@ public final class EventTap implements Listener {
         JsonObject o = new JsonObject();
         o.add("watching", watched);
         return o;
+    }
+
+    /**
+     * Hands a snapshot of every `type` event fired from now on to `sink` (on the thread that fired it). A busy type
+     * that is not recorded by default is tapped only while subscribed. Run the returned handle to unsubscribe.
+     */
+    public synchronized Runnable subscribe(String type, Consumer<JsonObject> sink) {
+        Class<? extends Event> c = resolve(type);
+        HandlerList h = handlerList(c.getName(), c.getClassLoader());
+        if (h == null) throw new AgentError("INVALID_PARAMS", c.getName() + " has no handler list", "Wait for a concrete event type.");
+        Subscription s = new Subscription(c, h, sink);
+        subscriptions.add(s);
+        if (onRequest.contains(h) && attached.add(h)) h.register(listener);
+        return () -> unsubscribe(s);
+    }
+
+    private synchronized void unsubscribe(Subscription s) {
+        subscriptions.remove(s);
+        HandlerList h = s.handlers();
+        // A busy type (not watched meanwhile) that no other subscription needs: stop tapping it.
+        if (onRequest.contains(h) && subscriptions.stream().noneMatch(o -> o.handlers() == h) && attached.remove(h)) h.unregister(listener);
+    }
+
+    private void onEvent(Event e) {
+        recorder.record(e);
+        if (subscriptions.isEmpty()) return;
+        JsonObject snapshot = null;
+        for (Subscription s : subscriptions) {
+            if (!s.type().isInstance(e)) continue;
+            if (snapshot == null) snapshot = EventSnapshot.of(e, System.currentTimeMillis());
+            s.sink().accept(snapshot);
+        }
     }
 
     private void attachAll() {
