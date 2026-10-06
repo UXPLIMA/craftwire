@@ -64,3 +64,16 @@ describe("Mojang version JSON", () => {
     expect(assetFiles(index, "/o", true)).toHaveLength(2);
   });
 });
+
+describe("offline starts", () => {
+  it("uses the cached version JSON when the manifest cannot be fetched", async () => {
+    const { mkdtempSync, mkdirSync, writeFileSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const { fetchVersion } = await import("../src/client/mojang.js");
+    const dir = mkdtempSync(join(tmpdir(), "cw-ver-"));
+    mkdirSync(join(dir, "26.2"));
+    writeFileSync(join(dir, "26.2", "26.2.json"), JSON.stringify(v));
+    const offline = (async () => { throw new Error("getaddrinfo ENOTFOUND"); }) as unknown as typeof fetch;
+    expect((await fetchVersion("26.2", dir, { fetchImpl: offline })).id).toBe("26.2");
+  });
+});

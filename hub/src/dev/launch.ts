@@ -136,11 +136,8 @@ export function eulaAccepted(serverDir: string): boolean {
   return existsSync(file) && /^\s*eula\s*=\s*true\s*$/im.test(readFileSync(file, "utf8"));
 }
 
-/**
- * The port from server.properties when something already listens on it, else undefined. A server folder that has
- * never run has no server.properties and cannot be running. Spots servers running without the Craftwire plugin.
- */
-export async function serverPortInUse(serverDir: string): Promise<number | undefined> {
+/** server.properties as a map, or undefined when the server has never run. */
+export function serverProperties(serverDir: string): Map<string, string> | undefined {
   const file = join(serverDir, "server.properties");
   if (!existsSync(file)) return undefined;
   const props = new Map<string, string>();
@@ -148,6 +145,26 @@ export async function serverPortInUse(serverDir: string): Promise<number | undef
     const eq = line.indexOf("=");
     if (eq > 0 && !line.startsWith("#")) props.set(line.slice(0, eq).trim(), line.slice(eq + 1).trim());
   }
+  return props;
+}
+
+/** Where a client joins this server, and whether it demands Microsoft accounts (online-mode, the default). */
+export function serverAddress(serverDir: string): { host: string; port: number; onlineMode: boolean } {
+  const props = serverProperties(serverDir) ?? new Map<string, string>();
+  return {
+    host: props.get("server-ip") || "127.0.0.1",
+    port: Number(props.get("server-port") || 25565),
+    onlineMode: (props.get("online-mode") ?? "true").toLowerCase() !== "false",
+  };
+}
+
+/**
+ * The port from server.properties when something already listens on it, else undefined. A server folder that has
+ * never run has no server.properties and cannot be running. Spots servers running without the Craftwire plugin.
+ */
+export async function serverPortInUse(serverDir: string): Promise<number | undefined> {
+  const props = serverProperties(serverDir);
+  if (!props) return undefined;
   const port = Number(props.get("server-port") || 25565);
   if (!Number.isInteger(port) || port <= 0 || port > 65535) return undefined;
   const host = props.get("server-ip") || undefined;

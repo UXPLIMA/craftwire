@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { CraftwireError } from "../errors.js";
 import { type FetchOptions, fetchVerified, type FileSpec } from "./download.js";
@@ -109,14 +109,20 @@ export function assetFiles(index: AssetIndex, objectsDir: string, sounds: boolea
 
 /** The version JSON of `minecraft`, through the manifest (always fetched) and a sha1-checked local copy. */
 export async function fetchVersion(minecraft: string, versionsDir: string, o: FetchOptions = {}): Promise<VersionJson> {
-  const res = await (o.fetchImpl ?? fetch)(MANIFEST_URL).catch((e: Error) => {
-    throw new CraftwireError("DOWNLOAD_FAILED", `${MANIFEST_URL}: ${e.message}`, "Check the network connection, then retry.");
-  });
-  if (!res.ok) throw new CraftwireError("DOWNLOAD_FAILED", `${MANIFEST_URL}: HTTP ${res.status}`, "Retry in a moment.");
-  const manifest = (await res.json()) as { versions: { id: string; url: string; sha1: string }[] };
-  const entry = manifest.versions.find((x) => x.id === minecraft);
-  if (!entry) throw new CraftwireError("UNKNOWN_VERSION", `Mojang's manifest has no Minecraft ${minecraft}`, "Update craftwire.");
   const dest = join(versionsDir, minecraft, `${minecraft}.json`);
+  let entry: { url: string; sha1: string } | undefined;
+  try {
+    const res = await (o.fetchImpl ?? fetch)(MANIFEST_URL);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const manifest = (await res.json()) as { versions: { id: string; url: string; sha1: string }[] };
+    entry = manifest.versions.find((x) => x.id === minecraft);
+    if (!entry) throw new CraftwireError("UNKNOWN_VERSION", `Mojang's manifest has no Minecraft ${minecraft}`, "Update craftwire.");
+  } catch (e) {
+    if (e instanceof CraftwireError) throw e;
+    // Offline after a first start: the version JSON downloaded then is enough (every file it names is sha1-checked).
+    if (existsSync(dest)) return JSON.parse(readFileSync(dest, "utf8")) as VersionJson;
+    throw new CraftwireError("DOWNLOAD_FAILED", `${MANIFEST_URL}: ${(e as Error).message}`, "Check the network connection, then retry.");
+  }
   await fetchVerified({ url: entry.url, sha1: entry.sha1, dest }, o);
   return JSON.parse(readFileSync(dest, "utf8")) as VersionJson;
 }

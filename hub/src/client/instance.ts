@@ -26,10 +26,7 @@ export interface InstanceOptions {
  * start with exactly the agent, Fabric API and the extra mods; options.txt gets the defaults it lacks.
  */
 export function prepareInstance(root: string, o: InstanceOptions): string {
-  for (const mod of o.extraMods) {
-    if (!existsSync(mod) || !statSync(mod).isFile()) throw new CraftwireError("INVALID_PARAMS", `${mod} does not exist`, "Pass absolute paths to mod jars.");
-    if (!mod.toLowerCase().endsWith(".jar")) throw new CraftwireError("INVALID_PARAMS", `${mod} is not a jar`, "mods takes Fabric mod jars.");
-  }
+  checkMods(o.extraMods);
   const dir = join(root, "instances", o.username);
   const mods = join(dir, "mods");
   rmSync(mods, { recursive: true, force: true });
@@ -37,6 +34,14 @@ export function prepareInstance(root: string, o: InstanceOptions): string {
   for (const jar of [o.agentJar, o.fabricApiJar, ...o.extraMods]) copyFileSync(jar, join(mods, basename(jar)));
   writeOptions(join(dir, "options.txt"));
   return dir;
+}
+
+/** Extra mods must be existing jar files; checked before anything is downloaded or changed. */
+export function checkMods(mods: string[]): void {
+  for (const mod of mods) {
+    if (!existsSync(mod) || !statSync(mod).isFile()) throw new CraftwireError("INVALID_PARAMS", `${mod} does not exist`, "Pass absolute paths to mod jars.");
+    if (!mod.toLowerCase().endsWith(".jar")) throw new CraftwireError("INVALID_PARAMS", `${mod} is not a jar`, "mods takes Fabric mod jars.");
+  }
 }
 
 function writeOptions(file: string): void {

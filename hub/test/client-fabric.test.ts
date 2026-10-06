@@ -44,3 +44,18 @@ describe("Fabric loader profile", () => {
     expect(slash(f.dest)).toBe("/m/fabric-api-0.161.0+26.2.jar");
   });
 });
+
+describe("offline starts", () => {
+  it("uses the cached Fabric profile when meta.fabricmc.net cannot be reached", async () => {
+    const { mkdtempSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const { fetchFabricProfile } = await import("../src/client/fabric.js");
+    const dir = mkdtempSync(join(tmpdir(), "cw-fab-"));
+    const profile = { mainClass: "K", arguments: {}, libraries: [] };
+    const online = (async () => new Response(JSON.stringify(profile))) as unknown as typeof fetch;
+    const offline = (async () => { throw new Error("ENOTFOUND"); }) as unknown as typeof fetch;
+    await fetchFabricProfile("26.2", "0.19.5", dir, { fetchImpl: online });
+    expect((await fetchFabricProfile("26.2", "0.19.5", dir, { fetchImpl: offline })).mainClass).toBe("K");
+  });
+});

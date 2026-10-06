@@ -1,3 +1,4 @@
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { CraftwireError } from "../errors.js";
 import type { FetchOptions, FileSpec } from "./download.js";
@@ -50,13 +51,22 @@ export function mergeLibraries(mojang: NamedFile[], fabric: NamedFile[]): FileSp
   return [...mojang.filter((l) => !fabricKeys.has(libraryKey(l.name))), ...fabric].map((l) => l.file);
 }
 
-export async function fetchFabricProfile(minecraft: string, loader: string, o: FetchOptions = {}): Promise<FabricProfile> {
+/** The loader profile from meta.fabricmc.net, kept in `cacheDir` so later starts also work offline. */
+export async function fetchFabricProfile(minecraft: string, loader: string, cacheDir: string, o: FetchOptions = {}): Promise<FabricProfile> {
   const url = `${META}/${encodeURIComponent(minecraft)}/${encodeURIComponent(loader)}/profile/json`;
-  const res = await (o.fetchImpl ?? fetch)(url).catch((e: Error) => {
-    throw new CraftwireError("DOWNLOAD_FAILED", `${url}: ${e.message}`, "Check the network connection, then retry.");
-  });
-  if (!res.ok) throw new CraftwireError("DOWNLOAD_FAILED", `${url}: HTTP ${res.status}`, "Retry in a moment.");
-  return (await res.json()) as FabricProfile;
+  const cached = join(cacheDir, `fabric-loader-${loader}-${minecraft}.json`);
+  try {
+    const res = await (o.fetchImpl ?? fetch)(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
+    const profile = JSON.parse(text) as FabricProfile;
+    mkdirSync(cacheDir, { recursive: true });
+    writeFileSync(cached, text);
+    return profile;
+  } catch (e) {
+    if (existsSync(cached)) return JSON.parse(readFileSync(cached, "utf8")) as FabricProfile;
+    throw new CraftwireError("DOWNLOAD_FAILED", `${url}: ${(e as Error).message}`, "Check the network connection, then retry.");
+  }
 }
 
 /** Fabric API, which the agent needs, from Fabric's own Maven at the pinned version and sha1. */
