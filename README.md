@@ -16,7 +16,7 @@ By [UXPLIMA](https://github.com/uxplima) · MIT licensed · Minecraft 26.2 (Fabr
 
 Ask Claude: *"take a screenshot of what I'm looking at"*.
 
-> Windows: if the MCP server does not start, edit `.mcp.json` in the plugin to use `"command": "cmd", "args": ["/c", "npx", "-y", "craftwire@0.4.0"]`.
+> Windows: if the MCP server does not start, edit `.mcp.json` in the plugin to use `"command": "cmd", "args": ["/c", "npx", "-y", "craftwire@0.4.1"]`.
 
 ## Paper server
 
