@@ -2,4 +2,6 @@
 jdk:
   - openjdk21
 install:
-  - ./gradlew -PapiOnly :craftwire-api:publishToMavenLocal --console=plain
+  # Not ./gradlew: JitPack's Java 21 launcher cannot open the Gradle 9 wrapper jar with -jar ("An unexpected error
+  # occurred while trying to open file"); loading it from the classpath works.
+  - java -cp gradle/wrapper/gradle-wrapper.jar org.gradle.wrapper.GradleWrapperMain -PapiOnly :craftwire-api:publishToMavenLocal --console=plain
