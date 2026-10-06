@@ -53,6 +53,11 @@ jobs:
           distribution: temurin
           java-version: 25
       - uses: gradle/actions/setup-gradle@v4
+      # GraalJS that client_eval downloads in the game tests (~60 MB; the agent checks every jar's sha256 anyway).
+      - uses: actions/cache@v4
+        with:
+          path: ~/.gradle/craftwire-test-home/lib
+          key: graaljs-${{ hashFiles('gradle.properties') }}
       - run: sudo apt-get update && sudo apt-get install -y xvfb libegl1 libegl-mesa0
       - id: v
         run: |
