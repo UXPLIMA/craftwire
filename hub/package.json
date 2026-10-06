@@ -13,7 +13,8 @@
   },
   "files": [
     "dist",
-    "skills"
+    "skills",
+    "agent"
   ],
   "engines": {
     "node": ">=20"
@@ -21,7 +22,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "prepack": "npm run build && node scripts/copy-skills.mjs",
+    "prepack": "npm run build && node scripts/copy-skills.mjs && node scripts/copy-agent.mjs",
     "test": "vitest run",
     "test:e2e": "vitest run --config vitest.e2e.config.ts"
   },
