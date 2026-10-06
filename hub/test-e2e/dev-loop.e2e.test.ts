@@ -155,6 +155,24 @@ describe("dev loop against a real Paper server", () => {
     expect(json(await hub.call("world_query", { action: "players" })).players.some((p: { name: string }) => p.name.startsWith("Scn"))).toBe(false);
   });
 
+  it("profiles the server and traces the fixture plugin's slow task, and a bot walks a path", async () => {
+    await hub.call("server_command", { command: "cwfixture lag 400" });
+    const p = json(await hub.call("profile", { durationMs: 3000 }));
+    expect(p.thread).toBe("Server thread");
+    expect(p.owners.map((o: { owner: string }) => o.owner)).toContain("CraftwireFixture");
+    expect(p.ticks.count).toBeGreaterThan(20);
+    const t = json(await hub.call("trace", { method: "com.uxplima.craftwire.fixtures.FixtureLag::burn", durationMs: 2000 }));
+    expect(t.methods[0]).toMatchObject({ method: "com.uxplima.craftwire.fixtures.FixtureLag.burn", owner: "CraftwireFixture" });
+    expect(t.methods[0].invocations).toBeGreaterThan(10);
+
+    await hub.call("server_command", { command: "minecraft:fill 8 -60 -3 8 -58 3 minecraft:stone" });
+    await hub.call("bot_spawn", { names: ["Walker"], location: { x: 5.5, y: -60, z: 0.5 } });
+    const walk = json(await hub.call("bot_action", { bot: "Walker", action: "move_to", x: 11.5, y: -60, z: 0.5 }));
+    expect(walk, JSON.stringify(walk)).toMatchObject({ reached: true, path: { complete: true } });
+    await hub.call("bot_remove", { all: true });
+    await hub.call("server_command", { command: "minecraft:fill 8 -60 -3 8 -58 3 minecraft:air" });
+  });
+
   it("stops the server gracefully", async () => {
     expect(json(await hub.call("server_process", { action: "stop", serverDir }))).toMatchObject({ stopped: true, forced: false });
     expect(json(await hub.call("server_process", { action: "status" })).servers[0].state).toBe("stopped");
