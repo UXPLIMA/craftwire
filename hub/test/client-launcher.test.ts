@@ -10,9 +10,9 @@ describe("client launcher", () => {
     expect(withDisplay(cmd, "linux", { WAYLAND_DISPLAY: "wayland-0" }, () => false)).toEqual(cmd);
   });
 
-  it("wraps with xvfb-run on a Linux machine without a display", () => {
+  it("wraps with xvfb-run on a Linux machine without a display, with OpenGL through EGL", () => {
     expect(withDisplay({ command: "java", args: ["-cp", "x"] }, "linux", {}, () => true))
-      .toEqual({ command: "xvfb-run", args: ["-a", "java", "-cp", "x"] });
+      .toEqual({ command: "xvfb-run", args: ["-a", "env", "SDL_VIDEO_FORCE_EGL=1", "java", "-cp", "x"] });
   });
 
   it("explains NO_DISPLAY when there is no display and no xvfb-run", () => {

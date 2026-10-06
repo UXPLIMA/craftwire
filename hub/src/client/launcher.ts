@@ -40,11 +40,14 @@ export async function pickJava(candidates: string[], probe: (java: string) => Pr
     `Install Java ${need}+, or pass java: the path to one.`);
 }
 
-/** On a Linux machine without a display the client runs under xvfb-run; elsewhere it runs as is. */
+/**
+ * On a Linux machine without a display the client runs under xvfb-run; elsewhere it runs as is. Under Xvfb, OpenGL
+ * goes through EGL: from 26.3 the game (SDL3) asks for an sRGB-capable GLX visual, which Xvfb does not have.
+ */
 export function withDisplay(cmd: Command, platform: NodeJS.Platform = process.platform, env: NodeJS.ProcessEnv = process.env,
   hasXvfb: () => boolean = () => spawnSync("xvfb-run", ["--help"], { stdio: "ignore" }).error === undefined): Command {
   if (platform !== "linux" || env.DISPLAY || env.WAYLAND_DISPLAY) return cmd;
-  if (hasXvfb()) return { command: "xvfb-run", args: ["-a", cmd.command, ...cmd.args] };
+  if (hasXvfb()) return { command: "xvfb-run", args: ["-a", "env", "SDL_VIDEO_FORCE_EGL=1", cmd.command, ...cmd.args] };
   throw new CraftwireError("NO_DISPLAY", "This Linux machine has no display for the game window",
     "Install Xvfb (e.g. apt install xvfb); client_process then runs the client under xvfb-run.");
 }
