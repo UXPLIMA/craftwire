@@ -11,7 +11,7 @@
       "name": "craftwire",
       "source": "./claude-plugin",
       "description": "See and drive Minecraft from Claude Code: screenshots, camera, GUIs, chat, input, plus Paper server commands, scripts, world edits and logs.",
-      "version": "0.5.0"
+      "version": "0.6.0"
     }
   ]
 }
