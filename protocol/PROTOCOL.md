@@ -30,7 +30,7 @@ Server methods (M4, bots; `allow-bots` gates all three):
 - `bot.action` `{bot, action, …}`. Actions: chat, command, messages, look, move_to, state, give, select_hotbar, gui_read, gui_click, gui_close, use, attack (parameters as in the `bot_action` tool).
 `world.query players` rows carry `bot: true` for bots.
 
-M6 (protocol version unchanged; a hub sends these only to agents that have them, and older agents answer `UNKNOWN_METHOD`):
+M6 (protocol version unchanged: an older agent answers these methods with `UNKNOWN_METHOD`, whose hint says to update it):
 
 Event types:
 - `tools` `{tools: [{name, namespace, description, inputSchema}]}` (both agents): the extension tools plugins and mods registered through `craftwire-api`. The full list, sent on every connect and whenever it changes; the hub drops an instance's tools when it disconnects.
