@@ -18,9 +18,12 @@ class HubClientTest {
     final Dispatcher dispatcher = new Dispatcher(new OperationCache(300_000, System::currentTimeMillis));
     final CountDownLatch connected = new CountDownLatch(1);
     final CountDownLatch disconnected = new CountDownLatch(1);
+    final AtomicReference<String> disconnectReason = new AtomicReference<>();
+    final java.util.List<String> refusals = new java.util.concurrent.CopyOnWriteArrayList<>();
     final HubClient.Listener listener = new HubClient.Listener() {
         @Override public void onConnected(String id) { connected.countDown(); }
-        @Override public void onDisconnected() { disconnected.countDown(); }
+        @Override public void onDisconnected(String reason) { disconnectReason.set(reason); disconnected.countDown(); }
+        @Override public void onRefused(String error) { refusals.add(error); }
         @Override public void onLog(String m) {}
     };
 
@@ -48,6 +51,28 @@ class HubClientTest {
         assertEquals(1, hello.getAsJsonObject("params").get("protocolVersion").getAsInt());
         assertTrue(connected.await(5, TimeUnit.SECONDS));
         assertTrue(client.isConnected());
+    }
+
+    @Test
+    void reportsWhyTheConnectionEnded() throws Exception {
+        int port = TestHub.freePort();
+        hub = new TestHub(port, TOKEN).startAndWait();
+        clientFor(new AtomicReference<>(new HubConfig(port, TOKEN)));
+        assertTrue(connected.await(5, TimeUnit.SECONDS));
+        hub.stop(500);
+        hub = null;
+        assertTrue(disconnected.await(5, TimeUnit.SECONDS));
+        assertFalse(disconnectReason.get().isBlank(), "reason: " + disconnectReason.get());
+    }
+
+    @Test
+    void reportsARefusalOnceAcrossRetries() throws Exception {
+        int port = TestHub.freePort();
+        hub = new TestHub(port, TOKEN).startAndWait();
+        clientFor(new AtomicReference<>(new HubConfig(port, "b".repeat(64))));
+        Thread.sleep(1500); // backoff 50-200 ms: several refused attempts
+        assertEquals(1, refusals.size(), "refusals: " + refusals);
+        assertTrue(refusals.getFirst().contains("Invalid token"), refusals.getFirst());
     }
 
     @Test

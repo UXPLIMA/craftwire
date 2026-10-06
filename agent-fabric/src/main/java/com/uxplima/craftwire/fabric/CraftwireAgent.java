@@ -51,7 +51,13 @@ public final class CraftwireAgent {
 
         hub = new HubClient(() -> HubConfig.load(HubConfig.defaultHome()), this::hello, dispatcher, new HubClient.Listener() {
             @Override public void onConnected(String instanceId) { onHubConnected(instanceId); }
-            @Override public void onDisconnected() { onHubDisconnected(); }
+            @Override public void onDisconnected(String reason) {
+                LOGGER.info("[craftwire] Lost the connection to the Craftwire hub ({}); reconnecting automatically", reason);
+                onHubDisconnected();
+            }
+            @Override public void onRefused(String error) {
+                LOGGER.warn("[craftwire] The Craftwire hub refused this client: {}. Restart Claude Code, or install the mod version that matches the hub.", error);
+            }
             @Override public void onLog(String message) { LOGGER.debug("[craftwire] {}", message); }
         });
         hub.start();

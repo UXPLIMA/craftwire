@@ -46,7 +46,14 @@ public final class CraftwirePlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new EventBridge(this), this);
         hub = new HubClient(() -> HubConfig.load(HubConfig.defaultHome()), this::hello, dispatcher, new HubClient.Listener() {
             @Override public void onConnected(String instanceId) { onHubConnected(instanceId); }
-            @Override public void onDisconnected() { onHubDisconnected(); }
+            @Override public void onDisconnected(String reason) {
+                getLogger().info("Lost the connection to the Craftwire hub (" + reason + "); reconnecting automatically");
+                onHubDisconnected();
+            }
+            @Override public void onRefused(String error) {
+                getLogger().warning("The Craftwire hub refused this server: " + error
+                        + ". Restart Claude Code, or install the plugin version that matches the hub.");
+            }
             @Override public void onLog(String message) { getSLF4JLogger().debug(message); }
         });
         hub.start();

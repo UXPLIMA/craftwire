@@ -49,5 +49,7 @@ class ConnectionIT {
         hub.dropConnectionAndClearEvents();
         hub.awaitHello(30_000, () -> true);
         hub.awaitLog(m -> m.startsWith("Done ("), 10_000);
+        // The drop itself is logged where an admin can see it, not only at debug level.
+        hub.awaitLog(m -> m.startsWith("Lost the connection to the Craftwire hub"), 10_000);
     }
 }

@@ -22,8 +22,13 @@ public final class HubClient implements AutoCloseable {
     public interface Listener {
         void onConnected(String instanceId);
 
-        void onDisconnected();
+        /** A connection that had completed hello ended; the client keeps reconnecting. */
+        void onDisconnected(String reason);
 
+        /** The hub answered hello with an error (wrong token, protocol mismatch). Reported once until the error changes. */
+        void onRefused(String error);
+
+        /** Low-level detail for debug logs (every failed attempt). */
         void onLog(String message);
     }
 
@@ -41,6 +46,7 @@ public final class HubClient implements AutoCloseable {
 
     private volatile WebSocket socket;
     private volatile String instanceId;
+    private volatile String lastRefusal;
     private volatile boolean closed;
     private CompletableFuture<?> sendChain = CompletableFuture.completedFuture(null);
 
@@ -113,12 +119,28 @@ public final class HubClient implements AutoCloseable {
         if (id != null && id.isJsonPrimitive() && id.getAsJsonPrimitive().isNumber() && id.getAsInt() == 0) {
             if (msg.has("result")) {
                 instanceId = msg.getAsJsonObject("result").get("instanceId").getAsString();
+                lastRefusal = null;
                 backoff.reset();
                 listener.onConnected(instanceId);
             } else {
-                listener.onLog("Hub refused the connection: " + msg.get("error"));
+                String error = errorText(msg.get("error"));
+                listener.onLog("Hub refused the connection: " + error);
+                if (!error.equals(lastRefusal)) {
+                    lastRefusal = error;
+                    listener.onRefused(error);
+                }
             }
         }
+    }
+
+    private static String errorText(JsonElement error) {
+        if (error != null && error.isJsonObject() && error.getAsJsonObject().has("message")) {
+            JsonObject e = error.getAsJsonObject();
+            String code = e.has("data") && e.get("data").isJsonObject() && e.getAsJsonObject("data").has("code")
+                    ? e.getAsJsonObject("data").get("code").getAsString() + ": " : "";
+            return code + e.get("message").getAsString();
+        }
+        return String.valueOf(error);
     }
 
     private synchronized void send(WebSocket ws, String text) {
@@ -183,7 +205,7 @@ public final class HubClient implements AutoCloseable {
             socket = null;
             boolean was = instanceId != null;
             instanceId = null;
-            if (was) listener.onDisconnected();
+            if (was) listener.onDisconnected(why);
             listener.onLog("Hub connection closed: " + why);
             scheduleReconnect();
         }
