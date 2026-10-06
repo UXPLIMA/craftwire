@@ -68,7 +68,9 @@ final class WorldQueryHandler {
             throw new AgentError("QUERY_TOO_LARGE", "The region covers " + box.volume() + " blocks; the limit is " + MAX_REGION,
                     "Query a smaller box, or use find_block to locate specific blocks in a large area.");
         }
-        return ChunkWork.forEachChunk(sync, w, box, part -> readCells(w, box, part)).thenApply(parts -> assemble(box, parts));
+        String encoding = Args.optString(p, "encoding").orElse("runs");
+        if (!encoding.equals("runs") && !encoding.equals("indices")) throw Args.invalid("encoding must be runs or indices");
+        return ChunkWork.forEachChunk(sync, w, box, part -> readCells(w, box, part)).thenApply(parts -> assemble(box, parts, encoding));
     }
 
     private static List<Cell> readCells(World w, Box whole, Box part) {
@@ -90,7 +92,7 @@ final class WorldQueryHandler {
         return snap.getBlockData(x & 15, y, z & 15).getAsString();
     }
 
-    private static JsonElement assemble(Box box, List<List<Cell>> parts) {
+    private static JsonElement assemble(Box box, List<List<Cell>> parts, String encoding) {
         int[] blocks = new int[(int) box.volume()];
         Map<String, Integer> palette = new LinkedHashMap<>();
         Map<String, Integer> counts = new LinkedHashMap<>();
@@ -108,9 +110,24 @@ final class WorldQueryHandler {
         JsonArray pal = new JsonArray();
         palette.keySet().forEach(pal::add);
         o.add("palette", pal);
-        JsonArray arr = new JsonArray(blocks.length);
-        for (int b : blocks) arr.add(b);
-        o.add("blocks", arr);
+        if (encoding.equals("indices")) {
+            JsonArray arr = new JsonArray(blocks.length);
+            for (int b : blocks) arr.add(b);
+            o.add("blocks", arr);
+        } else {
+            // [palette index, count] runs in the same order: a mostly empty region shrinks from thousands of numbers to a few.
+            JsonArray runs = new JsonArray();
+            for (int i = 0; i < blocks.length; ) {
+                int j = i;
+                while (j < blocks.length && blocks[j] == blocks[i]) j++;
+                JsonArray run = new JsonArray(2);
+                run.add(blocks[i]);
+                run.add(j - i);
+                runs.add(run);
+                i = j;
+            }
+            o.add("runs", runs);
+        }
         JsonObject cnt = new JsonObject();
         counts.forEach(cnt::addProperty);
         o.add("counts", cnt);

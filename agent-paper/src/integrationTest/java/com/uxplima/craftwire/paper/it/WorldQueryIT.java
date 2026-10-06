@@ -33,8 +33,17 @@ class WorldQueryIT {
     }
 
     @Test
-    void regionReturnsPaletteIndicesAndCounts() throws Exception {
+    void regionRunLengthEncodesByDefault() throws Exception {
         JsonObject r = query("{\"action\":\"region\",\"min\":{\"x\":1000,\"y\":-50,\"z\":1000},\"max\":{\"x\":1002,\"y\":-49,\"z\":1002}}");
+        assertFalse(r.has("blocks"));
+        // y=-50 is all gold (9 blocks), y=-49 all air (9): two runs of [palette index, count].
+        assertEquals("[[0,9],[1,9]]", r.get("runs").toString());
+        assertEquals("[\"minecraft:gold_block\",\"minecraft:air\"]", r.get("palette").toString());
+    }
+
+    @Test
+    void regionReturnsPaletteIndicesAndCounts() throws Exception {
+        JsonObject r = query("{\"action\":\"region\",\"encoding\":\"indices\",\"min\":{\"x\":1000,\"y\":-50,\"z\":1000},\"max\":{\"x\":1002,\"y\":-49,\"z\":1002}}");
         assertEquals("{\"x\":3,\"y\":2,\"z\":3}", r.get("size").toString());
         assertEquals(18, r.getAsJsonArray("blocks").size());
         assertEquals(9, r.getAsJsonObject("counts").get("minecraft:gold_block").getAsInt());

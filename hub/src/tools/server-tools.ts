@@ -30,7 +30,7 @@ export function registerServerTools(server: McpServer, ctx: ToolContext): void {
     async (args, c) => ok(await forward(c, "server", "server.eval", args, args.timeoutMs + 5000)));
 
   defineTool(server, ctx, "world_query",
-    "Read the world. block: one block at x,y,z. region: every block in min..max (inclusive, at most 32768) as palette + blocks (palette indices, x fastest, then z, then y) + counts. entities: entities in min..max, optional type (e.g. 'zombie'). players: online players. find_block: positions of `block` (an id like 'chest' or a state like 'oak_stairs[facing=east]') in min..max, up to limit.",
+    "Read the world. block: one block at x,y,z. region: every block in min..max (inclusive, at most 32768) as palette + runs ([palette index, count] pairs in order x fastest, then z, then y) + counts; encoding:'indices' returns one palette index per block in `blocks` instead. entities: entities in min..max, optional type (e.g. 'zombie'). players: online players. find_block: positions of `block` (an id like 'chest' or a state like 'oak_stairs[facing=east]') in min..max, up to limit.",
     {
       ...targetArgs,
       action: z.enum(["block", "region", "entities", "players", "find_block"]),
@@ -40,6 +40,7 @@ export function registerServerTools(server: McpServer, ctx: ToolContext): void {
       type: z.string().optional(),
       block: z.string().optional(),
       limit: z.number().int().min(1).max(1000).default(100),
+      encoding: z.enum(["runs", "indices"]).optional(),
     }, call("world.query", 30_000));
 
   defineTool(server, ctx, "world_edit",
