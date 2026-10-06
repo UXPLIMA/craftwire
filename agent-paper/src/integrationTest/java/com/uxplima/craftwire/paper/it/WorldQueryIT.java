@@ -53,6 +53,14 @@ class WorldQueryIT {
     }
 
     @Test
+    void regionAcrossManyChunksIsReadInBatches() throws Exception {
+        // 300 x 1 x 100 on the flat world's grass layer touches ~130 chunks: more than one batch of chunk loads.
+        JsonObject r = query("{\"action\":\"region\",\"min\":{\"x\":2000,\"y\":-61,\"z\":2000},\"max\":{\"x\":2299,\"y\":-61,\"z\":2099}}");
+        assertEquals("[[0,30000]]", r.get("runs").toString());
+        assertEquals(30000, r.getAsJsonObject("counts").get("minecraft:grass_block[snowy=false]").getAsInt(), r.get("counts").toString());
+    }
+
+    @Test
     void regionOverTheLimitIsRejected() throws Exception {
         JsonObject e = hub.error("world.query", "{\"action\":\"region\",\"min\":{\"x\":0,\"y\":0,\"z\":0},\"max\":{\"x\":100,\"y\":100,\"z\":100}}");
         assertEquals("QUERY_TOO_LARGE", e.get("code").getAsString());
