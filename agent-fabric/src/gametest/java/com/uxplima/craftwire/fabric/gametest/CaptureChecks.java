@@ -71,5 +71,35 @@ final class CaptureChecks {
         ctx.waitTicks(2);
         check(ctx.computeOnClient(mc -> mc.gameRenderer.mainCamera().position()).distanceTo(eye) < 0.5, "per-capture camera cleared");
         check(ctx.computeOnClient(mc -> mc.options.fov().get()) != 50, "per-capture fov restored");
+
+        // chat:false keeps chat lines out of a HUD shot: no white chat text left in the bottom-left.
+        ctx.runOnClient(mc -> {
+            for (int i = 0; i < 10; i++) mc.gui.hud.getChat().addClientSystemMessage(net.minecraft.network.chat.Component.literal("Teleported Steve to 1, 2, 3 #" + i));
+        });
+        ctx.waitTicks(2);
+        JsonObject withChat = Calls.call(ctx, "screenshot", "{\"hud\":true,\"maxSize\":512,\"savePath\":\"" + dir.resolve("chat-on.png").toString().replace("\\", "\\\\") + "\"}").getAsJsonObject();
+        JsonObject noChat = Calls.call(ctx, "screenshot", "{\"hud\":true,\"chat\":false,\"maxSize\":512,\"savePath\":\"" + dir.resolve("chat-off.png").toString().replace("\\", "\\\\") + "\"}").getAsJsonObject();
+        double on = chatTextShare(withChat);
+        double off = chatTextShare(noChat);
+        check(on > 0.03, "the chat lines should show without chat:false: " + on);
+        check(off < 0.002, "chat:false must hide the chat lines: " + off);
+        check(!com.uxplima.craftwire.fabric.CaptureOptions.hideChat, "chat hiding is undone after the capture");
+    }
+
+    /** Share of near-white (text) pixels in the bottom-left area where chat lines sit. */
+    private static double chatTextShare(JsonObject shot) throws java.io.IOException {
+        java.awt.image.BufferedImage img = javax.imageio.ImageIO.read(Path.of(shot.get("savedPath").getAsString()).toFile());
+        int w = img.getWidth();
+        int h = img.getHeight();
+        int text = 0;
+        int n = 0;
+        for (int y = h * 46 / 100; y < h * 82 / 100; y++) {
+            for (int x = 0; x < w * 35 / 100; x++) {
+                int rgb = img.getRGB(x, y);
+                if (((rgb >> 16) & 0xff) > 200 && ((rgb >> 8) & 0xff) > 200 && (rgb & 0xff) > 200) text++;
+                n++;
+            }
+        }
+        return (double) text / n;
     }
 }

@@ -62,10 +62,10 @@ describe("client tools", () => {
       seen = p;
       return { mime: "image/png", data: "iVBORw0KGgo=", width: 2, height: 1, fullWidth: 4, fullHeight: 2, savedPath: p.savePath };
     });
-    const res = await hub.call("screenshot", { hud: false, savePath: "shots/a.png" });
+    const res = await hub.call("screenshot", { hud: false, chat: false, savePath: "shots/a.png" });
     expect(res.content[0]).toEqual({ type: "image", data: "iVBORw0KGgo=", mimeType: "image/png" });
     expect(JSON.parse((res.content[1] as { text: string }).text)).toMatchObject({ width: 2, fullWidth: 4, savedPath: resolve("shots/a.png") });
-    expect(seen).toMatchObject({ hud: false, maxSize: 1600, savePath: resolve("shots/a.png") });
+    expect(seen).toMatchObject({ hud: false, chat: false, maxSize: 1600, savePath: resolve("shots/a.png") });
   });
 
   it("chat send and command forward to chat.send", async () => {

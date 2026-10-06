@@ -4,6 +4,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.uxplima.craftwire.core.AgentError;
 import com.uxplima.craftwire.fabric.CaptureFaults;
+import com.uxplima.craftwire.fabric.CaptureOptions;
 import com.uxplima.craftwire.fabric.ClientScheduler;
 import com.uxplima.craftwire.fabric.CraftwireAgent;
 import com.uxplima.craftwire.fabric.Params;
@@ -34,9 +35,10 @@ import net.minecraft.client.Screenshot;
 final class ScreenshotHandler {
     private ScreenshotHandler() {}
 
-    private record Saved(boolean hudHidden, CameraOverride.Pose pose, int fov) {
+    private record Saved(boolean hudHidden, CameraOverride.Pose pose, int fov, boolean chatHidden) {
         static Saved of(Minecraft mc) {
-            return new Saved(((HudAccessor) mc.gui.hud).craftwire$isHidden(), CameraOverride.INSTANCE.get(), mc.options.fov().get());
+            return new Saved(((HudAccessor) mc.gui.hud).craftwire$isHidden(), CameraOverride.INSTANCE.get(), mc.options.fov().get(),
+                    CaptureOptions.hideChat);
         }
 
         void restore(Minecraft mc) {
@@ -44,11 +46,13 @@ final class ScreenshotHandler {
             if (pose == null) CameraOverride.INSTANCE.clear();
             else CameraOverride.INSTANCE.set(pose);
             if (mc.options.fov().get() != fov) mc.options.fov().set(fov);
+            CaptureOptions.hideChat = chatHidden;
         }
     }
 
     static CompletableFuture<JsonElement> capture(JsonObject p, CraftwireAgent agent) {
         boolean hud = Params.optBool(p, "hud").orElse(true);
+        boolean chat = Params.optBool(p, "chat").orElse(true);
         int maxSize = Params.optInt(p, "maxSize").orElse(1600);
         String savePath = Params.optString(p, "savePath").orElse(null);
         String format = Params.optString(p, "format").orElse("auto");
@@ -74,6 +78,7 @@ final class ScreenshotHandler {
             Saved saved = Saved.of(mc);
             agent.setCaptureInProgress(true);
             if (!hud) ((HudAccessor) mc.gui.hud).craftwire$setHidden(true);
+            if (!chat) CaptureOptions.hideChat = true;
             if (capturePose != null) CameraOverride.INSTANCE.set(capturePose);
             if (captureFov != null) mc.options.fov().set(captureFov);
             return saved;
