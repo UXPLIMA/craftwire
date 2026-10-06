@@ -59,6 +59,19 @@ Every picture on this page was taken by Craftwire itself, through the tools belo
 
 > *"Build my plugin, deploy it to ~/servers/test, spawn two bots, have one open /shop and buy the first item, and tell me what the plugin answered."*
 
+### Test your plugin with scenarios
+
+A scenario is a plugin test written as JSON: bots run commands and click menus, and checks wait for the message, the block, the item or the event that should follow. When a check fails you get the expected and actual values plus what the bots saw, which events fired and which exceptions were logged at that moment. Run them from the AI with `scenario_run`, or in CI with `npx craftwire test --server <dir> --junit report.xml`. See [docs/scenarios.md](docs/scenarios.md).
+
+```json
+{ "name": "shop sells a diamond", "bots": ["Buyer"],
+  "steps": [
+    { "bot": "Buyer", "command": "/shop" },
+    { "bot": "Buyer", "action": "gui_click", "slot": 13 },
+    { "expect_message": { "bot": "Buyer", "matches": "you bought a diamond" } },
+    { "expect_no_exceptions": {} } ] }
+```
+
 ### Let the AI run its own client
 
 You don't have to keep the game open. `client_process` starts a Minecraft client the hub runs itself:
@@ -151,9 +164,9 @@ Then ask your AI: *"take a screenshot of what I'm looking at"* or *"what's the T
 | Hub | `list_instances` · `wait_for` · `get_request_status` · `logs` · `exceptions` |
 | Client | `screenshot` · `camera` · `gui_read` · `gui_action` · `input` · `chat` · `hud_read` · `player_state` · `client_settings` |
 | Server | `server_command` · `server_eval` · `world_query` · `world_edit` · `server_info` · `plugin_manage` · `events` |
-| Dev loop | `server_process` · `plugin_deploy` · `client_process` |
+| Dev loop | `server_process` · `plugin_deploy` · `client_process` · `scenario_run` |
 | Bots | `bot_spawn` · `bot_action` · `bot_remove` |
-| CLI | `npx craftwire setup` · `npx craftwire doctor` |
+| CLI | `npx craftwire setup` · `npx craftwire doctor` · `npx craftwire test` |
 
 Skills that teach the agent the workflows ship with the Claude Code plugin, and `setup` installs them for Codex and Gemini CLI:
 - `craftwire`: the tools in general.

@@ -3,15 +3,11 @@ import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { trackExceptions } from "./exceptions.js";
-import { AgentServer } from "./agents.js";
-import { AuditLog } from "./audit.js";
-import { ClientManager } from "./client/client-manager.js";
-import { prepareClient } from "./client/launcher.js";
-import { ConfigError, craftwireHome, hubPort, loadOrCreateToken, writeHubConfig } from "./config.js";
-import { ServerManager } from "./dev/server-manager.js";
+import { ConfigError, craftwireHome } from "./config.js";
 import { formatChecks, runDoctor } from "./doctor.js";
-import { OperationTracker } from "./operations.js";
+import { runningHub, startHub } from "./hub.js";
+import { parseTestArgs, runTests, TEST_USAGE } from "./scenario/test-command.js";
+import { CraftwireError } from "./errors.js";
 import { createCraftwireServer } from "./server.js";
 import { setupCommand, setupEnvFromProcess } from "./setup.js";
 import { HUB_VERSION } from "./version.js";
@@ -20,23 +16,14 @@ const log = (msg: string) => process.stderr.write(`[craftwire] ${msg}\n`);
 
 async function main(): Promise<void> {
   const home = craftwireHome();
-  const token = loadOrCreateToken(home);
-  const agents = new AgentServer({ token, port: hubPort() });
-  const port = await agents.listen();
-  writeHubConfig({ port, token }, home);
-  agents.on("connected", (i) => log(`${i.id} connected (${i.name}, Minecraft ${i.mcVersion}, agent ${i.agentVersion})`));
-  agents.on("disconnected", (i) => log(`${i.id} disconnected`));
-
-  const servers = new ServerManager({ agents, home });
-  const clients = new ClientManager({ agents, home, servers, prepare: (p) => prepareClient(p) });
-  const server = createCraftwireServer({ agents, ops: new OperationTracker(), audit: new AuditLog(join(home, "logs")), servers, clients, exceptions: trackExceptions(agents) });
+  const hub = await startHub(home, log);
+  const server = createCraftwireServer(hub.ctx);
   const transport = new StdioServerTransport();
   let stopping = false;
   const shutdown = () => {
     if (stopping) return;
     stopping = true;
-    // Clients first (they may be on these servers), then servers, which get a graceful stop so their worlds are saved.
-    void clients.shutdown().finally(() => servers.shutdown()).finally(() => agents.close()).finally(() => process.exit(0));
+    void hub.close().finally(() => process.exit(0));
   };
   transport.onclose = shutdown;
   // StdioServerTransport does not report stdin EOF; without this the hub outlives Claude Code and keeps its port.
@@ -45,7 +32,44 @@ async function main(): Promise<void> {
   process.once("SIGINT", shutdown);
   process.once("SIGTERM", shutdown);
   await server.connect(transport);
-  log(`hub ${HUB_VERSION} listening on 127.0.0.1:${port} (state: ${home})`);
+  log(`hub ${HUB_VERSION} listening on 127.0.0.1:${hub.port} (state: ${home})`);
+}
+
+async function test(args: string[]): Promise<void> {
+  if (args.includes("--help") || args.includes("-h")) {
+    process.stdout.write(`${TEST_USAGE}\n`);
+    return;
+  }
+  const fail = (e: unknown) => {
+    const msg = e instanceof CraftwireError ? `${e.message}${e.hint ? `\n${e.hint}` : ""}` : e instanceof Error ? e.message : String(e);
+    process.stderr.write(`craftwire test: ${msg}\n`);
+  };
+  let opts;
+  try {
+    opts = parseTestArgs(args);
+  } catch (e) {
+    fail(e);
+    process.stderr.write(`${TEST_USAGE}\n`);
+    process.exit(2);
+  }
+  const home = craftwireHome();
+  const other = await runningHub(home);
+  if (other !== undefined) {
+    fail(new CraftwireError("HUB_RUNNING", `Another Craftwire hub is running on port ${other} (an AI session) and holds the connected server and clients.`,
+      "Ask the AI to run them with scenario_run {files: [...]}, or close that session and run this again."));
+    process.exit(2);
+  }
+  const hub = await startHub(home, () => {});
+  const ctx = hub.ctx;
+  let code = 2;
+  try {
+    code = await runTests(opts, { ctx, makeServer: () => createCraftwireServer(ctx), cwd: process.cwd(), out: (s) => process.stdout.write(`${s}\n`) });
+  } catch (e) {
+    fail(e);
+  } finally {
+    await hub.close();
+  }
+  process.exit(code);
 }
 
 async function doctor(args: string[]): Promise<void> {
@@ -72,6 +96,7 @@ const fatal = (e: unknown) => {
   process.exit(1);
 };
 if (argv[0] === "doctor") doctor(argv.slice(1)).catch(fatal);
+else if (argv[0] === "test") test(argv.slice(1)).catch(fatal);
 else if (argv[0] === "setup") {
   try {
     setup(argv.slice(1));

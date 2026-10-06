@@ -31,7 +31,8 @@ export async function startHub(opts: { writeHubJson?: boolean; javaMajor?: numbe
     agents, home, servers, prepare: opts.prepareClient ?? noClient, ...(opts.clientRoot ? { root: opts.clientRoot } : {}),
     stopTimeoutMs: opts.clientStopTimeoutMs ?? 2000, quitTimeoutMs: 500, readyPollMs: 50,
   });
-  const server = createCraftwireServer({ agents, ops: new OperationTracker(), audit: new AuditLog(join(home, "logs")), servers, clients, exceptions: trackExceptions(agents) });
+  const ctx = { agents, ops: new OperationTracker(), audit: new AuditLog(join(home, "logs")), servers, clients, exceptions: trackExceptions(agents) };
+  const server = createCraftwireServer(ctx);
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   await server.connect(serverTransport);
   const client = new Client({ name: "test", version: "0.0.0" });
@@ -39,7 +40,7 @@ export async function startHub(opts: { writeHubJson?: boolean; javaMajor?: numbe
   const call = (name: string, args: Record<string, unknown> = {}) =>
     client.callTool({ name, arguments: args }) as Promise<CallToolResult>;
   return {
-    agents, servers, clients, port, token: TOKEN, home, client, call,
+    agents, servers, clients, ctx, port, token: TOKEN, home, client, call,
     close: async () => { await clients.shutdown(); await servers.shutdown(); await client.close(); await server.close(); await agents.close(); },
   };
 }

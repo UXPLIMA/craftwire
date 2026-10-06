@@ -42,6 +42,7 @@ If `gui_action` returns `SLOT_OUT_OF_RANGE` or `NO_SCREEN_OPEN`, the screen chan
 ## Dev loop (local server)
 - `server_process {action:"start"|"stop"|"restart"|"status", serverDir}` runs a local Paper server under the hub; `start` returns when `Done (` was printed and the Craftwire plugin connected.
 - `plugin_deploy {projectDir}` (or `{jar}`) builds, installs and restarts, then reports `loaded` and `problems`. See the `paper-plugin-dev` skill for the full loop.
+- `scenario_run {files:[…]}` or `{scenario:{…}}` runs plugin tests written as JSON steps (see `paper-plugin-dev`).
 - Never accept the EULA for the user. Ask before `takeOver:true` — it stops a server the user started.
 
 ## Player commands through `chat`

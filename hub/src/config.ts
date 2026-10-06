@@ -38,6 +38,16 @@ export function writeHubConfig(config: HubConfig, home: string = craftwireHome()
   return file;
 }
 
+/** The hub.json a hub wrote, if it is there and readable. */
+export function readHubConfig(home: string = craftwireHome()): HubConfig | undefined {
+  try {
+    const o = JSON.parse(readFileSync(join(home, "hub.json"), "utf8")) as Partial<HubConfig>;
+    return typeof o.port === "number" && typeof o.token === "string" ? { port: o.port, token: o.token } : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function tokensEqual(a: string, b: string): boolean {
   const ba = Buffer.from(a);
   const bb = Buffer.from(b);

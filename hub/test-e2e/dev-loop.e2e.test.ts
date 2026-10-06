@@ -97,6 +97,45 @@ describe("dev loop against a real Paper server", () => {
     expect(json(await hub.call("bot_remove", { all: true })).removed).toEqual(["E2eBot"]);
   });
 
+  it("runs scenario files: a plugin flow that passes and one that fails with its context", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "cw-scenarios-"));
+    writeFileSync(join(dir, "menu.cwtest.json"), JSON.stringify({
+      name: "fixture menu and shop",
+      bots: { names: ["Scn"], location: { x: 0.5, y: -60, z: 0.5 } },
+      setup: [{ command: "minecraft:setblock 3 -60 3 minecraft:air" }],
+      steps: [
+        { bot: "Scn", command: "/cwfixture menu", expect: { path: "success", equals: true } },
+        { bot: "Scn", action: "gui_read", expect: { path: "title", equals: "Fixture Menu" }, within: 2000 },
+        { bot: "Scn", action: "gui_click", slot: 4 },
+        { expect_message: { bot: "Scn", matches: "clicked 4" } },
+        { bot: "Scn", command: "/cwfixture buy" },
+        { expect_event: { type: "FixtureShopEvent", player: "Scn", matches: '"cancelled":true' } },
+        { command: "minecraft:setblock 3 -60 3 minecraft:stone" },
+        { expect_block: { x: 3, y: -60, z: 3, is: "stone" } },
+        { wait: { condition: "player_near", player: "Scn", x: 0.5, y: -60, z: 0.5, radius: 3, timeoutMs: 2000 }, save: "near" },
+        { expect: { tool: "server_command", args: { command: "say ${near.value.distance}" }, path: "output", exists: true } },
+        { expect_no_exceptions: {} },
+      ],
+      cleanup: [{ command: "minecraft:setblock 3 -60 3 minecraft:air" }],
+    }));
+    writeFileSync(join(dir, "broken.cwtest.json"), JSON.stringify({
+      name: "expects the wrong reply",
+      bots: ["Scn2"],
+      steps: [
+        { bot: "Scn2", command: "/cwfixture blocked" },
+        { expect_message: { bot: "Scn2", matches: "welcome", within: 500 } },
+      ],
+    }));
+    const r = json(await hub.call("scenario_run", { files: [dir] }));
+    const [broken, menu] = r.scenarios;
+    expect(menu, JSON.stringify(menu, null, 2)).toMatchObject({ name: "fixture menu and shop", passed: true });
+    expect(broken).toMatchObject({
+      name: "expects the wrong reply", passed: false,
+      failure: { index: 1, message: "Scn2 received no message matching /welcome/", actual: ["fixture: blocked"], context: { Scn2: { messages: expect.arrayContaining(["fixture: blocked"]) } } },
+    });
+    expect(json(await hub.call("world_query", { action: "players" })).players.some((p: { name: string }) => p.name.startsWith("Scn"))).toBe(false);
+  });
+
   it("stops the server gracefully", async () => {
     expect(json(await hub.call("server_process", { action: "stop", serverDir }))).toMatchObject({ stopped: true, forced: false });
     expect(json(await hub.call("server_process", { action: "status" })).servers[0].state).toBe("stopped");

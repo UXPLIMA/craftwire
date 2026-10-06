@@ -26,6 +26,14 @@ description: Use when developing or debugging a Paper/Bukkit plugin with the cra
    - No client needed for most checks: `bot_spawn`, then `bot_action` to run the plugin's commands, click its menus (`gui_read`/`gui_click`), use items or blocks, read what the plugin sent (`messages`) and what it put on screen (`hud_read`: sidebar lines, tab header/footer and names, boss bars, titles, action bar). Remove bots afterwards.
 4. Repeat. Keep `restart:true` (default): Paper cannot reload plugins safely.
 
+## Regression tests (scenarios)
+Once a flow works, keep it as a scenario so it is checked after every change: write `tests/<flow>.cwtest.json` in the plugin project and run `scenario_run {files:["tests"]}` after each deploy.
+- Steps: `{bot, command}`, `{bot, action, …}`, `{command}` (console), `{wait:{…wait_for}}`; add `expect: {path, equals|matches|contains|exists}` and `within: ms` to retry until it holds.
+- Checks: `expect_message {bot, matches}`, `expect_hud {bot, path, matches}`, `expect_block {x,y,z,is}`, `expect_event {type, player, matches}`, `expect_no_exceptions {}`.
+- `bots: ["Buyer"]` spawns and removes the bots; `cleanup` always runs, so undo world changes there (or `save` a `world_edit` snapshot in setup and restore it).
+- A failure names the step, expected vs actual, and the bots' messages/HUD, events and new exceptions at that moment: read them before changing code. Full format: docs/scenarios.md in the Craftwire repo.
+- CI: `npx craftwire test tests --server <dir> --junit report.xml`.
+
 ## Notes
 - `buildCommand` runs any build in projectDir. On Windows write wrappers with a path: `.\gradlew.bat shadowJar` (a bare `gradlew.bat` is not found from the hub's shell). `javaHome` sets the JDK for the build.
 - Replaced jars are kept in `plugins/.craftwire-backup/`.
