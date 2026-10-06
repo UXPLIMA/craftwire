@@ -61,6 +61,18 @@ class BotLifecycleIT {
     }
 
     @Test
+    void removingABotInTheTickItWasKickedLeavesItOnce() throws Exception {
+        hub.result("bot.spawn", "{\"names\":[\"ItRace\"]}");
+        hub.result("server.eval", "{\"code\":\"server.dispatchCommand(server.getConsoleSender(), 'minecraft:kick ItRace bye');"
+                + " plugin('Craftwire').bots().remove('ItRace'); 'ok'\",\"reset\":true}");
+        Thread.sleep(500);
+        assertNull(player("ItRace"));
+        long quits = hub.events.stream().filter(e -> e.toString().contains("\"action\":\"quit\"") && e.toString().contains("ItRace")).count();
+        assertEquals(1, quits, "exactly one quit event");
+        assertTrue(hub.events.stream().noneMatch(e -> e.toString().contains("\"level\":\"ERROR\"") && e.toString().contains("ItRace")), "no errors");
+    }
+
+    @Test
     void kickedBotLeaves() throws Exception {
         hub.result("bot.spawn", "{\"names\":[\"ItKick\"]}");
         hub.result("server.command", "{\"command\":\"minecraft:kick ItKick bye\"}");
