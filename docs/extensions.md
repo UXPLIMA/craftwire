@@ -12,10 +12,16 @@ have?"), setting up a test situation in one call ("open an auction with these it
 The API is a small jar with no dependencies (Java 21). Compile against it, but do not bundle it: Craftwire brings
 these classes at runtime.
 
+Download `craftwire-api-<version>.jar` from [Releases](https://github.com/uxplima/craftwire/releases) into your
+project's `libs/` folder:
+
 ```groovy
-repositories { maven { url = 'https://jitpack.io' } }
-dependencies { compileOnly 'com.github.uxplima.craftwire:craftwire-api:<version>' }
+dependencies { compileOnly files('libs/craftwire-api-0.6.0.jar') }
 ```
+
+With Maven, install it once with `mvn install:install-file -Dfile=libs/craftwire-api-0.6.0.jar
+-DgroupId=com.uxplima.craftwire -DartifactId=craftwire-api -Dversion=0.6.0 -Dpackaging=jar`, then depend on
+`com.uxplima.craftwire:craftwire-api:0.6.0` with `<scope>provided</scope>`.
 
 To build it from a checkout instead, run `./gradlew -PapiOnly :craftwire-api:build` (Java 21 is enough); the jar is
 in `craftwire-api/build/libs`.

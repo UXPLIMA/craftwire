@@ -9,7 +9,7 @@ pluginManagement {
 
 rootProject.name = 'craftwire'
 
-// -PapiOnly builds just the public API (JitPack, plugin developers): no Minecraft, Loom or paperweight needed.
+// -PapiOnly builds just the public API (plugin and mod developers): no Minecraft, Loom or paperweight needed.
 if (providers.gradleProperty('apiOnly').isPresent()) {
     include 'craftwire-api'
     return
