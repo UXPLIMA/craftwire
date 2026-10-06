@@ -1,4 +1,7 @@
+import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname, resolve as resolvePath } from "node:path";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { defineTool, forward, ok, targetArgs, type ToolContext } from "./registry.js";
 
@@ -42,6 +45,36 @@ export function registerServerTools(server: McpServer, ctx: ToolContext): void {
       limit: z.number().int().min(1).max(1000).default(100),
       encoding: z.enum(["runs", "indices"]).optional(),
     }, call("world.query", 30_000));
+
+  defineTool(server, ctx, "world_render",
+    "Draw a region of a Paper world as an image, without any client: top (the surface as a map draws it: north up, x right, z down; higher blocks lighter, water by depth), slice {y} (the blocks at one height, e.g. a floor plan; air is light grey), or side {facing, y1?, y2?} (a front view looking toward facing; nearer blocks brighter). " +
+    "Up to 512x512 blocks; scale is pixels per block (1-8, default fits about 1024 px). grid draws a line every N blocks with coordinates in the margins, so you can name positions. Players and bots are marked with their names. Chunks that were never generated are not generated (checkered) unless generate:true. savePath also writes the PNG (relative to the current directory).",
+    {
+      ...targetArgs,
+      world,
+      x1: z.number().int(), z1: z.number().int(), x2: z.number().int(), z2: z.number().int(),
+      view: z.enum(["top", "slice", "side"]).default("top"),
+      y: z.number().int().optional().describe("slice: the height to cut at."),
+      facing: z.enum(["north", "south", "east", "west"]).optional().describe("side: the direction you look."),
+      y1: z.number().int().optional(), y2: z.number().int().optional(),
+      scale: z.number().int().min(1).max(8).optional(),
+      grid: z.number().int().min(0).max(512).default(0),
+      players: z.boolean().default(true),
+      generate: z.boolean().default(false),
+      savePath: z.string().optional(),
+    },
+    async (args, c): Promise<CallToolResult> => {
+      const { savePath, ...params } = args;
+      const r = (await forward(c, "server", "world.render", params, 60_000)) as { mime: string; data: string } & Record<string, unknown>;
+      const { data, mime, ...meta } = r;
+      if (savePath !== undefined) {
+        const file = resolvePath(savePath);
+        mkdirSync(dirname(file), { recursive: true });
+        writeFileSync(file, Buffer.from(data, "base64"));
+        meta.savedPath = file;
+      }
+      return { content: [{ type: "image", data, mimeType: mime }, { type: "text", text: JSON.stringify(meta) }] };
+    });
 
   defineTool(server, ctx, "world_edit",
     "Change the world. set_blocks: blocks [{x,y,z,block}] (up to 10000). fill: min..max with block, only where `replace` matches if given. snapshot: save min..max and return an id; restore: put snapshot `id` back. save_schematic: save min..max as structure `name`; paste_schematic: place it with its origin at `at`, optionally rotated/mirrored around that point. Edits over 32768 blocks take a snapshot first and return its snapshotId. Block states use Minecraft syntax, e.g. 'oak_stairs[facing=east]'.",

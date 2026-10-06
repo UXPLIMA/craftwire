@@ -1,3 +1,6 @@
+import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { connectFakeAgent } from "./helpers/fakeAgent.js";
 import { json, startHub, TOKEN } from "./helpers/hub.js";
@@ -31,6 +34,25 @@ describe("server tools", () => {
       expect(json(res)).toEqual({ got: expect.objectContaining(args) });
     });
   }
+
+  it("world_render returns the PNG as an image, with what it shows, and can save it", async () => {
+    const { hub, agent } = await withServer();
+    const png = Buffer.from("89504e470d0a1a0a", "hex").toString("base64");
+    let got: Record<string, unknown> | undefined;
+    agent.onRequest("world.render", (p) => {
+      got = p;
+      return { mime: "image/png", data: png, width: 64, height: 64, view: "top", region: { x1: 0, z1: 0, x2: 15, z2: 15 }, scale: 4, origin: { x: 0, y: 0 }, orientation: "North is up" };
+    });
+    const dir = mkdtempSync(join(tmpdir(), "cw-render-"));
+    const res = await hub.call("world_render", { x1: 0, z1: 0, x2: 15, z2: 15, savePath: join(dir, "map.png") });
+    expect(got).toMatchObject({ x1: 0, z1: 0, x2: 15, z2: 15, view: "top", grid: 0, players: true, generate: false });
+    expect(got).not.toHaveProperty("savePath");
+    expect(res.content[0]).toEqual({ type: "image", data: png, mimeType: "image/png" });
+    const meta = JSON.parse((res.content[1] as { text: string }).text);
+    expect(meta).toMatchObject({ width: 64, scale: 4, orientation: "North is up", savedPath: join(dir, "map.png") });
+    expect(meta).not.toHaveProperty("data");
+    expect(existsSync(join(dir, "map.png")) && readFileSync(join(dir, "map.png")).toString("hex")).toBe("89504e470d0a1a0a");
+  });
 
   it("applies parameter defaults before forwarding", async () => {
     const { hub, agent } = await withServer();

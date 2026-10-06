@@ -52,6 +52,7 @@ Every picture on this page was taken by Craftwire itself, through the tools belo
 
 - `server_command` runs console commands and returns their output. `server_eval` runs JavaScript with the full Bukkit API.
 - `world_query` and `world_edit` read and change blocks, and take snapshots you can restore.
+- `world_render` draws a region as an image on the server, no client needed: a map from above, a floor plan at one height, or a front view, with a coordinate grid and players marked.
 - `server_process` starts, stops and restarts a local Paper server. It never accepts the EULA for you.
 - `events` records every Bukkit event, your plugin's own events included: what fired, with which values, whether it ended up cancelled, and which plugins listen to it.
 - `exceptions` groups the stack traces of the server and the clients into distinct bugs, with a count and the plugin and line to blame.
@@ -167,7 +168,7 @@ Then ask your AI: *"take a screenshot of what I'm looking at"* or *"what's the T
 |---|---|
 | Hub | `list_instances` · `wait_for` · `get_request_status` · `logs` · `exceptions` |
 | Client | `screenshot` · `camera` · `gui_read` · `gui_action` · `input` · `chat` · `hud_read` · `player_state` · `client_settings` |
-| Server | `server_command` · `server_eval` · `world_query` · `world_edit` · `server_info` · `plugin_manage` · `events` |
+| Server | `server_command` · `server_eval` · `world_query` · `world_edit` · `world_render` · `server_info` · `plugin_manage` · `events` |
 | Dev loop | `server_process` · `plugin_deploy` · `client_process` · `scenario_run` |
 | Bots | `bot_spawn` · `bot_action` · `bot_remove` |
 | CLI | `npx craftwire setup` · `npx craftwire doctor` · `npx craftwire test` |
