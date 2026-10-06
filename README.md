@@ -44,7 +44,7 @@ Every picture on this page was taken by Craftwire itself, through the tools belo
 
 ### Bots that plugins treat as players
 
-`bot_spawn` puts fake players on the Paper server. They join with a join event and a tab-list entry. `bot_action` makes them chat, run commands (and returns what the server answered), walk, look, use items, attack, and open and click plugin menus. Plugins see the same events a real client would cause, so you can test a shop, a minigame or a permission check without a second account.
+`bot_spawn` puts fake players on the Paper server. They join with a join event and a tab-list entry. `bot_action` makes them chat, run commands (and returns what the server answered), walk, look, use items, attack, open and click plugin menus, and read their own HUD (scoreboard sidebar, tab list, boss bars, titles). Plugins see the same events a real client would cause, so you can test a shop, a minigame or a permission check without a second account.
 
 <img src="docs/images/bots.jpg" alt="Three bots named BuilderBot, MinerBot and ScoutBot standing in a meadow, holding items" width="100%">
 
