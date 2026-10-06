@@ -43,6 +43,7 @@ public final class BotActions {
                             Math.clamp(Args.optLong(p, "timeoutMs").orElse(10_000L), 500L, 120_000L)))
                     .thenCompose(f -> f).thenApply(r -> (JsonElement) r);
             case "state" -> sync.global(() -> (JsonElement) BotJson.state(bots.get(name)));
+            case "hud_read" -> sync.global(() -> (JsonElement) bots.get(name).hud());
             case "give" -> sync.global(() -> give(bots.get(name), p));
             case "select_hotbar" -> sync.global(() -> selectHotbar(bots.get(name), Args.integer(p, "slot")));
             default -> BotGuiActions.run(action, p, bots, sync, name);

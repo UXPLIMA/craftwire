@@ -49,6 +49,12 @@ describe("bot tools", () => {
     expect(r).toEqual({ reached: true, action: "move_to" });
   });
 
+  it("bot_action forwards hud_read", async () => {
+    const { hub, agent } = await withServerAgent();
+    agent.onRequest("bot.action", (p) => ({ sidebar: null, action: p.action, bot: p.bot }));
+    expect(json(await hub.call("bot_action", { bot: "Bot1", action: "hud_read" }))).toEqual({ sidebar: null, action: "hud_read", bot: "Bot1" });
+  });
+
   it("bot_action passes structured errors through", async () => {
     const { hub, agent } = await withServerAgent();
     agent.onRequest("bot.action", () => { throw Object.assign(new Error("No bot named Ghost"), { code: "BOT_NOT_FOUND", hint: "bot_spawn creates bots" }); });

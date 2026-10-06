@@ -16,7 +16,7 @@ export function registerClientTools(server: McpServer, ctx: ToolContext): void {
     { ...targetArgs }, fwd("player.state"));
 
   defineTool(server, ctx, "hud_read",
-    "Read HUD state: bossbars (name, progress, color), actionbar, title/subtitle, scoreboard sidebar and tab list.",
+    "Read HUD state as plain text: bossbars (name, progress, color), actionbar, title/subtitle; sidebar {title, entries:[{name, value, shown}]} with lines as drawn (team prefix + name + suffix, game order, hidden # holders left out; shown is the number text or null when hidden); tab {header, footer, players:[{name, display, ping, gameMode, score?}]}; belowName {title, entries}; tabList (display names).",
     { ...targetArgs }, fwd("hud.read"));
 
   defineTool(server, ctx, "gui_read",

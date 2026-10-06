@@ -17,20 +17,21 @@ import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket;
 import net.minecraft.network.protocol.game.ClientboundSystemChatPacket;
 
 /**
- * A server-side connection with no client: outbound packets are dropped, except that chat and action-bar
- * messages are copied into the bot's inbox and teleports are remembered so the bot can confirm them.
+ * A server-side connection with no client: outbound packets are dropped after the bot has looked at them.
+ * Chat and action-bar messages are copied into the bot's inbox, HUD packets update its BotHud, and teleports
+ * are remembered so the bot can confirm them.
  * EmbeddedChannel runs writes inline, so nothing queues up.
  */
 final class FakeConnection {
     private FakeConnection() {}
 
-    static Connection create(BotInbox inbox, AtomicInteger pendingTeleport) {
+    static Connection create(BotInbox inbox, BotHud hud, AtomicInteger pendingTeleport) {
         Connection c = new Connection(PacketFlow.SERVERBOUND);
         c.channel = new EmbeddedChannel(new ChannelOutboundHandlerAdapter() {
             @Override
             public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) {
                 try {
-                    record(inbox, pendingTeleport, msg, System.currentTimeMillis());
+                    record(inbox, hud, pendingTeleport, msg, System.currentTimeMillis());
                 } finally {
                     ReferenceCountUtil.release(msg);
                     promise.setSuccess();
@@ -41,7 +42,8 @@ final class FakeConnection {
         return c;
     }
 
-    static void record(BotInbox inbox, AtomicInteger pendingTeleport, Object msg, long now) {
+    static void record(BotInbox inbox, BotHud hud, AtomicInteger pendingTeleport, Object msg, long now) {
+        if (!(msg instanceof ClientboundBundlePacket)) hud.accept(msg, now);
         if (msg instanceof ClientboundPlayerPositionPacket p) {
             pendingTeleport.set(p.id());
         } else if (msg instanceof ClientboundSystemChatPacket p) {
@@ -50,7 +52,7 @@ final class FakeConnection {
             String text = p.unsignedContent() != null ? p.unsignedContent().getString() : p.body().content();
             inbox.add("chat", text, p.chatType().name().getString(), now);
         } else if (msg instanceof ClientboundBundlePacket bundle) {
-            for (Packet<?> sub : bundle.subPackets()) record(inbox, pendingTeleport, sub, now);
+            for (Packet<?> sub : bundle.subPackets()) record(inbox, hud, pendingTeleport, sub, now);
         }
     }
 }

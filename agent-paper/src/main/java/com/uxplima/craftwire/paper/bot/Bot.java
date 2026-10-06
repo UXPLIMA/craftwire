@@ -34,18 +34,20 @@ public final class Bot {
     private final Connection connection;
     private final ServerGamePacketListenerImpl listener;
     private final BotInbox inbox;
+    private final BotHud hud;
     private final AtomicInteger pendingTeleport;
     private int sequence;
     private int deadTicks;
     private Move move;
 
     private Bot(String name, UUID uuid, Connection connection, ServerGamePacketListenerImpl listener, BotInbox inbox,
-            AtomicInteger pendingTeleport) {
+            BotHud hud, AtomicInteger pendingTeleport) {
         this.name = name;
         this.uuid = uuid;
         this.connection = connection;
         this.listener = listener;
         this.inbox = inbox;
+        this.hud = hud;
         this.pendingTeleport = pendingTeleport;
     }
 
@@ -57,11 +59,12 @@ public final class Bot {
         UUID uuid = UUID.nameUUIDFromBytes(("OfflinePlayer:" + name).getBytes(StandardCharsets.UTF_8));
         GameProfile profile = new GameProfile(uuid, name);
         BotInbox inbox = new BotInbox(200);
+        BotHud hud = new BotHud();
         AtomicInteger pendingTeleport = new AtomicInteger(-1);
-        Connection connection = FakeConnection.create(inbox, pendingTeleport);
+        Connection connection = FakeConnection.create(inbox, hud, pendingTeleport);
         ServerPlayer player = new ServerPlayer(server, level, profile, ClientInformation.createDefault());
         server.getPlayerList().placeNewPlayer(connection, player, CommonListenerCookie.createInitial(profile, false));
-        Bot bot = new Bot(name, uuid, connection, player.connection, inbox, pendingTeleport);
+        Bot bot = new Bot(name, uuid, connection, player.connection, inbox, hud, pendingTeleport);
         bot.bukkit().teleport(at);
         bot.settle();
         return bot;
@@ -70,6 +73,8 @@ public final class Bot {
     public String name() { return name; }
     public UUID uuid() { return uuid; }
     public BotInbox inbox() { return inbox; }
+    /** What the bot's HUD would show: sidebar, tab list, boss bars, title, action bar. */
+    public JsonObject hud() { return hud.json(name, System.currentTimeMillis()); }
     public ServerGamePacketListenerImpl listener() { return listener; }
     /** The current player entity; a respawn replaces it, the listener follows. */
     public ServerPlayer player() { return listener.player; }
