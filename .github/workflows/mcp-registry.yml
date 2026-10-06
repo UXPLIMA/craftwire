@@ -1,0 +1,21 @@
+name: MCP registry
+
+# Publishes hub/server.json to the MCP registry, signed in as this repository (GitHub OIDC), so the
+# io.github.uxplima namespace needs no personal login. Run it by hand once the version in server.json is on npm.
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install mcp-publisher
+        run: curl -fsSL https://github.com/modelcontextprotocol/registry/releases/download/v1.8.1/mcp-publisher_linux_amd64.tar.gz | tar xz mcp-publisher
+      - run: ./mcp-publisher login github-oidc
+      - run: ../mcp-publisher publish
+        working-directory: hub
