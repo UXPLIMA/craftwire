@@ -23,3 +23,9 @@ Server methods (M2, `agentKind: "server"`):
 - `world.edit` `{action: set_blocks|fill|snapshot|restore|save_schematic|paste_schematic, world?, …}` → results carry `snapshotId` when a snapshot was taken
 - `server.info` `{}` → `{name, version, minecraftVersion, tps[3], mspt, memory, players, worlds[], plugins[]}`
 - `plugin.manage` `{action: list|info|enable|disable, name?}`
+
+Server methods (M4, bots; `allow-bots` gates all three):
+- `bot.spawn` `{count?, namePrefix?, names?, location?: {world?, x, y, z, yaw?, pitch?}}` → `{bots: [{name, uuid, world, x, y, z}]}`
+- `bot.remove` `{name}` or `{all: true}` → `{removed: [names]}`
+- `bot.action` `{bot, action, …}`. Actions: chat, command, messages, look, move_to, state, give, select_hotbar, gui_read, gui_click, gui_close, use, attack (parameters as in the `bot_action` tool).
+`world.query players` rows carry `bot: true` for bots.

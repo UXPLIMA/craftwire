@@ -1,6 +1,6 @@
 # Craftwire
 
-Let AI agents (Claude Code and any MCP client) **see and drive Minecraft**: screenshots, a free camera, reading and clicking GUIs, chat and commands, HUD reading and input — and **drive a Paper server**: console commands, JavaScript against the Bukkit API, world reads and edits with undo snapshots, logs and plugin control. It also runs a local server and builds and redeploys your plugin in one step (dev loop). Bots follow in the next milestone.
+Let AI agents (Claude Code and any MCP client) **see and drive Minecraft**: screenshots, a free camera, reading and clicking GUIs, chat and commands, HUD reading and input — and **drive a Paper server**: console commands, JavaScript against the Bukkit API, world reads and edits with undo snapshots, logs and plugin control. It also runs a local server and builds and redeploys your plugin in one step (dev loop). Server-side bots stand in for players when you test plugins.
 
 By [UXPLIMA](https://github.com/uxplima) · MIT licensed · Minecraft 26.2 (Fabric client, Paper server)
 
@@ -16,7 +16,7 @@ By [UXPLIMA](https://github.com/uxplima) · MIT licensed · Minecraft 26.2 (Fabr
 
 Ask Claude: *"take a screenshot of what I'm looking at"*.
 
-> Windows: if the MCP server does not start, edit `.mcp.json` in the plugin to use `"command": "cmd", "args": ["/c", "npx", "-y", "craftwire@0.3.0"]`.
+> Windows: if the MCP server does not start, edit `.mcp.json` in the plugin to use `"command": "cmd", "args": ["/c", "npx", "-y", "craftwire@0.4.0"]`.
 
 ## Paper server
 
@@ -39,6 +39,14 @@ Ask Claude: *"build my plugin, deploy it to ~/servers/test and tell me what brok
 
 Something not connecting? Run `npx craftwire doctor` (add `--server <folder>` to check a server folder too).
 
+## Bots
+
+`bot_spawn` puts fake players on a Paper server running the Craftwire plugin. They join like real players, so plugins see join, chat, command, click and damage events from them.
+
+`bot_action` makes a bot chat, run commands (and returns the replies it received), walk to a point, look, use items and blocks, attack, and read and click plugin menus. `bot_remove` logs them out.
+
+Ask Claude: *"spawn two bots, have one open /shop and buy the first item, and tell me what the plugin answered"*.
+
 ## How it works
 
 `craftwire` (npm) is an MCP server over stdio. It listens on `127.0.0.1` only and writes its port and a random token to `~/.craftwire/hub.json`. The mod and the plugin read that file and connect out to the hub — the game and the server open no ports. Every tool call is logged to `~/.craftwire/logs/`.
@@ -49,6 +57,7 @@ Something not connecting? Run `npx craftwire doctor` (add `--server <folder>` to
 - Client (M1): `screenshot` · `camera` · `gui_read` · `gui_action` · `input` · `chat` · `hud_read` · `player_state` · `client_settings`
 - Server (M2): `server_command` · `server_eval` · `world_query` · `world_edit` · `server_info` · `plugin_manage`
 - Dev loop (M3): `server_process` · `plugin_deploy` · CLI `craftwire doctor`
+- Bots (M4): `bot_spawn` · `bot_action` · `bot_remove`
 
 ## Development
 

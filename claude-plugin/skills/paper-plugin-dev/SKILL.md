@@ -20,6 +20,7 @@ description: Use when developing or debugging a Paper/Bukkit plugin with the cra
    - `AMBIGUOUS_JAR`: multi-module project; pass `jarGlob`, e.g. `"my-plugin/build/libs/*-all.jar"`.
    - `NOT_MANAGED`: the user started this server outside Craftwire. Ask before passing `takeOver:true` — it stops their server.
 3. Check: `logs {level:"WARN"}`, `server_command` for the plugin's commands, `server_eval` to inspect state (`plugin('Name')`), and the client tools (`screenshot`, `gui_read`) for anything a player sees.
+   - No client needed for most checks: `bot_spawn`, then `bot_action` to run the plugin's commands, click its menus (`gui_read`/`gui_click`), use items or blocks, and read what the plugin sent (`messages`). Remove bots afterwards.
 4. Repeat. Keep `restart:true` (default): Paper cannot reload plugins safely.
 
 ## Notes

@@ -7,7 +7,7 @@ instance-name: ""
 allow-eval: true
 # world_edit: change blocks, paste structures, restore snapshots.
 allow-world-edit: true
-# bot_spawn / bot_action (milestone M4).
+# bot_spawn / bot_action / bot_remove: server-side fake players.
 allow-bots: true
 # Largest box, in blocks, that one world_edit call may change.
 max-edit-volume: 1000000

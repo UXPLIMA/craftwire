@@ -1,6 +1,6 @@
 ---
 name: craftwire
-description: Use when driving Minecraft or a Paper server through the craftwire MCP tools (screenshot, camera, gui_*, input, chat, server_command, server_eval, world_query, world_edit, logs, wait_for, server_process, plugin_deploy) — covers the reliable order of calls, menus, server scripting, safe world edits and recovering from errors.
+description: Use when driving Minecraft or a Paper server through the craftwire MCP tools (screenshot, camera, gui_*, input, chat, server_command, server_eval, world_query, world_edit, logs, wait_for, server_process, plugin_deploy, bot_spawn, bot_action) — covers the reliable order of calls, menus, server scripting, safe world edits and recovering from errors.
 ---
 
 # Driving Minecraft with Craftwire
@@ -37,6 +37,12 @@ If `gui_action` returns `SLOT_OUT_OF_RANGE` or `NO_SCREEN_OPEN`, the screen chan
 
 ## Player commands through `chat`
 - `chat {action:"command"}` strips one leading `/`, so WorldEdit commands keep their double slash: send `//pos1`.
+
+## Bots (server-side fake players)
+- `bot_spawn {count}` (or `names`), then drive with `bot_action`. Bots are real players to plugins: permissions, join/quit, chat and click events all fire.
+- Menus: `bot_action {action:"command", command:"shop"}` → `gui_read` → `gui_click {slot}`; the click result already includes the menu after the plugin reacted. Read replies with `messages`.
+- Walking is straight-line (`move_to`): it hops one-block steps, and reports `stuck` at walls. Give waypoints for longer routes, or `server_command "minecraft:tp Bot1 x y z"`.
+- Always `bot_remove {all:true}` when done.
 
 ## Errors
 Every error has `code`, `message`, `hint` — follow the hint. `PAUSED_BY_USER` means the human pressed F8: stop and ask them. Use `operationId` on actions you may retry (clicks, commands) so a retry never runs twice.
