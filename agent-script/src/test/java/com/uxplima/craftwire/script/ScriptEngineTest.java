@@ -1,4 +1,4 @@
-package com.uxplima.craftwire.paper.script;
+package com.uxplima.craftwire.script;
 
 import static org.junit.jupiter.api.Assertions.*;
 

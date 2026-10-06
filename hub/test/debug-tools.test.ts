@@ -42,4 +42,23 @@ describe("profile and trace", () => {
     expect(r.isError).toBe(true);
     expect(JSON.stringify(r.content)).toMatch(/UNKNOWN_METHOD|update/i);
   });
+
+  it("client_eval goes to a client, never a server, and passes the script on", async () => {
+    hub = await startHub();
+    await connectFakeAgent(hub.port, { token: TOKEN, kind: "server", name: "srv" });
+    const client = await connectFakeAgent(hub.port, { token: TOKEN, kind: "client", name: "Steve" });
+    const seen: unknown[] = [];
+    client.onRequest("client.eval", (p) => { seen.push(p); return { result: 2, output: "" }; });
+    expect(json(await hub.call("client_eval", { code: "1 + 1" }))).toEqual({ result: 2, output: "" });
+    expect(seen).toEqual([{ code: "1 + 1", timeoutMs: 5000, reset: false }]);
+  });
+
+  it("client_eval is refused on a read-only hub", async () => {
+    const { ToolPolicy } = await import("../src/tool-policy.js");
+    hub = await startHub({ policy: new ToolPolicy({ readOnly: true }) });
+    const names = (await hub.client.listTools()).tools.map((t) => t.name);
+    expect(names).toContain("profile");
+    expect(names).toContain("trace");
+    expect(names).not.toContain("client_eval");
+  });
 });

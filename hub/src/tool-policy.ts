@@ -5,7 +5,7 @@ export const TOOL_GROUPS: Record<string, readonly string[]> = {
   server: ["server_command", "server_eval", "world_query", "world_edit", "world_render", "server_info", "plugin_manage", "events"],
   dev: ["server_process", "plugin_deploy", "client_process", "scenario_run"],
   bots: ["bot_spawn", "bot_action", "bot_remove"],
-  debug: ["profile", "trace"],
+  debug: ["profile", "trace", "client_eval"],
   extensions: [],
 };
 

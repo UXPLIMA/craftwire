@@ -11,6 +11,7 @@ import com.uxplima.craftwire.core.LogCapture;
 import com.uxplima.craftwire.core.OperationCache;
 import com.uxplima.craftwire.core.profile.ProfileTools;
 import com.uxplima.craftwire.fabric.handlers.Handlers;
+import com.uxplima.craftwire.fabric.script.ClientEval;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.entrypoint.EntrypointContainer;
@@ -47,6 +48,7 @@ public final class CraftwireAgent {
         }
     }, extensionThreads, this::sendTools, (msg, t) -> LOGGER.error(msg, t));
     private final ProfileTools profiling = new ProfileTools(new FabricProfiling());
+    private final ClientEval eval = new ClientEval();
     private HubClient hub;
     private LogCapture logs;
     private volatile boolean connected;
@@ -67,6 +69,7 @@ public final class CraftwireAgent {
         dispatcher.register("ext.call", extensions::call);
         dispatcher.register("profile.run", profiling::profile);
         dispatcher.register("trace.run", profiling::trace);
+        dispatcher.register("client.eval", eval::handle);
         registerExtensions();
         KillSwitch killSwitch = new KillSwitch(this);
         ScreenWatcher screens = new ScreenWatcher(this);
@@ -101,6 +104,7 @@ public final class CraftwireAgent {
     public void onHubConnected(String instanceId) {
         connected = true;
         LOGGER.info("[craftwire] connected to hub as {}", instanceId);
+        eval.onHubConnected();
         if (hub != null) logs.attach((data, time) -> hub.notifyEvent("log", data, time));
         sendTools();
         Minecraft.getInstance().execute(() -> {

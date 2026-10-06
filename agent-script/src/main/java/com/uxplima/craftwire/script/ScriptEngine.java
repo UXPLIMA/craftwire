@@ -1,7 +1,8 @@
-package com.uxplima.craftwire.paper.script;
+package com.uxplima.craftwire.script;
 
 import com.google.gson.JsonObject;
 import com.uxplima.craftwire.core.AgentError;
+import com.uxplima.craftwire.core.ScriptRunner;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executors;
@@ -19,7 +20,7 @@ import org.graalvm.polyglot.Value;
  * GraalJS for server_eval: one context per hub session, so globals survive between calls until reset.
  * A watchdog cancels a run after its timeout and the cancelled context is discarded.
  */
-public final class ScriptEngine implements AutoCloseable {
+public final class ScriptEngine implements ScriptRunner {
     private final ClassLoader loader;
     private final String prelude;
     private final CapturedOutput output = new CapturedOutput();

@@ -13,7 +13,7 @@ import com.uxplima.craftwire.paper.events.EventTap;
 import com.uxplima.craftwire.paper.handlers.EvalHandler;
 import com.uxplima.craftwire.paper.handlers.Handlers;
 import com.uxplima.craftwire.paper.handlers.PaperProfiling;
-import com.uxplima.craftwire.paper.script.ScriptEngine;
+import com.uxplima.craftwire.script.ScriptEngine;
 import com.uxplima.craftwire.paper.world.SnapshotStore;
 import java.nio.file.Path;
 import org.bukkit.Bukkit;

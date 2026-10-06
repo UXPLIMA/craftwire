@@ -25,13 +25,27 @@ loom {
     }
 }
 
+configurations {
+    // client_eval's GraalJS: not in the jar; the agent downloads exactly these jars on first use (GraalRuntime).
+    graaljs {
+        canBeConsumed = false
+        canBeResolved = true
+    }
+}
+
+evaluationDependsOn(':agent-script')
+
 dependencies {
+    graaljs "org.graalvm.polyglot:polyglot:${graal_version}"
+    graaljs "org.graalvm.js:js-language:${graal_version}"
     minecraft "com.mojang:minecraft:${baseProps.minecraft_version}"
     implementation "net.fabricmc:fabric-loader:${project.loader_version}"
     implementation "net.fabricmc.fabric-api:fabric-api:${baseProps.fabric_api_version}"
 
     implementation project(':agent-core')
     include project(':agent-core')
+    // ClientEval's tests compile against the engine; the agent itself only loads it at runtime (GraalRuntime).
+    testImplementation project(':agent-script')
     // The extension API mods compile against; shipped inside the agent so they find it at runtime.
     include project(':craftwire-api')
 
@@ -40,7 +54,30 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
+// The GraalJS jars client_eval downloads, with their sha256: the same dependency the Paper plugin's libraries name.
+def graalManifest = tasks.register('graalManifest') {
+    def out = layout.buildDirectory.file('graal/craftwire-graaljs.txt')
+    def jars = configurations.graaljs
+    def version = graal_version
+    inputs.files(jars)
+    outputs.file(out)
+    doLast {
+        def lines = jars.incoming.artifacts.artifacts.collect { a ->
+            def id = a.id.componentIdentifier
+            def sha = java.security.MessageDigest.getInstance('SHA-256').digest(a.file.bytes).encodeHex().toString()
+            "${id.group}:${id.module}:${id.version}:${a.file.name} ${sha}"
+        }.sort()
+        out.get().asFile.text = "version=${version}\n" + lines.join('\n') + '\n'
+    }
+}
+
 processResources {
+    from(graalManifest)
+    // The script engine (agent-script) as a jar inside the agent jar: only GraalRuntime's class loader reads it.
+    from(project(':agent-script').tasks.named('jar')) {
+        into 'craftwire'
+        rename { 'craftwire-script.jar' }
+    }
     def versions = rootProject.mcVersions
     def last = versions[-1].tokenize('.')
     def props = [

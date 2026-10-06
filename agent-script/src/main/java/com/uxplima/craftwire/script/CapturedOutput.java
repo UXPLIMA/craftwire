@@ -1,4 +1,4 @@
-package com.uxplima.craftwire.paper.script;
+package com.uxplima.craftwire.script;
 
 import java.io.ByteArrayOutputStream;
 import java.io.OutputStream;

@@ -14,7 +14,7 @@ if (providers.gradleProperty('apiOnly').isPresent()) {
     include 'craftwire-api'
     return
 }
-include 'craftwire-api', 'agent-core', 'agent-fabric', 'agent-paper', 'test-fixtures'
+include 'craftwire-api', 'agent-core', 'agent-script', 'agent-fabric', 'agent-paper', 'test-fixtures'
 include 'compat-check'
 project(':compat-check').projectDir = file('tools/compat-check')
 

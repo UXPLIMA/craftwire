@@ -22,6 +22,7 @@ public final class AgentGameTests implements FabricClientGameTest {
             InputSettingsChecks.run(ctx, sp);
             ExtensionChecks.run(ctx);
             ProfileChecks.run(ctx);
+            EvalChecks.run(ctx);
         }
     }
 }

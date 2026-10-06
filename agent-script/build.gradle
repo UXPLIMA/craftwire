@@ -1,0 +1,32 @@
+plugins {
+    id 'java-library'
+}
+
+repositories {
+    mavenCentral()
+}
+
+// server_eval and client_eval: the GraalJS session. Compiled against the polyglot API only; GraalJS itself comes
+// from Paper's library loader (plugin.yml) or, on clients, from the agent's own download (GraalRuntime).
+dependencies {
+    compileOnly project(':agent-core')
+    compileOnly 'com.google.code.gson:gson:2.13.2'
+    compileOnly "org.graalvm.polyglot:polyglot:${graal_version}"
+
+    testImplementation project(':agent-core')
+    testImplementation 'com.google.code.gson:gson:2.13.2'
+    testImplementation "org.graalvm.polyglot:polyglot:${graal_version}"
+    testImplementation "org.graalvm.js:js-language:${graal_version}"
+    testImplementation platform('org.junit:junit-bom:5.13.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 25
+    options.encoding = 'UTF-8'
+}
+
+test {
+    useJUnitPlatform()
+}

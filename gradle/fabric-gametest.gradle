@@ -32,10 +32,12 @@ dependencies {
     }
 }
 
-// Game tests run with the window hidden, like clients started by client_process.
+// Game tests run with the window hidden, like clients started by client_process, and with a Craftwire home of
+// their own: never the user's hub.json, and client_eval's GraalJS download is kept between runs.
 tasks.matching { it.name == 'runClientGameTest' }.configureEach {
     dependsOn ':agent-fabric:jar'
     jvmArgs '-Dcraftwire.hidden=true'
+    environment 'CRAFTWIRE_HOME', new File(gradle.gradleUserHomeDir, 'craftwire-test-home').absolutePath
 }
 
 tasks.withType(JavaCompile).configureEach {

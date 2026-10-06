@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { defineTool, ok, type ToolContext } from "./registry.js";
+import { defineTool, forward, ok, targetArgs, type ToolContext } from "./registry.js";
 
 const instanceArg = {
   instance: z.string().optional().describe("Instance id or name. Defaults to the only server, else the only instance."),
@@ -37,4 +37,15 @@ export function registerDebugTools(server: McpServer, ctx: ToolContext): void {
       limit: z.number().int().min(1).max(200).optional().describe("Slowest calls to return (default 50)."),
     },
     async (args, c) => ok(await forwardAny(c, "trace.run", args, args.durationMs + 15_000)));
+
+  defineTool(server, ctx, "client_eval",
+    "Run JavaScript (GraalJS) on a Minecraft client's render thread, like server_eval on a server: for debugging a mod or checking client state no other tool shows. Globals: mc (the Minecraft instance), player (the local player, or null), level (the client world, or null), screen() (the open screen, or null), print(...); Java.type('…') reaches any class, the mods' own included (Minecraft 26.x names are Mojang's, unobfuscated). Returns {result, output}; Java objects come back as {class, toString}. Globals persist between calls until reset:true or a new hub session. Keep scripts short: the game does not render while one runs (timeoutMs cancels it). The first call downloads GraalJS (about 60 MB, checked against the agent's sha256 list) into ~/.craftwire/lib and can take a minute; later calls start at once. The user can turn it off (-Dcraftwire.allowEval=false).",
+    {
+      ...targetArgs,
+      code: z.string().min(1).max(100_000),
+      timeoutMs: z.number().int().min(100).max(60_000).default(5000),
+      reset: z.boolean().default(false).describe("Drop the globals of earlier calls first."),
+    },
+    // The first call downloads GraalJS: allow for that on top of the script's own time.
+    async (args, c) => ok(await forward(c, "client", "client.eval", args, args.timeoutMs + 300_000)));
 }

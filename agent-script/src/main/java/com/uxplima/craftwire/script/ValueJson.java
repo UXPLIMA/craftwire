@@ -1,4 +1,4 @@
-package com.uxplima.craftwire.paper.script;
+package com.uxplima.craftwire.script;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
