@@ -49,6 +49,25 @@ describe("bot tools", () => {
     expect(r).toEqual({ reached: true, action: "move_to" });
   });
 
+  it("bot_action forwards the path options and the new verbs, and waits for a long dig", async () => {
+    const { hub, agent } = await withServerAgent();
+    const seen: Array<Record<string, unknown>> = [];
+    agent.onRequest("bot.action", async (p) => {
+      seen.push(p);
+      if (p.action === "break_block") await new Promise((r) => setTimeout(r, 2500));
+      return { ok: p.action };
+    });
+    await hub.call("bot_action", { bot: "Bot1", action: "move_to", x: 1, y: 2, z: 3, path: false, maxFall: 5, openDoors: false, partial: true });
+    expect(json(await hub.call("bot_action", { bot: "Bot1", action: "break_block", block: { x: 1, y: 2, z: 3 } }))).toEqual({ ok: "break_block" });
+    for (const action of ["jump", "swap_hands"]) await hub.call("bot_action", { bot: "Bot1", action });
+    await hub.call("bot_action", { bot: "Bot1", action: "sneak", on: false });
+    await hub.call("bot_action", { bot: "Bot1", action: "drop", all: true });
+    expect(seen[0]).toMatchObject({ path: false, maxFall: 5, openDoors: false, partial: true });
+    expect(seen.map((p) => p.action)).toEqual(["move_to", "break_block", "jump", "swap_hands", "sneak", "drop"]);
+    expect(seen[4]).toMatchObject({ on: false });
+    expect(seen[5]).toMatchObject({ all: true });
+  });
+
   it("bot_action forwards hud_read", async () => {
     const { hub, agent } = await withServerAgent();
     agent.onRequest("bot.action", (p) => ({ sidebar: null, action: p.action, bot: p.bot }));

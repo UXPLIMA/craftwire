@@ -5,10 +5,13 @@ import com.google.gson.JsonObject;
 import com.uxplima.craftwire.core.AgentError;
 import com.uxplima.craftwire.paper.Args;
 import com.uxplima.craftwire.paper.Sync;
+import com.uxplima.craftwire.paper.bot.path.Pathfinder;
 import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import net.minecraft.network.protocol.game.ServerboundChatCommandPacket;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.network.protocol.game.ServerboundSetCarriedItemPacket;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.phys.Vec3;
@@ -42,8 +45,65 @@ public final class BotActions {
                             Args.number(p, "x"), Args.number(p, "y"), Args.number(p, "z"),
                             p.has("tolerance") ? Args.number(p, "tolerance") : 0.5,
                             Args.bool(p, "sprint", false),
-                            Math.clamp(Args.optLong(p, "timeoutMs").orElse(10_000L), 500L, 120_000L)))
+                            Math.clamp(Args.optLong(p, "timeoutMs").orElse(30_000L), 500L, 120_000L),
+                            Args.bool(p, "path", true),
+                            new Pathfinder.Options(Math.clamp(Args.optInt(p, "maxFall").orElse(3), 0, 10),
+                                    Args.bool(p, "openDoors", true), 40_000),
+                            Args.bool(p, "partial", false)))
                     .thenCompose(f -> f).thenApply(r -> (JsonElement) r);
+            case "break_block" -> sync.global(() -> {
+                        JsonObject at = Args.object(p, "block");
+                        Direction face = Args.optString(p, "face").map(f -> Direction.byName(f.toLowerCase(Locale.ROOT))).orElse(null);
+                        return bots.get(name).breakBlock(bots.plugin(), new BlockPos(Args.integer(at, "x"), Args.integer(at, "y"), Args.integer(at, "z")),
+                                face, Math.clamp(Args.optLong(p, "timeoutMs").orElse(30_000L), 500L, 120_000L));
+                    })
+                    .thenCompose(f -> f).thenApply(r -> (JsonElement) r);
+            case "jump" -> sync.global(() -> {
+                Bot b = bots.get(name);
+                boolean grounded = b.player().onGround();
+                b.jump();
+                JsonObject r = new JsonObject();
+                r.addProperty("jumped", grounded);
+                if (!grounded) r.addProperty("reason", "not on the ground");
+                return (JsonElement) r;
+            });
+            case "sneak", "sprint" -> sync.global(() -> {
+                Bot b = bots.get(name);
+                boolean on = Args.bool(p, "on", true);
+                if (action.equals("sneak")) b.sneak(on);
+                else b.sprint(on);
+                JsonObject r = new JsonObject();
+                r.addProperty("sneaking", b.bukkit().isSneaking());
+                r.addProperty("sprinting", b.bukkit().isSprinting());
+                return (JsonElement) r;
+            });
+            case "drop" -> sync.global(() -> {
+                Bot b = bots.get(name);
+                ItemStack before = b.bukkit().getInventory().getItemInMainHand().clone();
+                if (before.getType().isAir()) {
+                    throw new AgentError("NOTHING_HELD", b.name() + " holds nothing", "give the bot an item, or select_hotbar a slot that has one.");
+                }
+                b.drop(Args.bool(p, "all", false));
+                ItemStack after = b.bukkit().getInventory().getItemInMainHand();
+                JsonObject r = new JsonObject();
+                int dropped = before.getAmount() - (after.isSimilar(before) ? after.getAmount() : 0);
+                JsonObject item = BotJson.item(before);
+                item.addProperty("count", dropped);
+                r.add("dropped", dropped > 0 ? item : null);
+                if (dropped == 0) r.addProperty("cancelled", true);
+                if (!after.getType().isAir()) r.add("held", BotJson.item(after));
+                return (JsonElement) r;
+            });
+            case "swap_hands" -> sync.global(() -> {
+                Bot b = bots.get(name);
+                b.swapHands();
+                JsonObject r = new JsonObject();
+                ItemStack main = b.bukkit().getInventory().getItemInMainHand();
+                ItemStack off = b.bukkit().getInventory().getItemInOffHand();
+                if (!main.getType().isAir()) r.add("mainHand", BotJson.item(main));
+                if (!off.getType().isAir()) r.add("offHand", BotJson.item(off));
+                return (JsonElement) r;
+            });
             case "state" -> sync.global(() -> (JsonElement) BotJson.state(bots.get(name)));
             case "hud_read" -> sync.global(() -> (JsonElement) bots.get(name).hud());
             case "give" -> sync.global(() -> give(bots.get(name), p));

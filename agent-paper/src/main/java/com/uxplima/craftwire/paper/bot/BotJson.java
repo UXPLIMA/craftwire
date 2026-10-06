@@ -66,6 +66,9 @@ public final class BotJson {
         o.addProperty("onGround", p.isOnGround());
         o.addProperty("dead", p.isDead());
         o.addProperty("moving", b.moving());
+        o.addProperty("digging", b.digging());
+        o.addProperty("sneaking", p.isSneaking());
+        o.addProperty("sprinting", p.isSprinting());
         o.addProperty("heldSlot", p.getInventory().getHeldItemSlot());
         ItemStack held = p.getInventory().getItemInMainHand();
         if (!held.getType().isAir()) o.add("held", item(held));

@@ -76,7 +76,7 @@ class BotActionsIT {
     @Test
     void moveToStopsWhenStuck() throws Exception {
         hub.result("world.edit", "{\"action\":\"fill\",\"min\":{\"x\":5,\"y\":-60,\"z\":-2},\"max\":{\"x\":5,\"y\":-57,\"z\":3},\"block\":\"stone\"}");
-        JsonObject r = act("{\"bot\":\"Act\",\"action\":\"move_to\",\"x\":10.5,\"y\":-60,\"z\":0.5,\"timeoutMs\":20000}");
+        JsonObject r = act("{\"bot\":\"Act\",\"action\":\"move_to\",\"x\":10.5,\"y\":-60,\"z\":0.5,\"timeoutMs\":20000,\"path\":false}");
         assertEquals("stuck", r.get("reason").getAsString(), r.toString());
     }
 
@@ -93,7 +93,7 @@ class BotActionsIT {
 
     @Test
     void moveToTimesOut() throws Exception {
-        JsonObject r = act("{\"bot\":\"Act\",\"action\":\"move_to\",\"x\":200.5,\"y\":-60,\"z\":0.5,\"timeoutMs\":1000}");
+        JsonObject r = act("{\"bot\":\"Act\",\"action\":\"move_to\",\"x\":200.5,\"y\":-60,\"z\":0.5,\"timeoutMs\":1000,\"path\":false}");
         assertEquals("timeout", r.get("reason").getAsString(), r.toString());
         assertFalse(r.get("reached").getAsBoolean());
     }

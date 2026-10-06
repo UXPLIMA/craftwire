@@ -8,10 +8,16 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.UUID;
+import com.uxplima.craftwire.paper.bot.path.Pathfinder;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import net.minecraft.network.Connection;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.network.protocol.game.ServerboundClientCommandPacket;
+import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
+import net.minecraft.network.protocol.game.ServerboundPlayerCommandPacket;
+import net.minecraft.network.protocol.game.ServerboundPlayerInputPacket;
 import net.minecraft.network.protocol.game.ServerboundPlayerLoadedPacket;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ClientInformation;
@@ -19,11 +25,13 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.CommonListenerCookie;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
+import net.minecraft.world.entity.player.Input;
 import net.minecraft.world.level.storage.LevelResource;
 import net.minecraft.world.phys.Vec3;
 import org.bukkit.Location;
 import org.bukkit.craftbukkit.CraftWorld;
 import org.bukkit.entity.Player;
+import org.bukkit.plugin.Plugin;
 
 /** One fake player. Every method runs on the server thread. */
 public final class Bot {
@@ -38,7 +46,9 @@ public final class Bot {
     private final AtomicInteger pendingTeleport;
     private int sequence;
     private int deadTicks;
-    private Move move;
+    private Walk move;
+    private Dig dig;
+    private boolean jumpNext;
 
     private Bot(String name, UUID uuid, Connection connection, ServerGamePacketListenerImpl listener, BotInbox inbox,
             BotHud hud, AtomicInteger pendingTeleport) {
@@ -81,6 +91,7 @@ public final class Bot {
     public Player bukkit() { return player().getBukkitEntity(); }
     public int nextSequence() { return ++sequence; }
     public boolean moving() { return move != null; }
+    public boolean digging() { return dig != null; }
 
     /** One server tick. Returns false once the bot is gone (kicked, banned, disconnected). */
     boolean tick(long now) {
@@ -91,6 +102,7 @@ public final class Bot {
         ServerPlayer p = player();
         if (p.isDeadOrDying()) {
             if (move != null) finish("died");
+            if (dig != null) finishDig("died");
             if (++deadTicks >= RESPAWN_TICKS) {
                 deadTicks = 0;
                 listener.handleClientCommand(new ServerboundClientCommandPacket(ServerboundClientCommandPacket.Action.PERFORM_RESPAWN));
@@ -99,7 +111,20 @@ public final class Bot {
         }
         deadTicks = 0;
         settle();
-        if (move != null) steer(p, now);
+        if (move != null) {
+            String why = move.tick(this, p, now);
+            if (why != null) finish(why);
+        }
+        if (dig != null) {
+            String why = dig.tick(this, p, now);
+            if (why != null) finishDig(why);
+        }
+        if (jumpNext) {
+            jumpNext = false;
+            p.setJumping(p.onGround());
+        } else if (move == null) {
+            p.setJumping(false);
+        }
         // A real client's movement packets make the server tick the player; a bot has none, so tick it here.
         p.doTick();
         return true;
@@ -119,6 +144,7 @@ public final class Bot {
     /** Leaves the server now (quit event, player data saved). */
     void remove() {
         if (move != null) finish("removed");
+        if (dig != null) finishDig("removed");
         MinecraftServer.getServer().getPlayerList().remove(player());
         connection.channel.close();
         forgetPlayerFiles();
@@ -127,6 +153,7 @@ public final class Bot {
     /** Something else closed the connection (a kick): run the normal disconnect path once. */
     private void leave() {
         if (move != null) finish("removed");
+        if (dig != null) finishDig("removed");
         connection.handleDisconnection();
         var list = MinecraftServer.getServer().getPlayerList();
         if (list.getPlayer(uuid) != null) list.remove(player());
@@ -149,41 +176,68 @@ public final class Bot {
         }
     }
 
-    CompletableFuture<JsonObject> moveTo(double x, double y, double z, double tolerance, boolean sprint, long timeoutMs) {
+    /**
+     * Walks to the point: along a path the pathfinder found (usePath), else in a straight line. Completes with
+     * reached, reason, the position and, for a path, its size.
+     */
+    CompletableFuture<JsonObject> moveTo(double x, double y, double z, double tolerance, boolean sprint, long timeoutMs,
+            boolean usePath, Pathfinder.Options options, boolean partial) {
         if (move != null) finish("replaced");
-        move = new Move(x, y, z, tolerance, sprint, System.currentTimeMillis() + timeoutMs);
-        return move.done;
+        if (dig != null) finishDig("replaced");
+        Walk walk = new Walk(x, y, z, tolerance, sprint, System.currentTimeMillis() + timeoutMs, usePath, options, partial);
+        move = walk;
+        String why = walk.plan(player());
+        if (sprint) listener.handlePlayerCommand(new ServerboundPlayerCommandPacket(player(), ServerboundPlayerCommandPacket.Action.START_SPRINTING));
+        if (why != null) finish(why);
+        return walk.done;
     }
 
-    private void steer(ServerPlayer p, long now) {
-        Vec3 pos = p.position();
-        double dx = move.x - pos.x;
-        double dz = move.z - pos.z;
-        double distance = Steering.horizontal(dx, dz);
-        if (distance <= move.tolerance) {
-            // Over or under a target that is not at ground level, walking cannot get any closer.
-            finish(Math.abs(move.y - pos.y) <= 1.5 ? "arrived" : "height");
-        } else if (now >= move.deadline) {
-            finish("timeout");
-        } else if (move.progress.stuck(distance, now)) {
-            finish("stuck");
-        } else {
-            float yaw = Steering.yaw(dx, dz);
-            p.setYRot(yaw);
-            p.setYHeadRot(yaw);
-            p.zza = 1.0f;
-            p.setSprinting(move.sprint);
-            p.setJumping(p.horizontalCollision && p.onGround());
-        }
+    CompletableFuture<JsonObject> breakBlock(Plugin plugin, BlockPos pos, Direction face, long timeoutMs) {
+        if (move != null) finish("replaced");
+        if (dig != null) finishDig("replaced");
+        dig = Dig.start(this, plugin, pos, face, timeoutMs);
+        return dig.done;
+    }
+
+    /** Jumps on the next tick, if standing on something. */
+    void jump() {
+        jumpNext = true;
+    }
+
+    /** Presses or releases sneak through the input packet, so PlayerToggleSneakEvent fires. */
+    void sneak(boolean on) {
+        ServerPlayer p = player();
+        listener.handlePlayerInput(new ServerboundPlayerInputPacket(new Input(false, false, false, false, false, on, p.isSprinting())));
+    }
+
+    /** Starts or stops sprinting like a client (PlayerToggleSprintEvent). */
+    void sprint(boolean on) {
+        listener.handlePlayerCommand(new ServerboundPlayerCommandPacket(player(),
+                on ? ServerboundPlayerCommandPacket.Action.START_SPRINTING : ServerboundPlayerCommandPacket.Action.STOP_SPRINTING));
+    }
+
+    /** Drops the held item, or the whole stack (PlayerDropItemEvent). */
+    void drop(boolean all) {
+        listener.handlePlayerAction(new ServerboundPlayerActionPacket(
+                all ? ServerboundPlayerActionPacket.Action.DROP_ALL_ITEMS : ServerboundPlayerActionPacket.Action.DROP_ITEM,
+                BlockPos.ZERO, Direction.DOWN));
+    }
+
+    /** Swaps the main and off hand (PlayerSwapHandItemsEvent). */
+    void swapHands() {
+        listener.handlePlayerAction(new ServerboundPlayerActionPacket(ServerboundPlayerActionPacket.Action.SWAP_ITEM_WITH_OFFHAND, BlockPos.ZERO, Direction.DOWN));
     }
 
     private void finish(String reason) {
         ServerPlayer p = player();
         p.zza = 0f;
         p.setJumping(false);
-        p.setSprinting(false);
-        Move m = move;
+        Walk m = move;
         move = null;
+        if (m.sprint) {
+            p.setSprinting(false);
+            listener.handlePlayerCommand(new ServerboundPlayerCommandPacket(p, ServerboundPlayerCommandPacket.Action.STOP_SPRINTING));
+        }
         Vec3 pos = p.position();
         JsonObject r = new JsonObject();
         r.addProperty("reached", reason.equals("arrived"));
@@ -192,23 +246,13 @@ public final class Bot {
         r.addProperty("y", BotJson.round(pos.y));
         r.addProperty("z", BotJson.round(pos.z));
         r.addProperty("distance", BotJson.round(Steering.horizontal(m.x - pos.x, m.z - pos.z)));
+        m.describe(r);
         m.done.complete(r);
     }
 
-    private static final class Move {
-        final double x, y, z, tolerance;
-        final boolean sprint;
-        final long deadline;
-        final Steering.Progress progress = new Steering.Progress(0.3, 2000);
-        final CompletableFuture<JsonObject> done = new CompletableFuture<>();
-
-        Move(double x, double y, double z, double tolerance, boolean sprint, long deadline) {
-            this.x = x;
-            this.y = y;
-            this.z = z;
-            this.tolerance = tolerance;
-            this.sprint = sprint;
-            this.deadline = deadline;
-        }
+    private void finishDig(String reason) {
+        Dig d = dig;
+        dig = null;
+        d.finish(reason);
     }
 }

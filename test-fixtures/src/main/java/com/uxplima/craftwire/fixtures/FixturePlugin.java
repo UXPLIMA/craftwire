@@ -89,6 +89,12 @@ public final class FixturePlugin extends JavaPlugin implements Listener {
         player.sendActionBar(Component.text("Mana 10"));
     }
 
+    /** Like a protection plugin: bookshelves cannot be broken. */
+    @EventHandler
+    public void onBreak(org.bukkit.event.block.BlockBreakEvent e) {
+        if (e.getBlock().getType() == Material.BOOKSHELF) e.setCancelled(true);
+    }
+
     @EventHandler
     public void onTick(com.destroystokyo.paper.event.server.ServerTickStartEvent e) {
         if (FixtureLag.eventTicks > 0) {
