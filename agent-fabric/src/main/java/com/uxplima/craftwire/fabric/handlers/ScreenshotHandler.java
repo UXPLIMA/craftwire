@@ -85,6 +85,8 @@ final class ScreenshotHandler {
         });
 
         return prepared.thenCompose(saved -> s.delay(3)
+                        .thenCompose(v -> sectionsBuilt(s, System.currentTimeMillis() + SETTLE_MILLIS))
+                        .thenCompose(v -> s.delay(2))   // the frame after the last section was built draws it
                         .thenCompose(v -> grab(s))
                         // Always restore (success or failure) and only then complete, so callers observe restored state.
                         .handle((file, err) -> s.call(() -> {
@@ -97,6 +99,22 @@ final class ScreenshotHandler {
                         }))
                         .thenCompose(f -> f))
                 .thenApplyAsync(file -> encode(file, maxSize, savePath, format));
+    }
+
+    /** Longest wait for terrain to finish building before a capture. */
+    private static final long SETTLE_MILLIS = 5000;
+
+    /**
+     * Waits until every visible section is built (vanilla and Sodium both answer hasRenderedAllSections), so a shot
+     * right after a camera move, or on a slow renderer, does not show missing terrain. Gives up after the deadline.
+     */
+    private static CompletableFuture<Void> sectionsBuilt(ClientScheduler s, long deadline) {
+        return s.call(() -> {
+            Minecraft mc = Minecraft.getInstance();
+            return mc.level == null || mc.levelRenderer.hasRenderedAllSections();
+        }).thenCompose(done -> done || System.currentTimeMillis() > deadline
+                ? CompletableFuture.<Void>completedFuture(null)
+                : s.delay(1).thenCompose(v -> sectionsBuilt(s, deadline)));
     }
 
     private static CompletableFuture<Path> grab(ClientScheduler s) {
