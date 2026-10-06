@@ -39,8 +39,9 @@ export async function startHub(opts: { writeHubJson?: boolean; javaMajor?: numbe
   await server.connect(serverTransport);
   const client = new Client({ name: "test", version: "0.0.0" });
   await client.connect(clientTransport);
+  // The tools have their own timeouts (timeoutMs); the SDK's 60 s default would give up on a slow world creation first.
   const call = (name: string, args: Record<string, unknown> = {}) =>
-    client.callTool({ name, arguments: args }) as Promise<CallToolResult>;
+    client.callTool({ name, arguments: args }, undefined, { timeout: 15 * 60_000 }) as Promise<CallToolResult>;
   return {
     agents, servers, clients, ctx, port, token: TOKEN, home, client, call,
     close: async () => { await clients.shutdown(); await servers.shutdown(); await client.close(); await server.close(); await agents.close(); },
