@@ -6,6 +6,7 @@ import com.google.gson.JsonObject;
 import com.uxplima.craftwire.paper.Args;
 import com.uxplima.craftwire.paper.CraftwirePlugin;
 import com.uxplima.craftwire.paper.bot.Bot;
+import com.uxplima.craftwire.paper.bot.BotActions;
 import com.uxplima.craftwire.paper.bot.BotJson;
 import com.uxplima.craftwire.paper.bot.BotNames;
 import java.util.ArrayList;
@@ -50,6 +51,11 @@ final class BotHandler {
             r.add("removed", removed);
             return r;
         });
+    }
+
+    static CompletableFuture<JsonElement> action(JsonObject p, CraftwirePlugin self) {
+        self.agentConfig().require(self.agentConfig().allowBots(), "allow-bots");
+        return BotActions.run(p, self.bots(), self.sync());
     }
 
     /** `location` {world?, x, y, z, yaw?, pitch?}, else the main world's spawn (block centre). */
