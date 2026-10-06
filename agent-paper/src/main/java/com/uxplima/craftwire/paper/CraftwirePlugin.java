@@ -7,6 +7,7 @@ import com.uxplima.craftwire.core.HubClient;
 import com.uxplima.craftwire.core.HubConfig;
 import com.uxplima.craftwire.core.LogCapture;
 import com.uxplima.craftwire.core.OperationCache;
+import com.uxplima.craftwire.paper.bot.BotManager;
 import com.uxplima.craftwire.paper.handlers.EvalHandler;
 import com.uxplima.craftwire.paper.handlers.Handlers;
 import com.uxplima.craftwire.paper.script.ScriptEngine;
@@ -23,6 +24,7 @@ public final class CraftwirePlugin extends JavaPlugin {
     private Sync sync;
     private ScriptEngine scripts;
     private SnapshotStore snapshots;
+    private BotManager bots;
 
     @Override
     public void onLoad() {
@@ -38,6 +40,8 @@ public final class CraftwirePlugin extends JavaPlugin {
         getLogger().warning("Craftwire is active — do not run on production servers");
         scripts = new ScriptEngine(getClass().getClassLoader(), EvalHandler.PRELUDE);
         snapshots = new SnapshotStore(getDataFolder().toPath().resolve("snapshots"));
+        bots = new BotManager(this);
+        bots.start();
         Handlers.registerAll(this);
         getServer().getPluginManager().registerEvents(new EventBridge(this), this);
         hub = new HubClient(() -> HubConfig.load(HubConfig.defaultHome()), this::hello, dispatcher, new HubClient.Listener() {
@@ -50,6 +54,7 @@ public final class CraftwirePlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (bots != null) bots.shutdown();
         if (scripts != null) scripts.close();
         if (hub != null) hub.close();
         if (logs != null) logs.uninstall();
@@ -89,6 +94,10 @@ public final class CraftwirePlugin extends JavaPlugin {
 
     public ScriptEngine scripts() {
         return scripts;
+    }
+
+    public BotManager bots() {
+        return bots;
     }
 
     public SnapshotStore snapshots() {

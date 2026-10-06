@@ -13,8 +13,10 @@ public final class Handlers {
         d.register("server.info", p -> s.global(ServerInfoHandler::read));
         d.register("server.command", p -> CommandHandler.handle(p, s));
         d.register("server.eval", p -> EvalHandler.handle(p, plugin));
-        d.register("world.query", p -> WorldQueryHandler.handle(p, s));
+        d.register("world.query", p -> WorldQueryHandler.handle(p, s, plugin.bots()::isBot));
         d.register("world.edit", p -> WorldEditHandler.handle(p, plugin));
         d.register("plugin.manage", p -> PluginManageHandler.handle(p, plugin));
+        d.register("bot.spawn", p -> BotHandler.spawn(p, plugin));
+        d.register("bot.remove", p -> BotHandler.remove(p, plugin));
     }
 }

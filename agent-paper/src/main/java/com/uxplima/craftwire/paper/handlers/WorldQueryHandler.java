@@ -17,6 +17,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Predicate;
 import org.bukkit.Bukkit;
 import org.bukkit.ChunkSnapshot;
 import org.bukkit.World;
@@ -32,10 +33,10 @@ final class WorldQueryHandler {
 
     private WorldQueryHandler() {}
 
-    static CompletableFuture<JsonElement> handle(JsonObject p, Sync sync) {
+    static CompletableFuture<JsonElement> handle(JsonObject p, Sync sync, Predicate<String> isBot) {
         String action = Args.string(p, "action");
         return switch (action) {
-            case "players" -> sync.global(WorldQueryHandler::players);
+            case "players" -> sync.global(() -> players(isBot));
             case "block" -> block(p, sync);
             case "region" -> region(p, sync);
             case "entities" -> entities(p, sync);
@@ -153,7 +154,7 @@ final class WorldQueryHandler {
         });
     }
 
-    private static JsonElement players() {
+    private static JsonElement players(Predicate<String> isBot) {
         JsonArray list = new JsonArray();
         for (Player pl : Bukkit.getOnlinePlayers()) {
             JsonObject o = entityJson(pl);
@@ -161,6 +162,7 @@ final class WorldQueryHandler {
             o.addProperty("gameMode", pl.getGameMode().name().toLowerCase(Locale.ROOT));
             o.addProperty("health", pl.getHealth());
             o.addProperty("op", pl.isOp());
+            o.addProperty("bot", isBot.test(pl.getName()));
             list.add(o);
         }
         JsonObject r = new JsonObject();
