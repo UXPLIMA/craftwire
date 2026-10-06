@@ -58,14 +58,19 @@ final class Walk {
         this.partial = partial;
     }
 
+    /** Refuses a path search beyond MAX_DISTANCE; called before the walk starts, never while it runs. */
+    void checkDistance(ServerPlayer p) {
+        Vec3 pos = p.position();
+        if (usePath && Steering.horizontal(x - pos.x, z - pos.z) > MAX_DISTANCE) {
+            throw new AgentError("TOO_FAR", "The target is more than " + MAX_DISTANCE + " blocks away",
+                    "move_to a closer point first, or teleport the bot (server_command tp).");
+        }
+    }
+
     /** Plans the path from where the player stands. Returns why the walk cannot start, or null. */
     String plan(ServerPlayer p) {
         if (!usePath) return null;
         Vec3 pos = p.position();
-        if (Steering.horizontal(x - pos.x, z - pos.z) > MAX_DISTANCE) {
-            throw new AgentError("TOO_FAR", "The target is more than " + MAX_DISTANCE + " blocks away",
-                    "move_to a closer point first, or teleport the bot (server_command tp).");
-        }
         Pathfinder.Result r = Pathfinder.find(new PaperBlockView((ServerLevel) p.level()),
                 floor(pos.x), floor(pos.y + 1e-3), floor(pos.z), floor(x), floor(y), floor(z), options);
         complete = r.complete();
@@ -127,8 +132,7 @@ final class Walk {
         }
         if (!waiting && progress.stuck(d + Math.abs(s.standY() - pos.y), now)) {
             if (++replans > MAX_REPLANS) return "stuck";
-            String why = plan(p);
-            return why;
+            return plan(p);
         }
         steer(p, cx, cz, s.standY(), waiting);
         return null;

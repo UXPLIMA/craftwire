@@ -114,6 +114,17 @@ class BotMovementIT {
     }
 
     @Test
+    void aTargetTooFarIsRefusedAndTheBotStaysWhereItIs() throws Exception {
+        spawn("Mvt", 300.5, 240.5);
+        JsonObject e = hub.error("bot.action", "{\"bot\":\"Mvt\",\"action\":\"move_to\",\"x\":900.5,\"y\":-60,\"z\":240.5}");
+        assertEquals("TOO_FAR", e.get("code").getAsString());
+        Thread.sleep(1000);
+        JsonObject s = act("Mvt", "\"action\":\"state\"");
+        assertFalse(s.get("moving").getAsBoolean(), s.toString());
+        assertEquals(300.5, s.get("x").getAsDouble(), 0.01, s.toString());
+    }
+
+    @Test
     void walksOnIntoChunksThatLoadAsItGoes() throws Exception {
         // View distance 4: the target is beyond the chunks loaded around the bot when it starts.
         spawn("Mvf", 405.5, 230.5);

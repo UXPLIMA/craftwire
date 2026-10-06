@@ -185,6 +185,7 @@ public final class Bot {
         if (move != null) finish("replaced");
         if (dig != null) finishDig("replaced");
         Walk walk = new Walk(x, y, z, tolerance, sprint, System.currentTimeMillis() + timeoutMs, usePath, options, partial);
+        walk.checkDistance(player());   // before the walk is installed: a refused move must not start walking
         move = walk;
         String why = walk.plan(player());
         if (sprint) listener.handlePlayerCommand(new ServerboundPlayerCommandPacket(player(), ServerboundPlayerCommandPacket.Action.START_SPRINTING));
