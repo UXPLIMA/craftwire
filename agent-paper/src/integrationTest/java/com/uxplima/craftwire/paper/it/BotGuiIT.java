@@ -113,7 +113,15 @@ class BotGuiIT {
     void attackDamagesTheNearestEntityOfAType() throws Exception {
         hub.result("server.command", "{\"command\":\"minecraft:summon pig 24.5 -60 22.5 {NoAI:1b}\"}");
         Thread.sleep(200);
-        JsonObject r = act("{\"bot\":\"Gui\",\"action\":\"attack\",\"type\":\"pig\"}");
+        JsonObject r;
+        try {
+            r = act("{\"bot\":\"Gui\",\"action\":\"attack\",\"type\":\"pig\"}");
+        } catch (AssertionError e) {
+            // Failed once on CI with the target 4.4 blocks away: show where the bot and the pigs really were.
+            JsonObject state = act("{\"bot\":\"Gui\",\"action\":\"state\"}");
+            throw new AssertionError(e.getMessage() + " | bot at " + state.get("position")
+                    + " | pigs: " + hub.result("world.query", "{\"action\":\"entities\",\"type\":\"pig\"}"), e);
+        }
         assertEquals("minecraft:pig", r.getAsJsonObject("target").get("type").getAsString());
         assertTrue(r.get("healthAfter").getAsDouble() < r.get("healthBefore").getAsDouble(), r.toString());
         assertEquals("ENTITY_NOT_FOUND", hub.error("bot.action", "{\"bot\":\"Gui\",\"action\":\"attack\",\"type\":\"cow\"}").get("code").getAsString());

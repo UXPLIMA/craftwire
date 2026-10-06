@@ -53,6 +53,8 @@ final class PaperServer {
                 "level-type=minecraft\\:flat",
                 "generate-structures=false",
                 "spawn-protection=0",
+                // No hostile mobs: their hits knock test bots out of place.
+                "difficulty=peaceful",
                 "view-distance=4",
                 "simulation-distance=4",
                 "max-players=4",
