@@ -25,6 +25,8 @@ export class ExtensionRegistry extends EventEmitter {
 
   constructor(agents: AgentServer) {
     super();
+    // One listener per MCP session (craftwire serve can hold many).
+    this.setMaxListeners(0);
     agents.on("event", (id: string, ev: AgentEvent) => {
       if (ev.type !== "tools") return;
       const list = Array.isArray(ev.data.tools) ? (ev.data.tools as unknown[]).filter(isDef) : [];

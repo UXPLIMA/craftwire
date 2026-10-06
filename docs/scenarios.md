@@ -73,8 +73,8 @@ Every step above can also have:
 | `{"expect_no_exceptions": {}}` | No new exceptions were logged since the scenario started. |
 
 The `expect_message`, `expect_hud`, `expect_block` and `expect_event` checks wait up to `within` ms (default 5000).
-"Since the last action" means since the most recent step that was not a check, so a message from an earlier
-step does not satisfy a later check.
+"Since the last action" means since the most recent step that changed something (not a check, a `wait` or a
+read such as `gui_read`), so a message from an earlier action does not satisfy a later check.
 
 A check on a result (`expect`) takes a `path` and one or more of these comparisons:
 

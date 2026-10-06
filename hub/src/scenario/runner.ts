@@ -1,4 +1,5 @@
 import { checkAssertion, type Assertion } from "./assert.js";
+import { isReadingCall } from "../tool-policy.js";
 import { select } from "./path.js";
 import type { Scenario, Step } from "./scenario.js";
 
@@ -73,7 +74,8 @@ export async function runScenario(s: Scenario, call: ToolCaller, opts: RunOption
         if (step.bot) bots.add(step.bot);
         const args = interpolate(step.args, vars) as Record<string, unknown>;
         const assertions = interpolate(step.expect, vars) as Assertion[];
-        if (!step.check) lastActionAt = now();
+        // Checks, waits and reads change nothing: later checks still look back to the last real action.
+        if (!step.check && !isReadingCall(step.tool, args)) lastActionAt = now();
         const data = await poll(step.within, async () => {
           const r = await call(step.tool, args);
           if (step.expectError !== undefined) {

@@ -138,6 +138,32 @@ describe("runScenario", () => {
     expect(late.failure).toMatchObject({ message: "B1 received no message matching /welcome/", actual: [] });
   });
 
+  it("waits and reads do not count as the action a check looks back to", async () => {
+    const c = clock();
+    let commandAt = -1;
+    const t = tools({
+      bot_action: (a) => {
+        if (a.action === "command") { commandAt = c.now(); return {}; }
+        if (a.action === "messages") return { messages: (a.since as number) <= commandAt ? [{ text: "Bought!" }] : [] };
+        return {};
+      },
+      wait_for: () => ({ matched: true }),
+    });
+    const s = parseScenario({
+      steps: [
+        { sleep: 10 },
+        { bot: "B1", command: "/buy" },
+        { sleep: 50 },
+        { wait: { condition: "screen_open" } },
+        { tool: "world_query", args: { action: "block", x: 0, y: 0, z: 0 } },
+        { bot: "B1", action: "state" },
+        { expect_message: { bot: "B1", matches: "bought", within: 0 } },
+      ],
+    });
+    const r = await runScenario(s, t.call, c);
+    expect(r.failure).toBeUndefined();
+  });
+
   it("saves results and substitutes ${vars}", async () => {
     const t = tools({ world_edit: (a) => (a.action === "snapshot" ? { snapshotId: "snap-7" } : { restored: a.id }) });
     const s = parseScenario({

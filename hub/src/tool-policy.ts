@@ -28,6 +28,14 @@ const READING_ACTIONS: Record<string, readonly string[]> = {
   events: ["summary", "query", "listeners", "watch"],
 };
 
+/** Whether a call only reads (or waits): it changes nothing in the game. */
+export function isReadingCall(tool: string, args: Record<string, unknown>): boolean {
+  if (READS.has(tool)) return true;
+  const reading = READING_ACTIONS[tool];
+  if (reading !== undefined) return reading.includes(String(args.action));
+  return tool === "client_settings" && Object.keys(args).every((k) => k === "instance" || k === "operationId");
+}
+
 export function parseToolGroups(text: string): Set<string> {
   const groups = new Set(text.split(",").map((g) => g.trim()).filter(Boolean));
   for (const g of groups) {

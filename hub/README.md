@@ -4,8 +4,9 @@
 
 This package is the MCP server (hub) of **Craftwire**. It lets AI agents **see and drive Minecraft**:
 - On a **Fabric client**: screenshots, a free camera, reading and clicking GUIs, chat, input and the HUD.
-- On a **Paper server**: console commands, JavaScript against the Bukkit API, world reads and edits, logs and plugin control.
-- A plugin dev loop and server-side bots.
+- On a **Paper server**: console commands, JavaScript against the Bukkit API, world reads, edits and images, every event that fires, exceptions grouped into bugs, logs and plugin control.
+- A plugin dev loop, server-side bots, and plugin tests written as JSON scenarios (`npx craftwire test`).
+- Plugins and mods can add their own tools.
 
 Minecraft 26.2 & 26.3 · Fabric client · Paper server · MIT · by [UXPLIMA](https://github.com/uxplima)
 
@@ -39,9 +40,9 @@ Get both jars from [Releases](https://github.com/uxplima/craftwire/releases):
 - `craftwire-agent-fabric-<version>.jar`: put it in your Fabric profile's `mods/` folder, with Fabric API.
 - `craftwire-paper-<version>.jar`: put it in a Paper server's `plugins/` folder.
 
-Both connect to the hub on their own. The hub listens on `127.0.0.1` only and writes a token to `~/.craftwire/hub.json`. Use one AI client with Craftwire at a time.
+Both connect to the hub on their own. The hub listens on `127.0.0.1` only and writes a token to `~/.craftwire/hub.json`. Use one AI client with Craftwire at a time, or run `npx craftwire serve` (MCP over HTTP with a token) to share one hub between several clients.
 
-No game open? The `client_process` tool starts a hidden client the hub runs itself. It downloads Minecraft and Fabric from their official servers on first use, then joins your dev server, which needs `online-mode=false`.
+No game open? The `client_process` tool starts a hidden client the hub runs itself. It downloads Minecraft and Fabric from their official servers on first use, then joins your dev server, which needs `online-mode=false`, or opens a singleplayer world.
 
 Troubleshooting: `npx craftwire doctor`. Add `--server <folder>` to check a server folder too.
 
