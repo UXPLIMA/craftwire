@@ -16,12 +16,12 @@ Download `craftwire-api-<version>.jar` from [Releases](https://github.com/uxplim
 project's `libs/` folder:
 
 ```groovy
-dependencies { compileOnly files('libs/craftwire-api-0.6.0.jar') }
+dependencies { compileOnly files('libs/craftwire-api-0.6.1.jar') }
 ```
 
-With Maven, install it once with `mvn install:install-file -Dfile=libs/craftwire-api-0.6.0.jar
--DgroupId=com.uxplima.craftwire -DartifactId=craftwire-api -Dversion=0.6.0 -Dpackaging=jar`, then depend on
-`com.uxplima.craftwire:craftwire-api:0.6.0` with `<scope>provided</scope>`.
+With Maven, install it once with `mvn install:install-file -Dfile=libs/craftwire-api-0.6.1.jar
+-DgroupId=com.uxplima.craftwire -DartifactId=craftwire-api -Dversion=0.6.1 -Dpackaging=jar`, then depend on
+`com.uxplima.craftwire:craftwire-api:0.6.1` with `<scope>provided</scope>`.
 
 To build it from a checkout instead, run `./gradlew -PapiOnly :craftwire-api:build` (Java 21 is enough); the jar is
 in `craftwire-api/build/libs`.

@@ -1,6 +1,6 @@
 {
   "name": "craftwire",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Craftwire by UXPLIMA: let Claude see and drive Minecraft (screenshots, camera, GUIs, chat, input) and Paper servers (commands, scripts, world edits, logs).",
   "author": { "name": "UXPLIMA" },
   "license": "MIT",
