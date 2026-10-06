@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { type AddressInfo, createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -77,6 +78,31 @@ describe("plugin_deploy", () => {
       buildCommand: `${NODE} -e "console.log('/p/src/Foo.java:7: error: boom'); process.exit(1)"`,
     });
     expect(json(r)).toMatchObject({ code: "BUILD_FAILED", details: { exitCode: 1, errors: [{ file: "/p/src/Foo.java", line: 7, message: "boom" }] } });
+  });
+
+  it("spots a server running without the Craftwire plugin by its port, before building", async () => {
+    hub = await startHub({ writeHubJson: true, javaMajor: 25 });
+    const dir = makeServerDir();
+    const busy = createServer();
+    await new Promise<void>((r) => busy.listen(0, "127.0.0.1", () => r()));
+    const port = (busy.address() as AddressInfo).port;
+    writeFileSync(join(dir, "server.properties"), `server-ip=127.0.0.1
+server-port=${port}
+`);
+    try {
+      const project = mkdtempSync(join(tmpdir(), "cw-proj-"));
+      const r = json(await hub.call("plugin_deploy", { projectDir: project, serverDir: dir, buildCommand: `${NODE} -e "require('fs').writeFileSync('built.txt', '')"` }));
+      expect(r.code).toBe("NOT_MANAGED");
+      expect(r.message).toContain(String(port));
+      expect(r.hint).toMatch(/console/);
+      expect(existsSync(join(project, "built.txt"))).toBe(false);
+      // Without a restart the jar is installed for the running server's next start, as for one the hub knows.
+      pluginJar(join(dir, "plugins"), "demo-1.0.jar", "Demo");
+      const staged = json(await hub.call("plugin_deploy", { jar: pluginJar(mkdtempSync(join(tmpdir(), "cw-j-")), "demo-1.1.jar", "Demo"), serverDir: dir, restart: false }));
+      expect(staged.install).toMatchObject({ installed: join(dir, "plugins", "update", "demo-1.0.jar"), needsRestart: true });
+    } finally {
+      busy.close();
+    }
   });
 
   it("refuses to restart a server it did not start before running the build", async () => {

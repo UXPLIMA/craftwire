@@ -9,6 +9,7 @@ import { RingBuffer } from "../ringbuffer.js";
 import { groupLogs, type LogLine, rank } from "../tools/log-tools.js";
 import { parseBuildErrors } from "./build-errors.js";
 import { type PluginJarInfo, pluginInfoOfJar, pluginJarsNamed } from "./jar.js";
+import { serverPortInUse } from "./launch.js";
 import { samePath } from "./paths.js";
 import { killTree, notManagedError, type ServerManager } from "./server-manager.js";
 
@@ -218,6 +219,11 @@ export async function deploy(a: DeployArgs, servers: ServerManager, agents: Agen
   const before = servers.runningState(serverDir);
   // Refuse before building: a long build that ends in NOT_MANAGED wastes minutes.
   if (before === "external" && a.restart && !a.takeOver) throw notManagedError(servers.external(serverDir)!);
+  const busyPort = before === "none" ? await serverPortInUse(serverDir) : undefined;
+  if (busyPort !== undefined && a.restart) {
+    throw new CraftwireError("NOT_MANAGED", `Something already listens on this server's port ${busyPort}: probably the server in ${serverDir} running without the Craftwire plugin`,
+      "Ask the user to stop it from its own console (type stop), then deploy again; the hub starts it afterwards. Installing Craftwire in it lets the hub see it.");
+  }
 
   const result: Record<string, unknown> = { serverDir };
   let jarPath: string;
@@ -253,7 +259,7 @@ export async function deploy(a: DeployArgs, servers: ServerManager, agents: Agen
   result.plugin = plugin.version === undefined ? { name: plugin.name } : { name: plugin.name, version: plugin.version };
 
   if (!a.restart) {
-    const install = await installPluginJar(serverDir, jarPath, plugin, { running: before !== "none" });
+    const install = await installPluginJar(serverDir, jarPath, plugin, { running: before !== "none" || busyPort !== undefined });
     return { ...result, install, restarted: false, ...(install.needsRestart ? { hint: "Restart the server (server_process {action:'restart'}) to load the new jar." } : {}) };
   }
 

@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { createServer } from "node:net";
 import { isAbsolute, join, resolve } from "node:path";
 import { CraftwireError } from "../errors.js";
 
@@ -133,4 +134,27 @@ export function probeJavaMajor(java: string): Promise<number> {
 export function eulaAccepted(serverDir: string): boolean {
   const file = join(serverDir, "eula.txt");
   return existsSync(file) && /^\s*eula\s*=\s*true\s*$/im.test(readFileSync(file, "utf8"));
+}
+
+/**
+ * The port from server.properties when something already listens on it, else undefined. A server folder that has
+ * never run has no server.properties and cannot be running. Spots servers running without the Craftwire plugin.
+ */
+export async function serverPortInUse(serverDir: string): Promise<number | undefined> {
+  const file = join(serverDir, "server.properties");
+  if (!existsSync(file)) return undefined;
+  const props = new Map<string, string>();
+  for (const line of readFileSync(file, "utf8").split(/\r?\n/)) {
+    const eq = line.indexOf("=");
+    if (eq > 0 && !line.startsWith("#")) props.set(line.slice(0, eq).trim(), line.slice(eq + 1).trim());
+  }
+  const port = Number(props.get("server-port") || 25565);
+  if (!Number.isInteger(port) || port <= 0 || port > 65535) return undefined;
+  const host = props.get("server-ip") || undefined;
+  const busy = await new Promise<boolean>((done) => {
+    const probe = createServer();
+    probe.once("error", (e: NodeJS.ErrnoException) => done(e.code === "EADDRINUSE" || e.code === "EACCES"));
+    probe.listen(port, host, () => probe.close(() => done(false)));
+  });
+  return busy ? port : undefined;
 }
