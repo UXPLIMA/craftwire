@@ -48,6 +48,41 @@ export function readHubConfig(home: string = craftwireHome()): HubConfig | undef
   }
 }
 
+/**
+ * The token HTTP clients of `craftwire serve` send (`<home>/http.json`), separate from the agents' hub token so it
+ * can be handed to other machines. `rotate` replaces it.
+ */
+export function loadOrCreateHttpToken(home: string = craftwireHome(), rotate = false): { token: string; file: string; created: boolean } {
+  const file = join(home, "http.json");
+  if (!rotate && existsSync(file)) {
+    try {
+      const parsed = JSON.parse(readFileSync(file, "utf8")) as { token?: unknown };
+      if (typeof parsed.token === "string" && /^[0-9a-f]{64}$/.test(parsed.token)) return { token: parsed.token, file, created: false };
+    } catch {
+      // corrupt file: mint a new token
+    }
+  }
+  const token = randomBytes(32).toString("hex");
+  mkdirSync(home, { recursive: true });
+  writeFileSync(file, JSON.stringify({ token }, null, 2), { mode: 0o600 });
+  try {
+    chmodSync(file, 0o600);
+  } catch {
+    // Windows relies on the user-profile ACL
+  }
+  return { token, file, created: true };
+}
+
+/** The HTTP token if `craftwire serve` made one. */
+export function readHttpToken(home: string = craftwireHome()): string | undefined {
+  try {
+    const t = (JSON.parse(readFileSync(join(home, "http.json"), "utf8")) as { token?: unknown }).token;
+    return typeof t === "string" && /^[0-9a-f]{64}$/.test(t) ? t : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function tokensEqual(a: string, b: string): boolean {
   const ba = Buffer.from(a);
   const bb = Buffer.from(b);

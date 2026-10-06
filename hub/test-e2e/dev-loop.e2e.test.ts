@@ -2,6 +2,9 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFile
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { parseServeArgs, startServe } from "../src/http/serve-command.js";
+import { httpCaller } from "../src/scenario/caller.js";
+import { chooseHub, parseTestArgs, runTests } from "../src/scenario/test-command.js";
 import { json, startHub } from "../test/helpers/hub.js";
 import { ensurePaper, freePort, gradleProperties, repoRoot } from "./paper.js";
 
@@ -155,5 +158,37 @@ describe("dev loop against a real Paper server", () => {
   it("stops the server gracefully", async () => {
     expect(json(await hub.call("server_process", { action: "stop", serverDir }))).toMatchObject({ stopped: true, forced: false });
     expect(json(await hub.call("server_process", { action: "status" })).servers[0].state).toBe("stopped");
+  });
+});
+
+describe("craftwire serve with a real Paper server", () => {
+  it("craftwire test runs scenarios over HTTP and starts and stops the server itself", async () => {
+    const home = mkdtempSync(join(tmpdir(), "cw-serve-home-"));
+    const before = process.env.CRAFTWIRE_PORT;
+    process.env.CRAFTWIRE_PORT = "0";
+    const serving = await startServe({ ...parseServeArgs([]), port: 0 }, home, () => {});
+    try {
+      const scenarios = mkdtempSync(join(tmpdir(), "cw-serve-scn-"));
+      writeFileSync(join(scenarios, "fixture.cwtest.json"), JSON.stringify({
+        name: "fixture answers over HTTP",
+        steps: [{ command: "cwfixture", expect: { path: "output[*]", matches: "fixture: now" } }, { expect_no_exceptions: {} }],
+      }));
+      const choice = await chooseHub(home, undefined, undefined);
+      expect(choice.kind).toBe("http");
+      const caller = await httpCaller(serving.url, serving.token);
+      const out: string[] = [];
+      try {
+        const code = await runTests(parseTestArgs(["--server", serverDir]), { call: caller.call, cwd: scenarios, out: (s) => out.push(s) });
+        expect(code, out.join("\n")).toBe(0);
+        const status = await caller.call("server_process", { action: "status" });
+        expect((status.data as { servers: { state: string }[] }).servers[0]!.state).toBe("stopped");
+      } finally {
+        await caller.close();
+      }
+    } finally {
+      await serving.close();
+      if (before === undefined) delete process.env.CRAFTWIRE_PORT;
+      else process.env.CRAFTWIRE_PORT = before;
+    }
   });
 });

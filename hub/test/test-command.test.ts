@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { parseTestArgs, runTests } from "../src/scenario/test-command.js";
+import { inProcessCaller } from "../src/scenario/caller.js";
 import { createCraftwireServer } from "../src/server.js";
 import { connectFakeAgent } from "./helpers/fakeAgent.js";
 import { startHub, TOKEN } from "./helpers/hub.js";
@@ -18,8 +19,8 @@ function scenarioDir(files: Record<string, unknown>): string {
 
 describe("craftwire test", () => {
   it("parses its options", () => {
-    expect(parseTestArgs(["tests", "--server", "srv", "--junit", "out.xml", "--wait", "5", "--json"]))
-      .toEqual({ paths: ["tests"], serverDir: "srv", junit: "out.xml", json: true, waitMs: 5000 });
+    expect(parseTestArgs(["tests", "--server", "srv", "--junit", "out.xml", "--wait", "5", "--json", "--hub", "http://127.0.0.1:7777/mcp"]))
+      .toEqual({ paths: ["tests"], serverDir: "srv", junit: "out.xml", json: true, waitMs: 5000, hub: "http://127.0.0.1:7777/mcp" });
     expect(() => parseTestArgs(["--junit"])).toThrow(/needs a value/);
     expect(() => parseTestArgs(["--fast"])).toThrow(/Unknown option/);
   });
@@ -33,8 +34,9 @@ describe("craftwire test", () => {
       "b.cwtest.json": { name: "fails", steps: [{ command: "list", expect: { path: "output[0]", equals: "nope" } }] },
     });
     const out: string[] = [];
-    const ctx = hub.ctx;
-    const code = await runTests(parseTestArgs(["--junit", "junit.xml"]), { ctx, makeServer: () => createCraftwireServer(ctx), cwd: dir, out: (s) => out.push(s) });
+    const caller = await inProcessCaller(createCraftwireServer(hub.ctx));
+    const code = await runTests(parseTestArgs(["--junit", "junit.xml"]), { call: caller.call, cwd: dir, out: (s) => out.push(s) });
+    await caller.close();
     expect(code).toBe(1);
     expect(out[0]).toMatch(/^✓ passes/);
     expect(out[1]).toMatch(/^✗ fails[\s\S]*expected: \{"equals":"nope"\}/);
@@ -45,8 +47,9 @@ describe("craftwire test", () => {
   it("gives up when no server connects", async () => {
     hub = await startHub();
     const dir = scenarioDir({ "a.cwtest.json": { steps: [{ command: "list" }] } });
-    const ctx = hub.ctx;
-    await expect(runTests(parseTestArgs(["--wait", "0.3"]), { ctx, makeServer: () => createCraftwireServer(ctx), cwd: dir, out: () => {} }))
+    const caller = await inProcessCaller(createCraftwireServer(hub.ctx));
+    await expect(runTests(parseTestArgs(["--wait", "0.3"]), { call: caller.call, cwd: dir, out: () => {} }))
       .rejects.toMatchObject({ code: "NO_SERVER" });
+    await caller.close();
   });
 });

@@ -165,6 +165,10 @@ Run it over stdio: command `npx`, arguments `-y craftwire`. On Windows use `cmd 
 
 Then ask your AI: *"take a screenshot of what I'm looking at"* or *"what's the TPS, and which plugins logged errors since startup?"*.
 
+### One hub for several AI clients, or another machine
+
+`npx craftwire serve` runs the hub as a server with MCP over HTTP: several AI clients share the same game and server, an AI on another machine can connect (`--allow-remote`, TLS), and `--read-only` gives observers only the tools that change nothing. Every request needs a bearer token. See [docs/http.md](docs/http.md).
+
 ## Tools
 
 | Area | Tools |
@@ -174,7 +178,7 @@ Then ask your AI: *"take a screenshot of what I'm looking at"* or *"what's the T
 | Server | `server_command` · `server_eval` · `world_query` · `world_edit` · `world_render` · `server_info` · `plugin_manage` · `events` |
 | Dev loop | `server_process` · `plugin_deploy` · `client_process` · `scenario_run` |
 | Bots | `bot_spawn` · `bot_action` · `bot_remove` |
-| CLI | `npx craftwire setup` · `npx craftwire doctor` · `npx craftwire test` |
+| CLI | `npx craftwire setup` · `npx craftwire doctor` · `npx craftwire test` · `npx craftwire serve` |
 
 Skills that teach the agent the workflows ship with the Claude Code plugin, and `setup` installs them for Codex and Gemini CLI:
 - `craftwire`: the tools in general.

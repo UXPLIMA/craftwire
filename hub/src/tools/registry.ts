@@ -9,6 +9,7 @@ import { CraftwireError, toToolError } from "../errors.js";
 import type { ExceptionTracker } from "../exceptions.js";
 import type { ExtensionRegistry } from "../extensions.js";
 import type { OperationTracker } from "../operations.js";
+import type { ToolPolicy } from "../tool-policy.js";
 
 export interface ToolContext {
   agents: AgentServer;
@@ -18,6 +19,8 @@ export interface ToolContext {
   clients: ClientManager;
   exceptions: ExceptionTracker;
   extensions: ExtensionRegistry;
+  /** Limits the tools offered and the calls allowed (craftwire serve --read-only / --tools). */
+  policy?: ToolPolicy;
 }
 
 export const targetArgs = {
@@ -36,7 +39,7 @@ export function defineTool<S extends z.ZodRawShape>(
   description: string,
   shape: S,
   run: (args: z.infer<z.ZodObject<S>>, ctx: ToolContext) => Promise<CallToolResult>,
-): RegisteredTool {
+): RegisteredTool | undefined {
   return registerAudited(server, ctx, name, description, shape, run as (args: unknown, ctx: ToolContext) => Promise<CallToolResult>);
 }
 
@@ -48,7 +51,7 @@ export function defineToolWithSchema(
   description: string,
   schema: z.ZodObject,
   run: (args: Record<string, unknown>, ctx: ToolContext) => Promise<CallToolResult>,
-): RegisteredTool {
+): RegisteredTool | undefined {
   return registerAudited(server, ctx, name, description, schema, run as (args: unknown, ctx: ToolContext) => Promise<CallToolResult>);
 }
 
@@ -59,10 +62,13 @@ function registerAudited(
   description: string,
   inputSchema: z.ZodRawShape | z.ZodObject,
   run: (args: unknown, ctx: ToolContext) => Promise<CallToolResult>,
-): RegisteredTool {
+): RegisteredTool | undefined {
+  if (ctx.policy && !ctx.policy.lists(name)) return undefined;
   const handler = async (args: unknown): Promise<CallToolResult> => {
     const started = Date.now();
     try {
+      const refused = ctx.policy?.refusal(name, (args ?? {}) as Record<string, unknown>);
+      if (refused !== undefined) throw new CraftwireError("READ_ONLY", refused, "Ask the person running the hub; it was started with --read-only.");
       const result = await run(args, ctx);
       ctx.audit.write({ tool: name, args, ok: !result.isError, ms: Date.now() - started });
       return result;

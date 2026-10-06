@@ -12,11 +12,12 @@ import { ClientManager, type PrepareClient } from "../../src/client/client-manag
 import { writeHubConfig } from "../../src/config.js";
 import { ServerManager } from "../../src/dev/server-manager.js";
 import { OperationTracker } from "../../src/operations.js";
+import type { ToolPolicy } from "../../src/tool-policy.js";
 import { createCraftwireServer } from "../../src/server.js";
 
 export const TOKEN = "a".repeat(64);
 
-export async function startHub(opts: { writeHubJson?: boolean; javaMajor?: number; agentWaitMs?: number; stopTimeoutMs?: number; prepareClient?: PrepareClient; clientRoot?: string; clientStopTimeoutMs?: number } = {}) {
+export async function startHub(opts: { writeHubJson?: boolean; javaMajor?: number; agentWaitMs?: number; stopTimeoutMs?: number; prepareClient?: PrepareClient; clientRoot?: string; clientStopTimeoutMs?: number; policy?: ToolPolicy } = {}) {
   const home = mkdtempSync(join(tmpdir(), "cw-hub-"));
   const agents = new AgentServer({ token: TOKEN, port: 0, requestTimeoutMs: 2000 });
   const port = await agents.listen();
@@ -32,7 +33,7 @@ export async function startHub(opts: { writeHubJson?: boolean; javaMajor?: numbe
     agents, home, servers, prepare: opts.prepareClient ?? noClient, ...(opts.clientRoot ? { root: opts.clientRoot } : {}),
     stopTimeoutMs: opts.clientStopTimeoutMs ?? 2000, quitTimeoutMs: 500, readyPollMs: 50,
   });
-  const ctx = { agents, ops: new OperationTracker(), audit: new AuditLog(join(home, "logs")), servers, clients, exceptions: trackExceptions(agents), extensions: new ExtensionRegistry(agents) };
+  const ctx = { agents, ops: new OperationTracker(), audit: new AuditLog(join(home, "logs")), servers, clients, exceptions: trackExceptions(agents), extensions: new ExtensionRegistry(agents), ...(opts.policy ? { policy: opts.policy } : {}) };
   const server = createCraftwireServer(ctx);
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   await server.connect(serverTransport);

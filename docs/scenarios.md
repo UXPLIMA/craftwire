@@ -120,5 +120,6 @@ npx craftwire test [files or folders…] [--server <dir>] [--junit <file>] [--js
 - `--server <dir>` starts that Paper server for the run and stops it afterwards. Without it, the run waits for a
   server with the Craftwire plugin to connect.
 - `--junit <file>` writes JUnit XML for CI. Exit code: 0 all passed, 1 a scenario failed, 2 the run could not start.
-- While an AI session's hub is running, it holds the server's connection: run the scenarios from the AI with
-  `scenario_run {files: ["tests"]}` instead.
+- While an AI session's hub is running over stdio, it holds the server's connection: run the scenarios from the AI
+  with `scenario_run {files: ["tests"]}`, or run the hub as [`craftwire serve`](http.md) (then `craftwire test`
+  uses it). `--hub <url>` runs them on a `craftwire serve` hub elsewhere (token in `CRAFTWIRE_TOKEN`).

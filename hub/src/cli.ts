@@ -5,8 +5,10 @@ import { fileURLToPath } from "node:url";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { ConfigError, craftwireHome } from "./config.js";
 import { formatChecks, runDoctor } from "./doctor.js";
-import { runningHub, startHub } from "./hub.js";
-import { parseTestArgs, runTests, TEST_USAGE } from "./scenario/test-command.js";
+import { startHub } from "./hub.js";
+import { chooseHub, parseTestArgs, runTests, TEST_USAGE } from "./scenario/test-command.js";
+import { httpCaller, inProcessCaller } from "./scenario/caller.js";
+import { parseServeArgs, serve, SERVE_USAGE } from "./http/serve-command.js";
 import { CraftwireError } from "./errors.js";
 import { createCraftwireServer } from "./server.js";
 import { setupCommand, setupEnvFromProcess } from "./setup.js";
@@ -53,23 +55,63 @@ async function test(args: string[]): Promise<void> {
     process.exit(2);
   }
   const home = craftwireHome();
-  const other = await runningHub(home);
-  if (other !== undefined) {
-    fail(new CraftwireError("HUB_RUNNING", `Another Craftwire hub is running on port ${other} (an AI session) and holds the connected server and clients.`,
-      "Ask the AI to run them with scenario_run {files: [...]}, or close that session and run this again."));
+  const out = (s: string) => process.stdout.write(`${s}\n`);
+  let choice;
+  try {
+    choice = await chooseHub(home, opts.hub, process.env.CRAFTWIRE_TOKEN);
+  } catch (e) {
+    fail(e);
     process.exit(2);
   }
-  const hub = await startHub(home, () => {});
-  const ctx = hub.ctx;
   let code = 2;
+  if (choice.kind === "http") {
+    try {
+      const caller = await httpCaller(choice.url, choice.token);
+      try {
+        code = await runTests(opts, { call: caller.call, cwd: process.cwd(), out });
+      } finally {
+        await caller.close();
+      }
+    } catch (e) {
+      fail(e);
+    }
+    process.exit(code);
+  }
+  const hub = await startHub(home, () => {});
   try {
-    code = await runTests(opts, { ctx, makeServer: () => createCraftwireServer(ctx), cwd: process.cwd(), out: (s) => process.stdout.write(`${s}\n`) });
+    const caller = await inProcessCaller(createCraftwireServer(hub.ctx));
+    try {
+      code = await runTests(opts, { call: caller.call, cwd: process.cwd(), out });
+    } finally {
+      await caller.close();
+    }
   } catch (e) {
     fail(e);
   } finally {
     await hub.close();
   }
   process.exit(code);
+}
+
+async function serveCommand(args: string[]): Promise<void> {
+  if (args.includes("--help") || args.includes("-h")) {
+    process.stdout.write(`${SERVE_USAGE}\n`);
+    return;
+  }
+  let opts;
+  try {
+    opts = parseServeArgs(args);
+  } catch (e) {
+    process.stderr.write(`craftwire serve: ${(e as Error).message}\n${SERVE_USAGE}\n`);
+    process.exit(2);
+  }
+  try {
+    await serve(opts, craftwireHome(), log);
+  } catch (e) {
+    process.stderr.write(`craftwire serve: ${e instanceof Error ? e.message : String(e)}\n`);
+    process.exit(1);
+  }
+  process.exit(0);
 }
 
 async function doctor(args: string[]): Promise<void> {
@@ -97,6 +139,7 @@ const fatal = (e: unknown) => {
 };
 if (argv[0] === "doctor") doctor(argv.slice(1)).catch(fatal);
 else if (argv[0] === "test") test(argv.slice(1)).catch(fatal);
+else if (argv[0] === "serve") serveCommand(argv.slice(1)).catch(fatal);
 else if (argv[0] === "setup") {
   try {
     setup(argv.slice(1));
