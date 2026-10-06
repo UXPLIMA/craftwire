@@ -20,6 +20,11 @@ public final class ProfileTools implements AutoCloseable {
         /** Who owns which classes (built off the game thread; may read every plugin or mod jar). */
         OwnerIndex owners();
 
+        /** The event a listener method handles, for a frame without a descriptor; null when it is no listener. */
+        default String eventOf(Frame frame) {
+            return frame.eventParameter();
+        }
+
         /** Starts feeding the session what only the game knows (tick times, frame rate). */
         Feed feed(Profiler.Session session);
     }
@@ -50,7 +55,7 @@ public final class ProfileTools implements AutoCloseable {
         int top = (int) clamp(p, "top", 15, 1, 50);
         return CompletableFuture.supplyAsync(() -> {
             OwnerIndex owners = platform.owners();
-            Profiler.Session session = Profiler.start(platform.gameThread(), intervalMs, owners);
+            Profiler.Session session = Profiler.start(platform.gameThread(), intervalMs, owners, platform::eventOf);
             AutoCloseable handle = session::cancel;
             running.add(handle);
             Feed feed = Feed.NONE;

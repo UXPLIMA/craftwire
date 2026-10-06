@@ -1,9 +1,16 @@
 package com.uxplima.craftwire.core.profile;
 
-/** One Java stack frame: class (binary name, dots), method, JVM descriptor, line (or -1). */
+/** One Java stack frame: class (binary name, dots), method, JVM descriptor ("" when unknown), line (or -1). */
 public record Frame(String className, String method, String descriptor, int line) {
+    private static final java.util.regex.Pattern HIDDEN = java.util.regex.Pattern.compile("\\$\\$Lambda[/.$]?(0x)?[0-9a-fA-F]*");
+
+    /** class.method, with a lambda's generated class shown as Outer$$Lambda (the same every run). */
     public String qualified() {
-        return className + "." + method;
+        return display(className) + "." + method;
+    }
+
+    public static String display(String className) {
+        return HIDDEN.matcher(className).replaceFirst(java.util.regex.Matcher.quoteReplacement("$$Lambda"));
     }
 
     /**

@@ -43,6 +43,11 @@ public final class FixturePlugin extends JavaPlugin implements Listener {
             player.sendMessage(Component.text(bought ? "fixture: bought" : "fixture: too expensive"));
             return true;
         }
+        if (args.length >= 2 && args[0].equals("lag")) {
+            FixtureLag.start(this, Integer.parseInt(args[1]), args.length == 3 && args[2].equals("event"));
+            sender.sendMessage(Component.text("fixture: lagging"));
+            return true;
+        }
         if (args.length == 1 && args[0].equals("hud") && sender instanceof Player player) {
             showHud(player);
             return true;
@@ -82,6 +87,14 @@ public final class FixturePlugin extends JavaPlugin implements Listener {
         player.showBossBar(BossBar.bossBar(Component.text("Event"), 0.5f, BossBar.Color.RED, BossBar.Overlay.PROGRESS));
         player.showTitle(Title.title(Component.text("Welcome"), Component.text("to the fixture")));
         player.sendActionBar(Component.text("Mana 10"));
+    }
+
+    @EventHandler
+    public void onTick(com.destroystokyo.paper.event.server.ServerTickStartEvent e) {
+        if (FixtureLag.eventTicks > 0) {
+            FixtureLag.eventTicks--;
+            FixtureLag.burn(8);
+        }
     }
 
     /** Like a command blocker: /cwfixture blocked never runs. */

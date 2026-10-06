@@ -91,7 +91,7 @@ public final class MethodTracer {
         }
 
         private static String name(RecordedMethod m) {
-            return m.getType().getName() + "." + m.getName();
+            return Frame.display(m.getType().getName()) + "." + m.getName();
         }
 
         private synchronized void call(RecordedEvent e) {
@@ -102,7 +102,7 @@ public final class MethodTracer {
             RecordedMethod m = e.getValue("method");
             if (m == null) return;
             long nanos = e.getDuration().toNanos();
-            List<Frame> stack = Profiler.frames(e.getStackTrace(), stackDepth);
+            List<Frame> stack = frames(e.getStackTrace(), stackDepth);
             if (!stack.isEmpty()) callers.merge(stack.get(0).qualified(), 1, Integer::sum);
             if (slowest.size() < limit || nanos > slowest.peek().nanos()) {
                 RecordedThread t = e.getThread();
@@ -198,10 +198,22 @@ public final class MethodTracer {
         private JsonObject owned(String className, String method) {
             Owner owner = index.owner(className, method);
             JsonObject j = new JsonObject();
-            j.addProperty("method", className + "." + method);
+            j.addProperty("method", Frame.display(className) + "." + method);
             j.addProperty("owner", owner.name());
             return j;
         }
+    }
+
+    /** Java frames of a stack trace, innermost first. */
+    static List<Frame> frames(jdk.jfr.consumer.RecordedStackTrace trace, int max) {
+        List<Frame> out = new ArrayList<>();
+        if (trace == null) return out;
+        for (jdk.jfr.consumer.RecordedFrame f : trace.getFrames()) {
+            if (!f.isJavaFrame() || f.getMethod() == null) continue;
+            out.add(new Frame(f.getMethod().getType().getName(), f.getMethod().getName(), f.getMethod().getDescriptor(), f.getLineNumber()));
+            if (out.size() == max) break;
+        }
+        return out;
     }
 
     private static double ms(Duration d) {

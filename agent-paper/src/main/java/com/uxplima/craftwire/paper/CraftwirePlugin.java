@@ -7,10 +7,12 @@ import com.uxplima.craftwire.core.HubClient;
 import com.uxplima.craftwire.core.HubConfig;
 import com.uxplima.craftwire.core.LogCapture;
 import com.uxplima.craftwire.core.OperationCache;
+import com.uxplima.craftwire.core.profile.ProfileTools;
 import com.uxplima.craftwire.paper.bot.BotManager;
 import com.uxplima.craftwire.paper.events.EventTap;
 import com.uxplima.craftwire.paper.handlers.EvalHandler;
 import com.uxplima.craftwire.paper.handlers.Handlers;
+import com.uxplima.craftwire.paper.handlers.PaperProfiling;
 import com.uxplima.craftwire.paper.script.ScriptEngine;
 import com.uxplima.craftwire.paper.world.SnapshotStore;
 import java.nio.file.Path;
@@ -28,6 +30,7 @@ public final class CraftwirePlugin extends JavaPlugin {
     private BotManager bots;
     private EventTap events;
     private PaperExtensions extensions;
+    private ProfileTools profiling;
 
     @Override
     public void onLoad() {
@@ -47,6 +50,7 @@ public final class CraftwirePlugin extends JavaPlugin {
         bots.start();
         extensions = new PaperExtensions(this, this::sendTools);
         extensions.start();
+        profiling = new ProfileTools(new PaperProfiling(this));
         Handlers.registerAll(this);
         getServer().getPluginManager().registerEvents(new EventBridge(this), this);
         if (config.recordEvents()) {
@@ -71,6 +75,7 @@ public final class CraftwirePlugin extends JavaPlugin {
     @Override
     public void onDisable() {
         if (events != null) events.stop();
+        if (profiling != null) profiling.close();
         if (extensions != null) extensions.stop();
         if (bots != null) bots.shutdown();
         if (scripts != null) scripts.close();
@@ -96,6 +101,10 @@ public final class CraftwirePlugin extends JavaPlugin {
         JsonObject d = new JsonObject();
         d.add("tools", extensions.list());
         hub.notifyEvent("tools", d);
+    }
+
+    public ProfileTools profiling() {
+        return profiling;
     }
 
     public PaperExtensions extensions() {

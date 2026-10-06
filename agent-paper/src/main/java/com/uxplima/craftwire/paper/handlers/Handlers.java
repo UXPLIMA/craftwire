@@ -25,5 +25,7 @@ public final class Handlers {
         d.register("bot.spawn", p -> BotHandler.spawn(p, plugin));
         d.register("bot.remove", p -> BotHandler.remove(p, plugin));
         d.register("bot.action", p -> BotHandler.action(p, plugin));
+        d.register("profile.run", p -> plugin.profiling().profile(p));
+        d.register("trace.run", p -> plugin.profiling().trace(p));
     }
 }

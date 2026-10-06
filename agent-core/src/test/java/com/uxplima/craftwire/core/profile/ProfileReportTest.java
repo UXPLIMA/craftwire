@@ -132,6 +132,24 @@ class ProfileReportTest {
     }
 
     @Test
+    void idleSamplesGiveHowBusyTheThreadWas() {
+        ProfileReport r = new ProfileReport(owners);
+        r.add(SERVER_LOOP, 0);
+        for (int i = 0; i < 3; i++) r.idle();
+        JsonObject o = r.json(5);
+        assertEquals(1, o.get("samples").getAsInt());
+        assertEquals(3, o.get("idleSamples").getAsInt());
+        assertEquals(25.0, o.get("busyPercent").getAsDouble());
+    }
+
+    @Test
+    void thePlatformCanNameTheEventOfAListenerWhoseDescriptorIsUnknown() {
+        ProfileReport r = new ProfileReport(owners, f -> f.method().equals("onMove") ? "PlayerMoveEvent" : null);
+        r.add(concat(List.of(new Frame("com.shop.ShopListener", "onMove", "", 12)), SERVER_LOOP), 0);
+        assertEquals("PlayerMoveEvent", r.json(5).getAsJsonArray("entryPoints").get(0).getAsJsonObject().get("event").getAsString());
+    }
+
+    @Test
     void limitsEachListToTop() {
         ProfileReport r = new ProfileReport(owners);
         for (String m : Arrays.asList("a", "b", "c", "d")) r.add(stack("net.minecraft.X." + m), 0);

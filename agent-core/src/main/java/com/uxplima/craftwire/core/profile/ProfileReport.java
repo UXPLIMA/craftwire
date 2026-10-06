@@ -10,6 +10,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 
 /**
  * Sums stack samples of one thread into "who uses the time": per owner, per plugin/mod entry point, per method,
@@ -19,15 +20,28 @@ public final class ProfileReport {
     private static final int SLOWEST_TICKS = 5;
 
     private final OwnerIndex index;
+    private final Function<Frame, String> eventOf;
     private final Map<Owner, Integer> owners = new HashMap<>();
     private final Map<String, Count> self = new HashMap<>();
     private final Map<String, Entry> entries = new HashMap<>();
     private final List<Sample> samples = new ArrayList<>();
     private final List<Tick> ticks = new ArrayList<>();
     private int truncated;
+    private int idle;
 
     public ProfileReport(OwnerIndex index) {
+        this(index, Frame::eventParameter);
+    }
+
+    /** `eventOf` names the event a listener method handles (null when it is not a listener). */
+    public ProfileReport(OwnerIndex index, Function<Frame, String> eventOf) {
         this.index = index;
+        this.eventOf = eventOf;
+    }
+
+    /** A sample that found the thread waiting (between ticks or frames). */
+    public void idle() {
+        idle++;
     }
 
     private record Sample(long time, Owner owner) {}
@@ -92,7 +106,7 @@ public final class ProfileReport {
             Frame f = stack.get(i);
             Frame caller = i + 1 < stack.size() ? stack.get(i + 1) : null;
             String key = o.name() + "\u0000" + f.qualified();
-            entries.computeIfAbsent(key, k -> new Entry(o, f.qualified(), f.eventParameter(),
+            entries.computeIfAbsent(key, k -> new Entry(o, f.qualified(), eventOf.apply(f),
                     caller == null ? null : caller.qualified(), caller != null && isScheduler(caller))).n++;
         }
     }
@@ -111,6 +125,8 @@ public final class ProfileReport {
         int total = samples.size();
         JsonObject o = new JsonObject();
         o.addProperty("samples", total);
+        o.addProperty("idleSamples", idle);
+        o.addProperty("busyPercent", total + idle == 0 ? 0 : round(100.0 * total / (total + idle)));
         o.addProperty("truncatedStacks", truncated);
 
         JsonArray byOwner = new JsonArray();

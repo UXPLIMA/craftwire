@@ -46,7 +46,7 @@ class JfrTest {
         busy("cw-busy", stop, () -> sink += Busy.work(200_000));
         busy("cw-other", stop, () -> sink += Busy.hot(200_000));
         try {
-            Profiler.Session s = Profiler.start("cw-busy", 10, INDEX);
+            Profiler.Session s = Profiler.start("cw-busy", 10, INDEX, Frame::eventParameter);
             Thread.sleep(1500);
             JsonObject r = s.finish(10);
             assertEquals("cw-busy", r.get("thread").getAsString());
@@ -63,12 +63,32 @@ class JfrTest {
 
     @Test
     void takesTickTimesFromTheGame() throws Exception {
-        Profiler.Session s = Profiler.start("nobody", 10, INDEX);
+        Profiler.Session s = Profiler.start("nobody", 10, INDEX, Frame::eventParameter);
         long now = Profiler.now();
         s.tick(7, now, 60_000_000L);
         JsonObject r = s.finish(5);
         assertEquals(1, r.getAsJsonObject("ticks").get("count").getAsInt());
         assertEquals(1, r.getAsJsonObject("ticks").get("over50ms").getAsInt());
+    }
+
+    @Test
+    void aWaitingThreadIsIdleNotBusy() throws Exception {
+        Thread sleeper = new Thread(() -> {
+            try {
+                Thread.sleep(5000);
+            } catch (InterruptedException ignored) {
+                // test over
+            }
+        }, "cw-sleeper");
+        sleeper.setDaemon(true);
+        sleeper.start();
+        Profiler.Session s = Profiler.start("cw-sleeper", 10, INDEX, Frame::eventParameter);
+        Thread.sleep(500);
+        JsonObject r = s.finish(5);
+        sleeper.interrupt();
+        assertEquals(0, r.get("samples").getAsInt(), r.toString());
+        assertTrue(r.get("idleSamples").getAsInt() >= 20, r.toString());
+        assertEquals(0.0, r.get("busyPercent").getAsDouble());
     }
 
     @Test
