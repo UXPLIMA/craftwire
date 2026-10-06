@@ -70,7 +70,7 @@ export function registerClientTools(server: McpServer, ctx: ToolContext): void {
     }, fwd("client.settings"));
 
   defineTool(server, ctx, "screenshot",
-    "Capture the game frame and return it as an image. hud:false hides the HUD (F1); chat:false keeps the HUD but leaves chat lines (e.g. command feedback) out. maxSize is the long edge of the returned image. savePath (relative to the current directory) also writes the full-resolution PNG. camera {x,y,z,yaw,pitch,fov} applies only for this capture.",
+    "Capture the game frame and return it as an image. hud:false hides the HUD (F1); chat:false keeps the HUD but leaves chat lines (e.g. command feedback) out. maxSize is the long edge of the returned image. savePath (relative to the current directory) also writes the full-resolution image: PNG, or JPEG when it ends in .jpg/.jpeg (a tenth of the size). camera {x,y,z,yaw,pitch,fov} applies only for this capture.",
     {
       ...targetArgs,
       hud: z.boolean().default(true),

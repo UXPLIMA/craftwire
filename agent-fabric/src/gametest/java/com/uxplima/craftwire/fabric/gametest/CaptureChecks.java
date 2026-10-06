@@ -72,6 +72,11 @@ final class CaptureChecks {
         check(ctx.computeOnClient(mc -> mc.gameRenderer.mainCamera().position()).distanceTo(eye) < 0.5, "per-capture camera cleared");
         check(ctx.computeOnClient(mc -> mc.options.fov().get()) != 50, "per-capture fov restored");
 
+        // A .jpg savePath writes a JPEG (a 4K PNG is ~17 MB).
+        JsonObject jpg = Calls.call(ctx, "screenshot", "{\"hud\":false,\"maxSize\":256,\"savePath\":\"" + dir.resolve("shot.jpg").toString().replace("\\", "\\\\") + "\"}").getAsJsonObject();
+        byte[] head = Files.readAllBytes(Path.of(jpg.get("savedPath").getAsString()));
+        check(head.length > 1000 && (head[0] & 0xff) == 0xFF && (head[1] & 0xff) == 0xD8, "a .jpg savePath must hold a JPEG");
+
         // chat:false keeps chat lines out of a HUD shot: no white chat text left in the bottom-left.
         ctx.runOnClient(mc -> {
             for (int i = 0; i < 10; i++) mc.gui.hud.getChat().addClientSystemMessage(net.minecraft.network.chat.Component.literal("Teleported Steve to 1, 2, 3 #" + i));

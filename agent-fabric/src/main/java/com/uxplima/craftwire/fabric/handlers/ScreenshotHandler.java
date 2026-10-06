@@ -148,7 +148,17 @@ final class ScreenshotHandler {
                     Path target = Path.of(savePath).toAbsolutePath();
                     try {
                         if (target.getParent() != null) Files.createDirectories(target.getParent());
-                        Files.copy(file, target, StandardCopyOption.REPLACE_EXISTING);
+                        String name = target.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
+                        if (name.endsWith(".jpg") || name.endsWith(".jpeg")) {
+                            // Full-resolution JPEG: a 4K PNG is ~17 MB, the JPEG a tenth of that.
+                            BufferedImage rgb = new BufferedImage(full.getWidth(), full.getHeight(), BufferedImage.TYPE_INT_RGB);
+                            Graphics2D g = rgb.createGraphics();
+                            g.drawImage(full, 0, 0, null);
+                            g.dispose();
+                            Files.write(target, jpeg(rgb, 0.92f));
+                        } else {
+                            Files.copy(file, target, StandardCopyOption.REPLACE_EXISTING);
+                        }
                     } catch (IOException e) {
                         throw new AgentError("SAVE_FAILED", "Could not write " + target + ": " + e.getMessage(),
                                 "Pass a writable savePath; missing directories are created automatically.");
