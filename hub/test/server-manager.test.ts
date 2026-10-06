@@ -5,7 +5,7 @@ import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { AgentServer } from "../src/agents.js";
 import { writeHubConfig } from "../src/config.js";
-import { diagnoseCrash, pidAlive, ServerManager, type ServerManagerOptions, waitUntil } from "../src/dev/server-manager.js";
+import { diagnoseCrash, pidAlive, pruneStopped, ServerManager, type ServerManagerOptions, waitUntil } from "../src/dev/server-manager.js";
 import { FAKE_PAPER, fakeLaunch, makeServerDir } from "./helpers/servers.js";
 
 const TOKEN = "d".repeat(64);
@@ -140,6 +140,16 @@ describe("ServerManager", () => {
     await servers.start({ serverDir: dir, ...fakeLaunch("ok") });
     await servers.shutdown();
     expect(servers.status(dir).servers[0]!.state).toBe("stopped");
+  });
+
+  it("forgets all but the newest stopped servers, never a live one", () => {
+    const m = new Map<string, { state: "running" | "stopped" | "crashed"; startedAt: number }>();
+    for (let i = 0; i < 3; i++) m.set(`live${i}`, { state: "running", startedAt: i });
+    for (let i = 0; i < 15; i++) m.set(`old${i}`, { state: i % 2 ? "stopped" : "crashed", startedAt: 100 + i });
+    pruneStopped(m, 10);
+    expect([...m.keys()].filter((k) => k.startsWith("live"))).toHaveLength(3);
+    expect([...m.keys()].filter((k) => k.startsWith("old")).sort()).toEqual(
+      Array.from({ length: 10 }, (_, i) => `old${i + 5}`).sort());
   });
 
   it("names known crash causes", () => {

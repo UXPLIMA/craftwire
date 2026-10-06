@@ -76,6 +76,17 @@ const DONE = /\bDone \([\d.,]+s\)!/;
 const LIVE: readonly ServerState[] = ["starting", "running", "stopping"];
 const isLive = (m: Managed | undefined): m is Managed => m !== undefined && LIVE.includes(m.state);
 
+/** Stopped and crashed servers kept for status and for restarting with their previous options. */
+const KEEP_STOPPED = 10;
+
+/** Drops all but the `keep` most recently started stopped/crashed entries; live servers always stay. */
+export function pruneStopped<K, V extends { state: ServerState; startedAt?: number }>(servers: Map<K, V>, keep: number): void {
+  const stopped = [...servers.entries()]
+    .filter(([, v]) => !LIVE.includes(v.state))
+    .sort(([, a], [, b]) => (b.startedAt ?? 0) - (a.startedAt ?? 0));
+  for (const [key] of stopped.slice(keep)) servers.delete(key);
+}
+
 const CRASHES: [RegExp, string, string][] = [
   [/FAILED TO BIND TO PORT/i, "PORT_IN_USE", "Another process uses the server port: stop it, or change server-port in server.properties."],
   [/session\.lock|already locked/i, "WORLD_LOCKED", "Another server is using this world: stop it first (server_process {action:'status'} lists external servers)."],
@@ -273,6 +284,7 @@ export class ServerManager {
         settled = true;
         m.exitCode = code;
         m.state = m.state === "stopping" || (m.state === "running" && code === 0) ? "stopped" : "crashed";
+        pruneStopped(this.servers, KEEP_STOPPED);
         res(code);
       };
       child.once("error", (e) => { m.console.push(`[craftwire] cannot run ${launch.command}: ${e.message}`); settle(null); });
