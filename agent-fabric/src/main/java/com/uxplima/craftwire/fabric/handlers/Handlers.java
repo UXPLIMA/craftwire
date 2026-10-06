@@ -16,5 +16,6 @@ public final class Handlers {
         agent.dispatcher().register("screenshot", p -> ScreenshotHandler.capture(p, agent));
         agent.dispatcher().register("input", p -> s.call(() -> InputHandler.handle(p, s)));
         agent.dispatcher().register("client.settings", p -> s.call(() -> ClientSettingsHandler.handle(p)));
+        agent.dispatcher().register("client.quit", p -> s.call(QuitHandler::quit));
     }
 }

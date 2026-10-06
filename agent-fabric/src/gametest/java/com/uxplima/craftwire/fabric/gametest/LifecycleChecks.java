@@ -14,6 +14,12 @@ final class LifecycleChecks {
     static void run(ClientGameTestContext ctx, TestSingleplayerContext sp) {
         CraftwireAgent agent = CraftwireClient.agent();
 
+        // client_process starts clients with -Dcraftwire.hidden=true; the game tests run that way too (build.gradle), so
+        // every capture check below also proves that a hidden window still renders.
+        boolean hidden = Boolean.getBoolean("craftwire.hidden");
+        int visible = ctx.computeOnClient(mc -> GLFW.glfwGetWindowAttrib(mc.getWindow().handle(), GLFW.GLFW_VISIBLE));
+        check((visible == GLFW.GLFW_FALSE) == hidden, "window visible=" + visible + " but craftwire.hidden=" + hidden);
+
         // Review Focus #1: a connected hub must stop the game from pausing when Claude Code takes focus.
         ctx.runOnClient(mc -> mc.options.pauseOnLostFocus = true);
         ctx.runOnClient(mc -> agent.onHubConnected("client-1"));

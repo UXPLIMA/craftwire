@@ -56,7 +56,7 @@ public final class CraftwireAgent {
                 onHubDisconnected();
             }
             @Override public void onRefused(String error) {
-                LOGGER.warn("[craftwire] The Craftwire hub refused this client: {}. Restart Claude Code, or install the mod version that matches the hub.", error);
+                LOGGER.warn("[craftwire] The Craftwire hub refused this client: {}. Restart your AI client, or install the mod version that matches the hub.", error);
             }
             @Override public void onLog(String message) { LOGGER.debug("[craftwire] {}", message); }
         });
@@ -65,7 +65,8 @@ public final class CraftwireAgent {
 
     private Hello hello() {
         Minecraft mc = Minecraft.getInstance();
-        return new Hello("client", VERSION, SharedConstants.getCurrentVersion().name(), mc.getUser().getName());
+        String gameDir = FabricLoader.getInstance().getGameDir().toAbsolutePath().toString();
+        return new Hello("client", VERSION, SharedConstants.getCurrentVersion().name(), mc.getUser().getName(), null, null, gameDir);
     }
 
     public void onHubConnected(String instanceId) {

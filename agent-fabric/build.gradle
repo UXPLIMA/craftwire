@@ -45,6 +45,11 @@ dependencies {
     }
 }
 
+// Game tests run with the window hidden, like clients started by client_process.
+tasks.matching { it.name == 'runClientGameTest' }.configureEach {
+    jvmArgs '-Dcraftwire.hidden=true'
+}
+
 processResources {
     def version = project.version
     inputs.property "version", version
