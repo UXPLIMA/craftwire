@@ -11,7 +11,7 @@ By [UXPLIMA](https://github.com/uxplima) · MIT licensed · Minecraft 26.2 (Fabr
    /plugin marketplace add uxplima/craftwire
    /plugin install craftwire@uxplima
    ```
-2. Install **Craftwire Agent** (Fabric mod, requires Fabric API) into your Minecraft 26.2 profile.
+2. Install **Craftwire Agent** (`craftwire-agent-fabric-<version>.jar` from [Releases](https://github.com/uxplima/craftwire/releases); Fabric mod, requires Fabric API) into your Minecraft 26.2 profile.
 3. Start Minecraft and join a world. A green **⚡ Craftwire connected** appears top-left. **F8** pauses AI control at any time.
 
 Ask Claude: *"take a screenshot of what I'm looking at"*.
@@ -20,7 +20,7 @@ Ask Claude: *"take a screenshot of what I'm looking at"*.
 
 ## Paper server
 
-Drop `craftwire-paper-<version>.jar` into the server's `plugins/` folder and start it; it connects to the hub on its own.
+Drop `craftwire-paper-<version>.jar` (from [Releases](https://github.com/uxplima/craftwire/releases)) into the server's `plugins/` folder and start it; it connects to the hub on its own.
 
 - The first start downloads GraalJS (for `server_eval`) through Paper's library loader, so it needs network access once.
 - `plugins/Craftwire/config.yml` has four switches: `allow-eval`, `allow-world-edit`, `allow-bots` and `max-edit-volume`. A disabled capability answers `PERMISSION_DISABLED`.
