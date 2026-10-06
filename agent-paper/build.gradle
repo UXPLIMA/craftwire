@@ -1,5 +1,6 @@
 plugins {
     id 'java'
+    id 'io.papermc.paperweight.userdev' version '2.0.0-beta.24'
 }
 
 base {
@@ -19,13 +20,13 @@ sourceSets {
 }
 
 dependencies {
-    compileOnly "io.papermc.paper:paper-api:${paper_api_version}"
+    // Paper API plus Mojang-mapped server internals; only the bot package touches the internals.
+    paperweight.paperDevBundle("${paper_api_version}")
     compileOnly "org.apache.logging.log4j:log4j-core:${log4j_version}"
     // GraalJS comes from Paper's library loader at runtime (plugin.yml `libraries`), never from this jar.
     compileOnly "org.graalvm.polyglot:polyglot:${graal_version}"
     implementation project(':agent-core')
 
-    testImplementation "io.papermc.paper:paper-api:${paper_api_version}"
     testImplementation "org.apache.logging.log4j:log4j-core:${log4j_version}"
     testImplementation "org.graalvm.polyglot:polyglot:${graal_version}"
     testImplementation "org.graalvm.js:js-language:${graal_version}"
