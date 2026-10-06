@@ -20,7 +20,7 @@ function actionTimeout(a: { action: string; timeoutMs?: number; collectMs?: numb
 
 export function registerBotTools(server: McpServer, ctx: ToolContext): void {
   defineTool(server, ctx, "bot_spawn",
-    "Spawn server-side fake players (bots) on a Paper server running the Craftwire plugin. They join like real players (join event, tab list) and plugins treat them as players. Names: `names`, or `count` × namePrefix1, namePrefix2, …. location defaults to the main world's spawn. Returns each bot's name and position.",
+    "Spawn server-side fake players (bots) on a Paper server running the Craftwire plugin. They join like real players (join event, tab list) and plugins treat them as players. Names: `names`, or `count` × namePrefix1, namePrefix2, …. location defaults to the main world's spawn. Bots skip the login checks (whitelist, bans), and their player data, stats and advancements are deleted when they leave. Returns each bot's name and position.",
     {
       ...targetArgs,
       count: z.number().int().min(1).max(20).default(1),

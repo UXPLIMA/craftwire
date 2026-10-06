@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -70,6 +71,19 @@ class BotLifecycleIT {
         long quits = hub.events.stream().filter(e -> e.toString().contains("\"action\":\"quit\"") && e.toString().contains("ItRace")).count();
         assertEquals(1, quits, "exactly one quit event");
         assertTrue(hub.events.stream().noneMatch(e -> e.toString().contains("\"level\":\"ERROR\"") && e.toString().contains("ItRace")), "no errors");
+    }
+
+    @Test
+    void removedBotsLeaveNoPlayerFilesBehind() throws Exception {
+        String uuid = hub.result("bot.spawn", "{\"names\":[\"ItFiles\"]}").getAsJsonObject().getAsJsonArray("bots")
+                .get(0).getAsJsonObject().get("uuid").getAsString();
+        hub.result("bot.remove", "{\"name\":\"ItFiles\"}");
+        Thread.sleep(1000);   // give any asynchronous save time to land
+        java.nio.file.Path players = java.nio.file.Path.of(System.getProperty("craftwire.itDir"), "server", "world", "players");
+        try (var files = java.nio.file.Files.walk(players)) {
+            List<String> left = files.map(f -> f.getFileName().toString()).filter(n -> n.startsWith(uuid)).toList();
+            assertEquals(List.of(), left);
+        }
     }
 
     @Test

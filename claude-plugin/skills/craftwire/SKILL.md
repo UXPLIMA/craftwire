@@ -42,6 +42,7 @@ If `gui_action` returns `SLOT_OUT_OF_RANGE` or `NO_SCREEN_OPEN`, the screen chan
 - `bot_spawn {count}` (or `names`), then drive with `bot_action`. Bots are real players to plugins: permissions, join/quit, chat and click events all fire.
 - Menus: `bot_action {action:"command", command:"shop"}` → `gui_read` → `gui_click {slot}`; the click result already includes the menu after the plugin reacted. Read replies with `messages`.
 - Walking is straight-line (`move_to`): it hops one-block steps, and reports `stuck` at walls. Give waypoints for longer routes, or `server_command "minecraft:tp Bot1 x y z"`.
+- Bots skip the whitelist and bans, and leave no player files behind. They are not op: give permissions with the server's permission plugin, or `minecraft:op` if the test needs it.
 - Always `bot_remove {all:true}` when done.
 
 ## Errors

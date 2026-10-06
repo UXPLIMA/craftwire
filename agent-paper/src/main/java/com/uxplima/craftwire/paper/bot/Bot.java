@@ -2,7 +2,10 @@ package com.uxplima.craftwire.paper.bot;
 
 import com.google.gson.JsonObject;
 import com.mojang.authlib.GameProfile;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -16,6 +19,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.CommonListenerCookie;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
+import net.minecraft.world.level.storage.LevelResource;
 import net.minecraft.world.phys.Vec3;
 import org.bukkit.Location;
 import org.bukkit.craftbukkit.CraftWorld;
@@ -112,6 +116,7 @@ public final class Bot {
         if (move != null) finish("removed");
         MinecraftServer.getServer().getPlayerList().remove(player());
         connection.channel.close();
+        forgetPlayerFiles();
     }
 
     /** Something else closed the connection (a kick): run the normal disconnect path once. */
@@ -120,6 +125,23 @@ public final class Bot {
         connection.handleDisconnection();
         var list = MinecraftServer.getServer().getPlayerList();
         if (list.getPlayer(uuid) != null) list.remove(player());
+        forgetPlayerFiles();
+    }
+
+    /** Bots are throwaway players: drop the data, stats and advancements the server saved for them on leaving. */
+    private void forgetPlayerFiles() {
+        MinecraftServer server = MinecraftServer.getServer();
+        for (LevelResource dir : new LevelResource[] {LevelResource.PLAYER_DATA_DIR, LevelResource.PLAYER_OLD_DATA_DIR,
+                LevelResource.PLAYER_STATS_DIR, LevelResource.PLAYER_ADVANCEMENTS_DIR}) {
+            Path folder = server.getWorldPath(dir);
+            for (String suffix : new String[] {".dat", ".dat_old", ".json"}) {
+                try {
+                    Files.deleteIfExists(folder.resolve(uuid + suffix));
+                } catch (IOException ignored) {
+                    // a leftover file is harmless; the next removal tries again
+                }
+            }
+        }
     }
 
     CompletableFuture<JsonObject> moveTo(double x, double y, double z, double tolerance, boolean sprint, long timeoutMs) {
