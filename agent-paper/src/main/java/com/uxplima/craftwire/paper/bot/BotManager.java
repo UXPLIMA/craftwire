@@ -23,6 +23,10 @@ public final class BotManager {
         this.plugin = plugin;
     }
 
+    Plugin plugin() {
+        return plugin;
+    }
+
     public void start() {
         task = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, 1L, 1L);
     }

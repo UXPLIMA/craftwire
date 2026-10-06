@@ -12,6 +12,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
@@ -33,6 +34,11 @@ public final class FixturePlugin extends JavaPlugin implements Listener {
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (args.length == 1 && args[0].equals("menu") && sender instanceof Player player) {
             player.openInventory(new Menu().inventory);
+            return true;
+        }
+        if (args.length == 1 && args[0].equals("buy") && sender instanceof Player player) {
+            boolean bought = new FixtureShopEvent(player, 30).callEvent();
+            player.sendMessage(Component.text(bought ? "fixture: bought" : "fixture: too expensive"));
             return true;
         }
         if (args.length == 1 && args[0].equals("hud") && sender instanceof Player player) {
@@ -74,6 +80,20 @@ public final class FixturePlugin extends JavaPlugin implements Listener {
         player.showBossBar(BossBar.bossBar(Component.text("Event"), 0.5f, BossBar.Color.RED, BossBar.Overlay.PROGRESS));
         player.showTitle(Title.title(Component.text("Welcome"), Component.text("to the fixture")));
         player.sendActionBar(Component.text("Mana 10"));
+    }
+
+    /** Like a command blocker: /cwfixture blocked never runs. */
+    @EventHandler
+    public void onCommand(PlayerCommandPreprocessEvent e) {
+        if (!e.getMessage().startsWith("/cwfixture blocked")) return;
+        e.setCancelled(true);
+        e.getPlayer().sendMessage(Component.text("fixture: blocked"));
+    }
+
+    /** The shop refuses anything over 20. */
+    @EventHandler
+    public void onBuy(FixtureShopEvent e) {
+        if (e.getPrice() > 20) e.setCancelled(true);
     }
 
     /** Behaves like a typical plugin menu: clicks are cancelled, answered, and the menu closes a tick later. */

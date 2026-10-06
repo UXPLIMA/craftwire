@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { trackExceptions } from "./exceptions.js";
 import { AgentServer } from "./agents.js";
 import { AuditLog } from "./audit.js";
 import { ClientManager } from "./client/client-manager.js";
@@ -28,7 +29,7 @@ async function main(): Promise<void> {
 
   const servers = new ServerManager({ agents, home });
   const clients = new ClientManager({ agents, home, servers, prepare: (p) => prepareClient(p) });
-  const server = createCraftwireServer({ agents, ops: new OperationTracker(), audit: new AuditLog(join(home, "logs")), servers, clients });
+  const server = createCraftwireServer({ agents, ops: new OperationTracker(), audit: new AuditLog(join(home, "logs")), servers, clients, exceptions: trackExceptions(agents) });
   const transport = new StdioServerTransport();
   let stopping = false;
   const shutdown = () => {

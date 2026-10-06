@@ -11,7 +11,7 @@ class AgentConfigTest {
     @Test
     void defaultsAllowEverythingAndUseTheFolderName() {
         AgentConfig c = AgentConfig.from(new YamlConfiguration(), "myserver");
-        assertEquals(new AgentConfig("myserver", true, true, true, 1_000_000), c);
+        assertEquals(new AgentConfig("myserver", true, true, true, 1_000_000, true), c);
     }
 
     @Test
@@ -29,12 +29,12 @@ class AgentConfigTest {
     void shippedConfigMatchesTheDefaults() throws Exception {
         YamlConfiguration y = new YamlConfiguration();
         y.loadFromString(new String(getClass().getResourceAsStream("/config.yml").readAllBytes(), StandardCharsets.UTF_8));
-        assertEquals(new AgentConfig("x", true, true, true, 1_000_000), AgentConfig.from(y, "x"));
+        assertEquals(new AgentConfig("x", true, true, true, 1_000_000, true), AgentConfig.from(y, "x"));
     }
 
     @Test
     void aDisabledCapabilityIsPermissionDisabled() {
-        AgentConfig c = new AgentConfig("s", false, true, true, 10);
+        AgentConfig c = new AgentConfig("s", false, true, true, 10, true);
         AgentError e = assertThrows(AgentError.class, () -> c.require(c.allowEval(), "allow-eval"));
         assertEquals("PERMISSION_DISABLED", e.code());
         assertTrue(e.hint().contains("allow-eval: true"), e.hint());

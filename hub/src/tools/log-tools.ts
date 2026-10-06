@@ -1,6 +1,8 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { AgentEvent } from "../protocol.js";
+import { definedOnly } from "../dev/server-manager.js";
+import { CraftwireError } from "../errors.js";
 import { defineTool, ok, type ToolContext } from "./registry.js";
 
 const LEVELS = ["TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL"] as const;
@@ -58,5 +60,23 @@ export function registerLogTools(server: McpServer, ctx: ToolContext): void {
         .filter((l) => !needle || [l.message, l.thrown ?? "", ...(l.stack ?? [])].join("\n").toLowerCase().includes(needle))
         .slice(-args.limit);
       return ok({ instance: inst.id, lines });
+    });
+
+  defineTool(server, ctx, "exceptions",
+    "Exceptions the connected server and clients logged, grouped into distinct bugs (same root cause and own stack frames), newest first: type, message, count, firstSeen/lastSeen, origin (first frame outside Minecraft/Paper/Fabric — where to look), plugin when Paper names one, instances. Counted since the hub started, beyond the log buffer. Pass id for one bug's full stack trace and the distinct messages it had. Use after a test step to check nothing broke (since: the step's start time).",
+    {
+      id: z.string().regex(/^[0-9a-f]{8}$/).optional().describe("One bug's id from the list: returns its full stack."),
+      since: z.number().optional().describe("Only bugs seen at or after this time (epoch ms)."),
+      instance: z.string().optional().describe("Only bugs logged by this instance name."),
+      limit: z.number().int().min(1).max(200).default(50),
+    },
+    async (args, c) => {
+      if (args.id !== undefined) {
+        const one = c.exceptions.get(args.id);
+        if (!one) throw new CraftwireError("NOT_FOUND", `No exception with id ${args.id}`, "Call exceptions without id to list them.");
+        return ok(one);
+      }
+      const all = c.exceptions.list(definedOnly({ since: args.since, instance: args.instance }));
+      return ok({ total: all.length, exceptions: all.slice(0, args.limit) });
     });
 }

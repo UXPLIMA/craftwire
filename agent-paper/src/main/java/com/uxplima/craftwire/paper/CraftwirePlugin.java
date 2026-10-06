@@ -8,6 +8,7 @@ import com.uxplima.craftwire.core.HubConfig;
 import com.uxplima.craftwire.core.LogCapture;
 import com.uxplima.craftwire.core.OperationCache;
 import com.uxplima.craftwire.paper.bot.BotManager;
+import com.uxplima.craftwire.paper.events.EventTap;
 import com.uxplima.craftwire.paper.handlers.EvalHandler;
 import com.uxplima.craftwire.paper.handlers.Handlers;
 import com.uxplima.craftwire.paper.script.ScriptEngine;
@@ -25,6 +26,7 @@ public final class CraftwirePlugin extends JavaPlugin {
     private ScriptEngine scripts;
     private SnapshotStore snapshots;
     private BotManager bots;
+    private EventTap events;
 
     @Override
     public void onLoad() {
@@ -44,6 +46,10 @@ public final class CraftwirePlugin extends JavaPlugin {
         bots.start();
         Handlers.registerAll(this);
         getServer().getPluginManager().registerEvents(new EventBridge(this), this);
+        if (config.recordEvents()) {
+            events = new EventTap(this);
+            events.start();
+        }
         hub = new HubClient(() -> HubConfig.load(HubConfig.defaultHome()), this::hello, dispatcher, new HubClient.Listener() {
             @Override public void onConnected(String instanceId) { onHubConnected(instanceId); }
             @Override public void onDisconnected(String reason) {
@@ -61,6 +67,7 @@ public final class CraftwirePlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (events != null) events.stop();
         if (bots != null) bots.shutdown();
         if (scripts != null) scripts.close();
         if (hub != null) hub.close();
@@ -101,6 +108,11 @@ public final class CraftwirePlugin extends JavaPlugin {
 
     public ScriptEngine scripts() {
         return scripts;
+    }
+
+    /** The event recorder, or null when record-events is off. */
+    public EventTap events() {
+        return events;
     }
 
     public BotManager bots() {

@@ -5,8 +5,10 @@ import com.google.gson.JsonObject;
 import com.uxplima.craftwire.core.AgentError;
 import com.uxplima.craftwire.paper.Args;
 import com.uxplima.craftwire.paper.Sync;
+import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import net.minecraft.network.protocol.game.ServerboundChatCommandPacket;
 import net.minecraft.network.protocol.game.ServerboundSetCarriedItemPacket;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.phys.Vec3;
@@ -50,8 +52,12 @@ public final class BotActions {
         };
     }
 
-    private record Ran(Bot bot, boolean success) {}
+    private record Ran(Bot bot, boolean known, CommandWatch watch) {}
 
+    /**
+     * Sends the command the way a client does (the chat-command packet), so PlayerCommandPreprocessEvent fires and
+     * command blockers, aliases and loggers see bot commands. success = the command exists and no plugin cancelled it.
+     */
     private static CompletableFuture<JsonElement> command(JsonObject p, BotManager bots, Sync sync, String name) {
         String raw = Args.string(p, "command").strip();
         String command = raw.startsWith("/") ? raw.substring(1) : raw;
@@ -59,16 +65,26 @@ public final class BotActions {
         long started = System.currentTimeMillis();
         return sync.global(() -> {
                     Bot b = bots.get(name);
-                    return new Ran(b, b.bukkit().performCommand(command));
+                    String label = command.split(" ", 2)[0].toLowerCase(Locale.ROOT);
+                    boolean known = Bukkit.getCommandMap().getCommand(label) != null;
+                    CommandWatch watch = CommandWatch.start(bots.plugin(), b.uuid());
+                    b.listener().handleChatCommand(new ServerboundChatCommandPacket(command));
+                    return new Ran(b, known, watch);
                 })
-                .thenCompose(r -> CompletableFuture.supplyAsync(() -> r, CompletableFuture.delayedExecutor(collectMs, TimeUnit.MILLISECONDS)))
-                .thenApply(r -> {
+                .thenCompose(r -> CompletableFuture.supplyAsync(() -> r, CompletableFuture.delayedExecutor(Math.max(collectMs, 50L), TimeUnit.MILLISECONDS)))
+                .thenCompose(r -> sync.global(() -> {
+                    r.watch().stop();
+                    Boolean cancelled = r.watch().cancelled();
                     JsonObject o = new JsonObject();
                     o.addProperty("command", command);
-                    o.addProperty("success", r.success());
+                    o.addProperty("success", r.known() && Boolean.FALSE.equals(cancelled));
+                    if (Boolean.TRUE.equals(cancelled)) o.addProperty("cancelled", true);
+                    if (!r.known()) o.addProperty("unknown", true);
+                    String finalText = r.watch().message();
+                    if (finalText != null && !finalText.equals("/" + command)) o.addProperty("rewrittenTo", finalText);
                     o.add("messages", BotJson.messages(r.bot().inbox().since(started, 200)));
-                    return o;
-                });
+                    return (JsonElement) o;
+                }));
     }
 
     private static JsonElement look(Bot b, JsonObject p) {

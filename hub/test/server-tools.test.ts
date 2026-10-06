@@ -18,6 +18,7 @@ describe("server tools", () => {
     ["world_query", "world.query", { action: "block", x: 1, y: 2, z: 3 }],
     ["world_edit", "world.edit", { action: "fill", min: { x: 0, y: 0, z: 0 }, max: { x: 1, y: 1, z: 1 }, block: "stone" }],
     ["server_info", "server.info", {}],
+    ["events", "events", { action: "query", type: "PlayerJoinEvent", since: 5 }],
     ["plugin_manage", "plugin.manage", { action: "list" }],
   ];
 

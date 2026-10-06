@@ -49,6 +49,17 @@ class BotActionsIT {
     }
 
     @Test
+    void commandsGoThroughTheCommandPacketSoPluginsCanBlockThem() throws Exception {
+        JsonObject blocked = act("{\"bot\":\"Act\",\"action\":\"command\",\"command\":\"/cwfixture blocked\",\"collectMs\":300}");
+        assertFalse(blocked.get("success").getAsBoolean(), blocked.toString());
+        assertTrue(blocked.get("cancelled").getAsBoolean(), blocked.toString());
+        assertTrue(blocked.getAsJsonArray("messages").toString().contains("fixture: blocked"));
+        JsonObject unknown = act("{\"bot\":\"Act\",\"action\":\"command\",\"command\":\"/nosuchcommand\",\"collectMs\":300}");
+        assertFalse(unknown.get("success").getAsBoolean());
+        assertTrue(unknown.get("unknown").getAsBoolean(), unknown.toString());
+    }
+
+    @Test
     void moveToWalksToTheTarget() throws Exception {
         JsonObject r = act("{\"bot\":\"Act\",\"action\":\"move_to\",\"x\":10.5,\"y\":-60,\"z\":0.5}");
         assertTrue(r.get("reached").getAsBoolean(), r.toString());

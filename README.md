@@ -53,6 +53,8 @@ Every picture on this page was taken by Craftwire itself, through the tools belo
 - `server_command` runs console commands and returns their output. `server_eval` runs JavaScript with the full Bukkit API.
 - `world_query` and `world_edit` read and change blocks, and take snapshots you can restore.
 - `server_process` starts, stops and restarts a local Paper server. It never accepts the EULA for you.
+- `events` records every Bukkit event, your plugin's own events included: what fired, with which values, whether it ended up cancelled, and which plugins listen to it.
+- `exceptions` groups the stack traces of the server and the clients into distinct bugs, with a count and the plugin and line to blame.
 - `plugin_deploy` builds your plugin (Gradle or Maven), swaps the jar, restarts the server and reports whether the plugin enabled and what it logged. Compiler errors come back as `file:line`.
 
 > *"Build my plugin, deploy it to ~/servers/test, spawn two bots, have one open /shop and buy the first item, and tell me what the plugin answered."*
@@ -146,9 +148,9 @@ Then ask your AI: *"take a screenshot of what I'm looking at"* or *"what's the T
 
 | Area | Tools |
 |---|---|
-| Hub | `list_instances` · `wait_for` · `get_request_status` · `logs` |
+| Hub | `list_instances` · `wait_for` · `get_request_status` · `logs` · `exceptions` |
 | Client | `screenshot` · `camera` · `gui_read` · `gui_action` · `input` · `chat` · `hud_read` · `player_state` · `client_settings` |
-| Server | `server_command` · `server_eval` · `world_query` · `world_edit` · `server_info` · `plugin_manage` |
+| Server | `server_command` · `server_eval` · `world_query` · `world_edit` · `server_info` · `plugin_manage` · `events` |
 | Dev loop | `server_process` · `plugin_deploy` · `client_process` |
 | Bots | `bot_spawn` · `bot_action` · `bot_remove` |
 | CLI | `npx craftwire setup` · `npx craftwire doctor` |

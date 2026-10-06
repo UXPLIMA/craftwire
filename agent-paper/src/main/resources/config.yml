@@ -11,3 +11,6 @@ allow-world-edit: true
 allow-bots: true
 # Largest box, in blocks, that one world_edit call may change.
 max-edit-volume: 1000000
+# events: record every Bukkit event (counts, details, cancellations) for the events tool and wait_for.
+# Events Paper only fires while listened to (entity movement, physics, ticks) are recorded only when watched.
+record-events: true

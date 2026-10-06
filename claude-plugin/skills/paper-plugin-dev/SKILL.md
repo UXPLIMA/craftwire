@@ -20,7 +20,8 @@ description: Use when developing or debugging a Paper/Bukkit plugin with the cra
    - `AMBIGUOUS_JAR`: multi-module project; pass `jarGlob`, e.g. `"my-plugin/build/libs/*-all.jar"`.
    - `NOT_MANAGED`: the user started this server outside Craftwire. Ask before passing `takeOver:true` — it stops their server.
      If the message says something listens on the server's port, it runs without the Craftwire plugin: ask the user to stop it from its console, then deploy again.
-3. Check: `logs {level:"WARN"}`, `server_command` for the plugin's commands, `server_eval` to inspect state (`plugin('Name')`), and the client tools (`screenshot`, `gui_read`) for anything a player sees.
+3. Check: `exceptions` (new bugs since the deploy, grouped, with the plugin and frame to blame), `logs {level:"WARN"}`, `server_command` for the plugin's commands, `server_eval` to inspect state (`plugin('Name')`), and the client tools (`screenshot`, `gui_read`) for anything a player sees.
+   - Something did not happen? `events {action:"query", type:"<Event>"}` shows whether the event fired and was cancelled, and `events {action:"listeners", type}` which plugin cancelled it.
    - No game open? `client_process {action:"start"}` runs a hidden client that joins this server (it needs `online-mode=false`), so `screenshot` and `gui_read` work without the user; `client_process {action:"stop"}` afterwards.
    - No client needed for most checks: `bot_spawn`, then `bot_action` to run the plugin's commands, click its menus (`gui_read`/`gui_click`), use items or blocks, read what the plugin sent (`messages`) and what it put on screen (`hud_read`: sidebar lines, tab header/footer and names, boss bars, titles, action bar). Remove bots afterwards.
 4. Repeat. Keep `restart:true` (default): Paper cannot reload plugins safely.

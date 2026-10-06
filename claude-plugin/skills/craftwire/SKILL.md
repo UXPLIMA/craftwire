@@ -1,6 +1,6 @@
 ---
 name: craftwire
-description: Use when driving Minecraft or a Paper server through the craftwire MCP tools (screenshot, camera, gui_*, input, chat, server_command, server_eval, world_query, world_edit, logs, wait_for, server_process, plugin_deploy, client_process, bot_spawn, bot_action) — covers the reliable order of calls, menus, server scripting, safe world edits and recovering from errors.
+description: Use when driving Minecraft or a Paper server through the craftwire MCP tools (screenshot, camera, gui_*, input, chat, server_command, server_eval, world_query, world_edit, logs, exceptions, events, wait_for, server_process, plugin_deploy, client_process, bot_spawn, bot_action) — covers the reliable order of calls, menus, server scripting, safe world edits and recovering from errors.
 ---
 
 # Driving Minecraft with Craftwire
@@ -35,6 +35,8 @@ If `gui_action` returns `SLOT_OUT_OF_RANGE` or `NO_SCREEN_OPEN`, the screen chan
 - `server_eval` for anything without a command: `server`, `player(name)`, `plugin(name)`, `loc(x,y,z)`, `Java.type(...)`, `print(...)`. Scripts run on the server thread with a 5 s default timeout, so keep loops small. Keep values on `globalThis`; top-level `let/const` cannot be re-declared on the next run.
 - `world_query` before editing. `world_edit` edits over 32768 blocks return a `snapshotId`; `world_edit {action:"restore", id}` undoes them. Take an explicit `snapshot` before any risky change.
 - `logs {level:"WARN"}` after (re)enabling a plugin; stack traces arrive folded into one entry.
+- `exceptions` groups every stack trace the server and clients logged into distinct bugs, with a count, the first own frame (`origin`) and the plugin to blame; `exceptions {id}` returns the latest full trace. Call it after a test run with `since` set to when the run started.
+- `events {action:"summary"}` counts every Bukkit event that fired (also plugins' own events); `events {action:"query", type:"PlayerInteractEvent", player:"Bot1"}` shows their values and whether they ended up cancelled; `events {action:"listeners", type}` shows which plugins listen, at what priority. Busy events (movement, physics, ticks) are recorded only after `events {action:"watch", types:[…]}`.
 
 ## Dev loop (local server)
 - `server_process {action:"start"|"stop"|"restart"|"status", serverDir}` runs a local Paper server under the hub; `start` returns when `Done (` was printed and the Craftwire plugin connected.

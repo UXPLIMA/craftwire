@@ -62,6 +62,19 @@ export function registerServerTools(server: McpServer, ctx: ToolContext): void {
       physics: z.boolean().default(false),
     }, call("world.edit", 120_000));
 
+  defineTool(server, ctx, "events",
+    "What Bukkit events fired on the server, recorded at MONITOR priority so `cancelled` is the final outcome. summary {since?}: counts per type (and how many ended cancelled). query {type?, player?, since?, cancelledOnly?, limit?}: recent events with their values (getters: numbers, text, enums, blocks as type@x,y,z, items as type xN, players by name). listeners {type}: which plugins listen to an event, at what priority, and whether they skip cancelled events — check this when a listener seems not to run. watch {types}: also record busy events that are skipped by default (EntityMoveEvent, BlockPhysicsEvent, tick events…). A plugin's own events are recorded from their first call. Use since = the time a test step started.",
+    {
+      ...targetArgs,
+      action: z.enum(["summary", "query", "listeners", "watch"]),
+      type: z.string().optional().describe("Event type: simple (PlayerInteractEvent) or full class name. query: a substring of the simple name also matches."),
+      types: z.array(z.string()).max(50).optional().describe("watch: event types to start recording."),
+      player: z.string().optional().describe("query: only events about this player (bots included)."),
+      since: z.number().optional().describe("Epoch ms; only events at or after it."),
+      cancelledOnly: z.boolean().optional(),
+      limit: z.number().int().min(1).max(500).default(50),
+    }, call("events"));
+
   defineTool(server, ctx, "server_info",
     "Server health and metadata: TPS (1/5/15 min), MSPT, memory, versions, online players, worlds and plugins.",
     { ...targetArgs }, call("server.info"));

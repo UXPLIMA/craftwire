@@ -6,6 +6,7 @@ import type { AuditLog } from "../audit.js";
 import type { ClientManager } from "../client/client-manager.js";
 import type { ServerManager } from "../dev/server-manager.js";
 import { CraftwireError, toToolError } from "../errors.js";
+import type { ExceptionTracker } from "../exceptions.js";
 import type { OperationTracker } from "../operations.js";
 
 export interface ToolContext {
@@ -14,6 +15,7 @@ export interface ToolContext {
   audit: AuditLog;
   servers: ServerManager;
   clients: ClientManager;
+  exceptions: ExceptionTracker;
 }
 
 export const targetArgs = {
