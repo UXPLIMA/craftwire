@@ -74,6 +74,8 @@ export class AgentServer extends EventEmitter {
 
   constructor(private readonly opts: AgentServerOptions) {
     super();
+    // Every MCP session (several with craftwire serve) listens for resource updates.
+    this.setMaxListeners(0);
   }
 
   async listen(): Promise<number> {

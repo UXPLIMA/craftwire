@@ -1,6 +1,7 @@
 {
   "name": "craftwire",
   "version": "0.6.1",
+  "mcpName": "io.github.uxplima/craftwire",
   "description": "MCP hub that lets AI agents see and drive Minecraft (Craftwire by UXPLIMA)",
   "license": "MIT",
   "repository": { "type": "git", "url": "git+https://github.com/uxplima/craftwire.git", "directory": "hub" },
@@ -14,7 +15,8 @@
   "files": [
     "dist",
     "skills",
-    "agent"
+    "agent",
+    "docs"
   ],
   "engines": {
     "node": ">=20"
@@ -22,7 +24,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "prepack": "npm run build && node scripts/copy-skills.mjs && node scripts/copy-agent.mjs",
+    "prepack": "npm run build && node scripts/copy-skills.mjs && node scripts/copy-agent.mjs && node scripts/copy-docs.mjs",
     "test": "vitest run",
     "test:e2e": "vitest run --config vitest.e2e.config.ts"
   },
