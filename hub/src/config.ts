@@ -43,3 +43,16 @@ export function tokensEqual(a: string, b: string): boolean {
   const bb = Buffer.from(b);
   return ba.length === bb.length && timingSafeEqual(ba, bb);
 }
+
+/** A setup mistake the user has to fix; the CLI prints only its message. */
+export class ConfigError extends Error {}
+
+/** The hub's port: CRAFTWIRE_PORT, or 47821. 0 picks a free port (tests). */
+export function hubPort(value: string | undefined = process.env.CRAFTWIRE_PORT): number {
+  if (value === undefined || value.trim() === "") return 47821;
+  const port = /^\d+$/.test(value.trim()) ? Number(value.trim()) : NaN;
+  if (!Number.isInteger(port) || port > 65535) {
+    throw new ConfigError(`CRAFTWIRE_PORT must be a port number (0-65535), got "${value}". Fix or unset it in the MCP server's env.`);
+  }
+  return port;
+}

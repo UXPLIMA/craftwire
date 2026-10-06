@@ -3,7 +3,7 @@ import { join, resolve } from "node:path";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { AgentServer } from "./agents.js";
 import { AuditLog } from "./audit.js";
-import { craftwireHome, loadOrCreateToken, writeHubConfig } from "./config.js";
+import { ConfigError, craftwireHome, hubPort, loadOrCreateToken, writeHubConfig } from "./config.js";
 import { ServerManager } from "./dev/server-manager.js";
 import { formatChecks, runDoctor } from "./doctor.js";
 import { OperationTracker } from "./operations.js";
@@ -15,7 +15,7 @@ const log = (msg: string) => process.stderr.write(`[craftwire] ${msg}\n`);
 async function main(): Promise<void> {
   const home = craftwireHome();
   const token = loadOrCreateToken(home);
-  const agents = new AgentServer({ token, port: Number(process.env.CRAFTWIRE_PORT ?? 47821) });
+  const agents = new AgentServer({ token, port: hubPort() });
   const port = await agents.listen();
   writeHubConfig({ port, token }, home);
   agents.on("connected", (i) => log(`${i.id} connected (${i.name}, Minecraft ${i.mcVersion}, agent ${i.agentVersion})`));
@@ -51,7 +51,7 @@ async function doctor(args: string[]): Promise<void> {
 
 const argv = process.argv.slice(2);
 const fatal = (e: unknown) => {
-  log(`fatal: ${e instanceof Error ? e.stack ?? e.message : String(e)}`);
+  log(`fatal: ${e instanceof ConfigError ? e.message : e instanceof Error ? e.stack ?? e.message : String(e)}`);
   process.exit(1);
 };
 if (argv[0] === "doctor") doctor(argv.slice(1)).catch(fatal);

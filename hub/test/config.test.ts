@@ -2,12 +2,23 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { craftwireHome, loadOrCreateToken, tokensEqual, writeHubConfig } from "../src/config.js";
+import { ConfigError, craftwireHome, hubPort, loadOrCreateToken, tokensEqual, writeHubConfig } from "../src/config.js";
 
 const tmp = () => mkdtempSync(join(tmpdir(), "cw-"));
 
 describe("config", () => {
   afterEach(() => { delete process.env.CRAFTWIRE_HOME; });
+
+  it("reads the hub port from CRAFTWIRE_PORT and rejects junk with a clear message", () => {
+    expect(hubPort(undefined)).toBe(47821);
+    expect(hubPort("")).toBe(47821);
+    expect(hubPort("50000")).toBe(50000);
+    expect(hubPort("0")).toBe(0);
+    for (const bad of ["abc", "47821x", "70000", "-1", "1.5"]) {
+      expect(() => hubPort(bad)).toThrow(ConfigError);
+      expect(() => hubPort(bad)).toThrow(/CRAFTWIRE_PORT/);
+    }
+  });
 
   it("honours CRAFTWIRE_HOME", () => {
     process.env.CRAFTWIRE_HOME = "/x/y";
