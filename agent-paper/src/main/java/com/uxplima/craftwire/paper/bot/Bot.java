@@ -5,8 +5,11 @@ import com.mojang.authlib.GameProfile;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicInteger;
 import net.minecraft.network.Connection;
+import net.minecraft.network.protocol.game.ServerboundAcceptTeleportationPacket;
 import net.minecraft.network.protocol.game.ServerboundClientCommandPacket;
+import net.minecraft.network.protocol.game.ServerboundPlayerLoadedPacket;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ClientInformation;
 import net.minecraft.server.level.ServerLevel;
@@ -27,16 +30,19 @@ public final class Bot {
     private final Connection connection;
     private final ServerGamePacketListenerImpl listener;
     private final BotInbox inbox;
+    private final AtomicInteger pendingTeleport;
     private int sequence;
     private int deadTicks;
     private Move move;
 
-    private Bot(String name, UUID uuid, Connection connection, ServerGamePacketListenerImpl listener, BotInbox inbox) {
+    private Bot(String name, UUID uuid, Connection connection, ServerGamePacketListenerImpl listener, BotInbox inbox,
+            AtomicInteger pendingTeleport) {
         this.name = name;
         this.uuid = uuid;
         this.connection = connection;
         this.listener = listener;
         this.inbox = inbox;
+        this.pendingTeleport = pendingTeleport;
     }
 
     /** Joins the server like a client would (join event, tab list, player data), then moves to `at`. */
@@ -47,11 +53,13 @@ public final class Bot {
         UUID uuid = UUID.nameUUIDFromBytes(("OfflinePlayer:" + name).getBytes(StandardCharsets.UTF_8));
         GameProfile profile = new GameProfile(uuid, name);
         BotInbox inbox = new BotInbox(200);
-        Connection connection = FakeConnection.create(inbox);
+        AtomicInteger pendingTeleport = new AtomicInteger(-1);
+        Connection connection = FakeConnection.create(inbox, pendingTeleport);
         ServerPlayer player = new ServerPlayer(server, level, profile, ClientInformation.createDefault());
         server.getPlayerList().placeNewPlayer(connection, player, CommonListenerCookie.createInitial(profile, false));
-        Bot bot = new Bot(name, uuid, connection, player.connection, inbox);
+        Bot bot = new Bot(name, uuid, connection, player.connection, inbox, pendingTeleport);
         bot.bukkit().teleport(at);
+        bot.settle();
         return bot;
     }
 
@@ -81,10 +89,22 @@ public final class Bot {
             return true;
         }
         deadTicks = 0;
+        settle();
         if (move != null) steer(p, now);
         // A real client's movement packets make the server tick the player; a bot has none, so tick it here.
         p.doTick();
         return true;
+    }
+
+    /**
+     * Sends what a real client sends on its own: the teleport confirmation after every server-side move (join,
+     * /tp, respawn) and "world loaded" after joining or respawning. Until then the server ignores the player's
+     * block and entity interactions.
+     */
+    void settle() {
+        int teleport = pendingTeleport.getAndSet(-1);
+        if (teleport >= 0) listener.handleAcceptTeleportPacket(new ServerboundAcceptTeleportationPacket(teleport));
+        if (!listener.hasClientLoaded()) listener.handleAcceptPlayerLoad(new ServerboundPlayerLoadedPacket());
     }
 
     /** Leaves the server now (quit event, player data saved). */

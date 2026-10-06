@@ -84,6 +84,31 @@ public final class BotJson {
         return o;
     }
 
+    /** The bot's open menu in the same shape as the client gui_read; open:false when no menu is open. */
+    public static JsonObject gui(Bot b) {
+        InventoryView view = b.bukkit().getOpenInventory();
+        JsonObject o = new JsonObject();
+        boolean open = menuOpen(view);
+        o.addProperty("open", open);
+        if (!open) return o;
+        o.addProperty("title", plain(view.title()));
+        o.addProperty("type", view.getType().name());
+        int count = view.countSlots();
+        o.addProperty("slotCount", count);
+        int topSize = view.getTopInventory().getSize();
+        JsonArray slots = new JsonArray();
+        for (int raw = 0; raw < count; raw++) {
+            ItemStack s = view.getItem(raw);
+            if (s == null || s.getType().isAir()) continue;
+            JsonObject it = item(s);
+            it.addProperty("slot", raw);
+            it.addProperty("container", raw < topSize ? "menu" : "player");
+            slots.add(it);
+        }
+        o.add("slots", slots);
+        return o;
+    }
+
     /** A player's own inventory counts as "open" to Bukkit; only a real menu (chest, plugin GUI, …) counts here. */
     static boolean menuOpen(InventoryView view) {
         return view.getTopInventory().getType() != InventoryType.CRAFTING;
