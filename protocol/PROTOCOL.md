@@ -29,3 +29,20 @@ Server methods (M4, bots; `allow-bots` gates all three):
 - `bot.remove` `{name}` or `{all: true}` → `{removed: [names]}`
 - `bot.action` `{bot, action, …}`. Actions: chat, command, messages, look, move_to, state, give, select_hotbar, gui_read, gui_click, gui_close, use, attack (parameters as in the `bot_action` tool).
 `world.query players` rows carry `bot: true` for bots.
+
+M6 (protocol version unchanged; a hub sends these only to agents that have them, and older agents answer `UNKNOWN_METHOD`):
+
+Event types:
+- `tools` `{tools: [{name, namespace, description, inputSchema}]}` (both agents): the extension tools plugins and mods registered through `craftwire-api`. The full list, sent on every connect and whenever it changes; the hub drops an instance's tools when it disconnects.
+
+Methods, both agents:
+- `ext.call` `{tool, args}` → the tool's JSON result. Errors: `EXTENSION_NOT_FOUND`, `EXTENSION_FAILED` (a bug in the tool, logged with its stack), or the tool's own `ToolException` code.
+
+Client methods:
+- `world.open` `{name, create?: {type?: normal|flat|void, seed?, gameMode?, difficulty?, cheats?}}` → `{name, created}` once loading has been started (`opening: true` when that world is already loading). `NOT_READY` while the client is still starting; `WORLD_NOT_FOUND`, `WORLD_EXISTS`, `ALREADY_IN_WORLD`.
+
+Server methods:
+- `events` `{action: summary|query|listeners|watch, type?, types?, player?, since?, limit?, cancelledOnly?}` (`record-events` gates it)
+- `wait` `{condition: block|player_near|inventory|event|message|expr, timeoutMs, …}` → `{matched: true, condition, elapsedMs, value}` or, at the timeout, `{matched: false, condition, elapsedMs, last}`. Tick conditions are checked every server tick; `event` and `message` count only what happens after the call.
+- `world.render` `{x1, z1, x2, z2, world?, view?: top|slice|side, y?, facing?, y1?, y2?, scale?, grid?, players?, generate?}` → `{mime, data (base64 PNG), width, height, view, region, scale, origin {x, y}, orientation, unloadedColumns?, players?}`
+- `bot.action command` now sends the command packet: the result adds `cancelled`, `unknown` and `rewrittenTo`.
