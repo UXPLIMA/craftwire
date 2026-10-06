@@ -39,7 +39,7 @@ export function registerBotTools(server: McpServer, ctx: ToolContext): void {
     async (args, c) => ok(await forward(c, "server", "bot.remove", args.all ? { ...args, name: undefined } : args)));
 
   defineTool(server, ctx, "bot_action",
-    "Drive a bot. chat {text}. command {command, collectMs} returns the messages the bot received. messages {since?, limit?}. look {yaw,pitch} or {x,y,z}. move_to {x,y,z, tolerance?, sprint?, timeoutMs?} walks in a straight line (jumps 1-block steps) and returns reached + reason (arrived; height = right x/z but the target y is not where the bot can stand; stuck; timeout; died). state: position, health, held item, inventory, open menu. give {item, count} (ids like diamond_sword, components allowed). select_hotbar {slot 0-8}. gui_read / gui_click {slot, click: left|right|shift} / gui_close for plugin menus (slots as in gui_read; gui_click returns the menu after the plugin reacted). use: right-click with the held item — {block:{x,y,z}, face} on a block, {entity: uuid} on an entity, or nothing for the air. attack {entity: uuid} or {type: 'zombie'} (nearest within reach). Actions go through the server's packet handlers, so plugins see the same events as from a real client.",
+    "Drive a bot. chat {text}. command {command, collectMs} returns the messages the bot received. messages {since?, limit?}. look {yaw,pitch} or {x,y,z}. move_to {x,y,z, tolerance?, sprint?, timeoutMs?} walks in a straight line (jumps 1-block steps) and returns reached + reason (arrived; height = right x/z but the target y is not where the bot can stand; stuck; timeout; died). state: position, health, held item, inventory, open menu. give {item, count} (ids like diamond_sword, components allowed). select_hotbar {slot 0-8}. gui_read / gui_click {slot, click: left|right|shift} / gui_close for plugin menus (slots as in gui_read; gui_click returns the menu after the plugin reacted; with inventory:true and no menu open they act on the bot's own inventory like a player pressing E: 5-8 armour, 9-35 main, 36-44 hotbar, 45 offhand). use: right-click with the held item — {block:{x,y,z}, face} on a block, {entity: uuid} on an entity, or nothing for the air. attack {entity: uuid} or {type: 'zombie'} (nearest within reach). Actions go through the server's packet handlers, so plugins see the same events as from a real client.",
     {
       ...targetArgs,
       bot: z.string().min(1),
@@ -58,6 +58,7 @@ export function registerBotTools(server: McpServer, ctx: ToolContext): void {
       count: z.number().int().min(1).max(2304).optional(),
       slot: z.number().int().min(0).optional(),
       click: z.enum(["left", "right", "shift"]).optional(),
+      inventory: z.boolean().optional(),
       settleMs: z.number().int().min(0).max(5000).optional(),
       hand: z.enum(["main", "off"]).optional(),
       block: z.object({ x: z.number().int(), y: z.number().int(), z: z.number().int() }).optional(),

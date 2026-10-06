@@ -84,16 +84,22 @@ public final class BotJson {
         return o;
     }
 
-    /** The bot's open menu in the same shape as the client gui_read; open:false when no menu is open. */
-    public static JsonObject gui(Bot b) {
+    /**
+     * The bot's open menu in the same shape as the client gui_read; open:false when no menu is open. With
+     * `inventory`, and no menu open, the bot's own inventory as a player sees it with E (raw slots: 5-8 armour,
+     * 9-35 main, 36-44 hotbar, 45 offhand).
+     */
+    public static JsonObject gui(Bot b, boolean inventory) {
         InventoryView view = b.bukkit().getOpenInventory();
         JsonObject o = new JsonObject();
         boolean open = menuOpen(view);
         o.addProperty("open", open);
-        if (!open) return o;
-        o.addProperty("title", plain(view.title()));
+        if (!open && !inventory) return o;
+        if (!open) o.addProperty("inventory", true);
+        o.addProperty("title", open ? plain(view.title()) : "Inventory");
         o.addProperty("type", view.getType().name());
-        int count = view.countSlots();
+        // The server's own slot list: Bukkit's countSlots() can count more slots than the menu has raw indices.
+        int count = b.player().containerMenu.slots.size();
         o.addProperty("slotCount", count);
         int topSize = view.getTopInventory().getSize();
         JsonArray slots = new JsonArray();

@@ -57,6 +57,20 @@ class BotGuiIT {
     }
 
     @Test
+    void theBotsOwnInventoryCanBeReadAndClickedWithoutAMenu() throws Exception {
+        act("{\"bot\":\"Gui\",\"action\":\"give\",\"item\":\"stone\",\"count\":5}");
+        JsonObject inv = act("{\"bot\":\"Gui\",\"action\":\"gui_read\",\"inventory\":true}");
+        assertEquals("Inventory", inv.get("title").getAsString(), inv.toString());
+        assertEquals(36, inv.getAsJsonArray("slots").get(0).getAsJsonObject().get("slot").getAsInt(), "hotbar slot 0 is raw slot 36");
+        // shift-click moves the stack from the hotbar into the main inventory, as for a player with E open
+        JsonObject r = act("{\"bot\":\"Gui\",\"action\":\"gui_click\",\"inventory\":true,\"slot\":36,\"click\":\"shift\"}");
+        JsonObject moved = r.getAsJsonObject("gui").getAsJsonArray("slots").get(0).getAsJsonObject();
+        assertTrue(moved.get("slot").getAsInt() >= 9 && moved.get("slot").getAsInt() <= 35, r.toString());
+        assertEquals(5, moved.get("count").getAsInt());
+        assertEquals("NO_SCREEN_OPEN", hub.error("bot.action", "{\"bot\":\"Gui\",\"action\":\"gui_click\",\"slot\":36}").get("code").getAsString());
+    }
+
+    @Test
     void guiCloseAndSlotRange() throws Exception {
         act("{\"bot\":\"Gui\",\"action\":\"command\",\"command\":\"cwfixture menu\",\"collectMs\":100}");
         assertEquals("SLOT_OUT_OF_RANGE", hub.error("bot.action", "{\"bot\":\"Gui\",\"action\":\"gui_click\",\"slot\":999}").get("code").getAsString());

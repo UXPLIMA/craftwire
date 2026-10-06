@@ -37,16 +37,17 @@ final class BotGuiActions {
 
     static CompletableFuture<JsonElement> run(String action, JsonObject p, BotManager bots, Sync sync, String name) {
         return switch (action) {
-            case "gui_read" -> sync.global(() -> (JsonElement) BotJson.gui(bots.get(name)));
+            case "gui_read" -> sync.global(() -> (JsonElement) BotJson.gui(bots.get(name), Args.bool(p, "inventory", false)));
             case "gui_click" -> {
                 long settleMs = Math.clamp(Args.optLong(p, "settleMs").orElse(150L), 0L, 5000L);
                 String click = Args.optString(p, "click").orElse("left");
-                yield sync.global(() -> click(bots.get(name), Args.integer(p, "slot"), click))
+                boolean inventory = Args.bool(p, "inventory", false);
+                yield sync.global(() -> click(bots.get(name), Args.integer(p, "slot"), click, inventory))
                         .thenCompose(v -> CompletableFuture.supplyAsync(() -> v, CompletableFuture.delayedExecutor(settleMs, TimeUnit.MILLISECONDS)))
                         .thenCompose(v -> sync.global(() -> {
                             JsonObject r = new JsonObject();
                             r.addProperty("clicked", v);
-                            r.add("gui", BotJson.gui(bots.get(name)));
+                            r.add("gui", BotJson.gui(bots.get(name), inventory));
                             return (JsonElement) r;
                         }));
             }
@@ -63,9 +64,10 @@ final class BotGuiActions {
         return b;
     }
 
-    private static int click(Bot b, int slot, String click) {
+    private static int click(Bot b, int slot, String click, boolean inventory) {
         if (!click.equals("left") && !click.equals("right") && !click.equals("shift")) throw Args.invalid("click must be left, right or shift");
-        requireMenu(b);
+        // With no menu open, containerMenu is the bot's own inventory (container 0), as with E on a client.
+        if (!inventory) requireMenu(b);
         AbstractContainerMenu menu = b.player().containerMenu;
         if (slot < 0 || slot >= menu.slots.size()) {
             throw new AgentError("SLOT_OUT_OF_RANGE", "Slot " + slot + " is outside 0.." + (menu.slots.size() - 1),
@@ -90,7 +92,7 @@ final class BotGuiActions {
     private static void requireMenu(Bot b) {
         if (!BotJson.menuOpen(b.bukkit().getOpenInventory())) {
             throw new AgentError("NO_SCREEN_OPEN", b.name() + " has no menu open",
-                    "Open one first, e.g. bot_action {action:'command'} with the plugin's menu command.");
+                    "Open one first, e.g. bot_action {action:'command'} with the plugin's menu command, or pass inventory:true for the bot's own inventory.");
         }
     }
 
