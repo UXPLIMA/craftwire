@@ -1,6 +1,6 @@
 ---
 name: craftwire
-description: Use when driving Minecraft or a Paper server through the craftwire MCP tools (screenshot, camera, gui_*, input, chat, server_command, server_eval, world_query, world_edit, logs, exceptions, events, wait_for, server_process, plugin_deploy, client_process, bot_spawn, bot_action) — covers the reliable order of calls, menus, server scripting, safe world edits and recovering from errors.
+description: Use when driving Minecraft or a Paper server through the craftwire MCP tools (screenshot, camera, gui_*, input, chat, server_command, server_eval, world_query, world_edit, logs, exceptions, events, wait_for, server_process, plugin_deploy, client_process, bot_spawn, bot_action, profile, trace, client_eval) — covers the reliable order of calls, menus, server scripting, safe world edits and recovering from errors.
 ---
 
 # Driving Minecraft with Craftwire
@@ -57,9 +57,18 @@ If `gui_action` returns `SLOT_OUT_OF_RANGE` or `NO_SCREEN_OPEN`, the screen chan
 ## Bots (server-side fake players)
 - `bot_spawn {count}` (or `names`), then drive with `bot_action`. Bots are real players to plugins: permissions, join/quit, chat and click events all fire.
 - Menus: `bot_action {action:"command", command:"shop"}` → `gui_read` → `gui_click {slot}`; the click result already includes the menu after the plugin reacted. Read replies with `messages`.
-- Walking is straight-line (`move_to`): it hops one-block steps, and reports `stuck` at walls. Give waypoints for longer routes, or `server_command "minecraft:tp Bot1 x y z"`.
+- `move_to {x,y,z}` finds a path (around walls, up steps, down drops up to `maxFall`, through doors, up ladders, through water; never into lava or fire) within 256 blocks in loaded chunks. `reason: no_path` comes with `closest`; `partial:true` walks there. `path:false` walks straight.
+- `break_block {block}` digs like a survival player and returns `cancelledBy` when a plugin refused; `jump`, `sneak {on}`, `sprint {on}`, `drop {all}`, `swap_hands` fire the matching player events.
 - Bots skip the whitelist and bans, and leave no player files behind. They are not op: give permissions with the server's permission plugin, or `minecraft:op` if the test needs it.
 - Always `bot_remove {all:true}` when done.
+
+## Lag and slow code
+- `profile {durationMs}` while the slow thing happens (start the bots or the command first): `owners` says which plugin or mod uses the tick or frame, `entryPoints` which listener (and event) or task, `hotMethods` where, `ticks` the mspt.
+- `trace {method:"com.example.Shop::buy"}` then gives exact call counts, average and worst times, the slowest calls' stacks and the callers. Make the method run while tracing.
+- `client_eval {code}` runs JavaScript on a client (`mc`, `player`, `level`, `screen()`, `Java.type`) for mod and client state no other tool shows. The first call downloads GraalJS (a minute).
+
+## Resources and prompts
+`craftwire://instances/<name>/log`, `craftwire://exceptions`, `craftwire://docs/scenarios` and the rest are readable as MCP resources; the prompts `test_plugin`, `debug_lag`, `write_scenario` and `setup` start those workflows.
 
 ## Errors
 Every error has `code`, `message`, `hint` — follow the hint. `PAUSED_BY_USER` means the human pressed F8: stop and ask them. Use `operationId` on actions you may retry (clicks, commands) so a retry never runs twice.

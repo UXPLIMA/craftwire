@@ -21,7 +21,9 @@ const INSTRUCTIONS = [
   "Dev loop: server_process starts/stops a local Paper server; plugin_deploy builds a plugin project (or takes a jar), installs it, restarts the server and reports whether it enabled.",
   "scenario_run runs plugin tests written as JSON steps (bots, commands, checks) and reports the failing step with context.",
   "No game open? client_process starts a hidden client the hub runs itself (offline mode, for dev servers); then use the client tools on it.",
-  "Bots: bot_spawn puts fake players on a Paper server; bot_action drives them (chat, command, move_to, gui_read/gui_click, use, attack, …) so you can test plugins without a real client; bot_remove when done.",
+  "Bots: bot_spawn puts fake players on a Paper server; bot_action drives them (chat, command, move_to with pathfinding, break_block, gui_read/gui_click, use, attack, …) so you can test plugins without a real client; bot_remove when done.",
+  "Lag and slow code: profile samples a server's tick or a client's frame and names the plugin or mod, listener and method that use the time; trace times every call of a named method. client_eval runs JavaScript on a client (mods, client state).",
+  "Resources: craftwire://instances, craftwire://exceptions, craftwire://instances/{name}/log (and /chat, /screenshot on clients), craftwire://docs/{scenarios,extensions,http}. Prompts: test_plugin, debug_lag, write_scenario, setup.",
   "After an action that opens a menu (e.g. chat {action:'command'}), call wait_for {condition:'screen_open'} before gui_read. wait_for also waits on the server (a block, a player arriving, items, an event, a bot's message) instead of sleeping and polling.",
   "Errors carry a `hint` with the next step. Pass operationId on actions you might retry.",
 ].join(" ");

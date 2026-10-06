@@ -34,6 +34,9 @@ Once a flow works, keep it as a scenario so it is checked after every change: wr
 - A failure names the step, expected vs actual, and the bots' messages/HUD, events and new exceptions at that moment: read them before changing code. Full format: docs/scenarios.md in the Craftwire repo.
 - CI: `npx craftwire test tests --server <dir> --junit report.xml`.
 
+## When it lags
+`profile` during the slow part (bots walking, a minigame running) names the plugin, the listener and its event or the task, and the hot methods; `trace` that method for call counts and times; fix, redeploy, profile again to show the difference.
+
 ## Notes
 - `buildCommand` runs any build in projectDir. On Windows write wrappers with a path: `.\gradlew.bat shadowJar` (a bare `gradlew.bat` is not found from the hub's shell). `javaHome` sets the JDK for the build.
 - Replaced jars are kept in `plugins/.craftwire-backup/`.

@@ -44,7 +44,7 @@ Every picture on this page was taken by Craftwire itself, through the tools belo
 
 ### Bots that plugins treat as players
 
-`bot_spawn` puts fake players on the Paper server. They join with a join event and a tab-list entry. `bot_action` makes them chat, run commands (and returns what the server answered), walk, look, use items, attack, open and click plugin menus, and read their own HUD (scoreboard sidebar, tab list, boss bars, titles). Plugins see the same events a real client would cause, so you can test a shop, a minigame or a permission check without a second account.
+`bot_spawn` puts fake players on the Paper server. They join with a join event and a tab-list entry. `bot_action` makes them chat, run commands (and returns what the server answered), walk, look, use items, attack, break blocks, sneak, sprint, jump, drop items, open and click plugin menus, and read their own HUD (scoreboard sidebar, tab list, boss bars, titles). `move_to` finds a path: around walls, up steps, down drops, through doors and gates, up ladders and through water, never into lava or fire. Plugins see the same events a real client would cause, so you can test a shop, a minigame or a permission check without a second account.
 
 <img src="docs/images/bots.jpg" alt="Three bots named BuilderBot, MinerBot and ScoutBot standing in a meadow, holding items" width="100%">
 
@@ -59,6 +59,22 @@ Every picture on this page was taken by Craftwire itself, through the tools belo
 - `plugin_deploy` builds your plugin (Gradle or Maven), swaps the jar, restarts the server and reports whether the plugin enabled and what it logged. Compiler errors come back as `file:line`.
 
 > *"Build my plugin, deploy it to ~/servers/test, spawn two bots, have one open /shop and buy the first item, and tell me what the plugin answered."*
+
+### Find what makes the game lag
+
+`profile` samples the server's tick (or a client's frame) for a few seconds and tells you whose code uses the time: each plugin or mod by name, the listener and the event it handles or the scheduler task, the hot methods, and the tick times (average, p95, the slowest ticks). Mixins count for the mod that injected them. `trace` then times every call of one method without changing any code (Java Flight Recorder method tracing): call counts, average and worst times, and who called it.
+
+```jsonc
+// profile, trimmed
+{ "thread": "Server thread", "busyPercent": 31.4,
+  "owners": [ { "owner": "MyShop", "kind": "plugin", "percent": 18.2 }, { "owner": "minecraft", "kind": "minecraft", "percent": 9.1 } ],
+  "entryPoints": [ { "owner": "MyShop", "kind": "plugin", "method": "com.example.shop.MoveListener.onMove", "event": "PlayerMoveEvent", "percent": 17.9 } ],
+  "ticks": { "count": 200, "msptAvg": 15.7, "p95": 22.3, "over50ms": 0 } }
+```
+
+`client_eval` runs JavaScript on a client, like `server_eval` on a server: read a mod's state or the client's, call a method, check a value no other tool shows. Its engine (GraalJS) is downloaded on first use and checked against a sha256 list.
+
+> *"The server lags when players walk around. Spawn ten bots, make them walk, profile it and tell me which plugin is responsible and why."*
 
 ### Test your plugin with scenarios
 
@@ -178,7 +194,10 @@ Then ask your AI: *"take a screenshot of what I'm looking at"* or *"what's the T
 | Server | `server_command` · `server_eval` · `world_query` · `world_edit` · `world_render` · `server_info` · `plugin_manage` · `events` |
 | Dev loop | `server_process` · `plugin_deploy` · `client_process` · `scenario_run` |
 | Bots | `bot_spawn` · `bot_action` · `bot_remove` |
+| Debugging | `profile` · `trace` · `client_eval` |
 | CLI | `npx craftwire setup` · `npx craftwire doctor` · `npx craftwire test` · `npx craftwire serve` |
+
+Resources: `craftwire://instances`, `craftwire://exceptions`, each game's log (`craftwire://instances/<name>/log`), a client's chat and a fresh screenshot, and the docs (`craftwire://docs/scenarios`, `extensions`, `http`). Prompts: `test_plugin`, `debug_lag`, `write_scenario` and `setup`.
 
 Skills that teach the agent the workflows ship with the Claude Code plugin, and `setup` installs them for Codex and Gemini CLI:
 - `craftwire`: the tools in general.
@@ -199,6 +218,7 @@ The hub listens on `127.0.0.1` only. It writes its port and a random token to `~
 
 - **Use it on development servers only.** Anyone who can run the hub on your computer gets full control of the game and the server: console commands, JavaScript, world edits. The plugin logs a warning on every start.
 - The `plugins/Craftwire/config.yml` file has a switch for each risky feature: `allow-eval`, `allow-world-edit`, `allow-bots` and `max-edit-volume`. A disabled feature answers `PERMISSION_DISABLED`.
+- On a client, `client_eval` can be turned off with `allow-eval=false` in `config/craftwire.properties` (or `-Dcraftwire.allowEval=false`).
 - Bots skip the login checks (whitelist and bans). Their player data is deleted when they leave.
 - **F8** in the game stops all AI input until you press it again.
 

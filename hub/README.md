@@ -5,7 +5,8 @@
 This package is the MCP server (hub) of **Craftwire**. It lets AI agents **see and drive Minecraft**:
 - On a **Fabric client**: screenshots, a free camera, reading and clicking GUIs, chat, input and the HUD.
 - On a **Paper server**: console commands, JavaScript against the Bukkit API, world reads, edits and images, every event that fires, exceptions grouped into bugs, logs and plugin control.
-- A plugin dev loop, server-side bots, and plugin tests written as JSON scenarios (`npx craftwire test`).
+- A plugin dev loop, server-side bots that find their own path, and plugin tests written as JSON scenarios (`npx craftwire test`).
+- Profiling: which plugin or mod, listener and method makes the server or the game lag, and exact call times for one method.
 - Plugins and mods can add their own tools.
 
 Minecraft 26.2 & 26.3 · Fabric client · Paper server · MIT · by [UXPLIMA](https://github.com/uxplima)

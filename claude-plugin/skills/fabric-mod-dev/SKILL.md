@@ -30,6 +30,8 @@ No server needed? Pass `world` instead: `client_process {action:"start", mods:[�
    - Screens: open them with `input` (a key) or `chat {action:"command"}`, then `wait_for {condition:"screen_open"}` → `gui_read` → `gui_action`.
    - `logs {level:"WARN"}` for the client log, including mixin and loading errors.
    - `player_state` for position, health and inventory.
+   - `client_eval` for the mod's own state: `Java.type('com.example.MyMod')`, `mc`, `player`, `level`.
+   - Frame drops: `profile {instance}` names the mod (mixins count for the mod that injected them) and its hot methods; `trace` one of them.
 4. Repeat.
 
 ## Automate it

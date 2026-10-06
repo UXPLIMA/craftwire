@@ -46,3 +46,16 @@ Server methods:
 - `wait` `{condition: block|player_near|inventory|event|message|expr, timeoutMs, …}` → `{matched: true, condition, elapsedMs, value}` or, at the timeout, `{matched: false, condition, elapsedMs, last}`. Tick conditions are checked every server tick; `event` and `message` count only what happens after the call.
 - `world.render` `{x1, z1, x2, z2, world?, view?: top|slice|side, y?, facing?, y1?, y2?, scale?, grid?, players?, generate?}` → `{mime, data (base64 PNG), width, height, view, region, scale, origin {x, y}, orientation, unloadedColumns?, players?}`
 - `bot.action command` now sends the command packet: the result adds `cancelled`, `unknown` and `rewrittenTo`.
+
+M7 (protocol version unchanged; older agents answer `UNKNOWN_METHOD`):
+
+Methods, both agents:
+- `profile.run` `{durationMs? (1000-60000, 10000), intervalMs? (5-50, 10), top? (1-50, 15)}` samples the game thread (`Server thread` / `Render thread`) → `{thread, durationMs, intervalMs, samples, idleSamples, busyPercent, truncatedStacks, owners: [{owner, kind, samples, percent}], entryPoints: [{owner, kind, method, event?, task?, calledFrom?, percent}], hotMethods: [{method, owner, kind, percent}], ticks?: {count, msptAvg, p50, p95, max, over50ms, slowest: [{tick, ms, owners}]}, fps?: {avg, min}}`. `kind` is `plugin`, `mod`, `minecraft`, `server`, `loader`, `java`, `craftwire` or `library`. Ends with `CANCELLED` when the agent shuts down while sampling.
+- `trace.run` `{method, durationMs?, minMs?, stackDepth? (1-32, 8), limit? (1-200, 50)}` uses Flight Recorder method tracing (Java 25+, else `UNSUPPORTED`); `method` is up to 5 filters separated by `;` (`pkg.Class::method`, `pkg.Class`, `@pkg.Annotation`), else `INVALID_PARAMS` → `{filter, durationMs, methods: [{method, owner, invocations, avgMs, maxMs, totalMs}], slowest: [{method, owner, ms, thread, stack: [{method, line, owner}]}], callers: [{method, owner, count}], calls, truncated, hint?}`. Stops after 100000 calls (`truncated: true`).
+
+Client methods:
+- `client.eval` `{code, timeoutMs?, reset?}` runs JavaScript (GraalJS) on the render thread → `{result, output}`. Errors: `EVAL_DISABLED` (`allow-eval=false` in `config/craftwire.properties` or `-Dcraftwire.allowEval=false`), `DOWNLOAD_FAILED` (GraalJS could not be fetched or failed its sha256 check), `EVAL_UNAVAILABLE`, `TIMEOUT`, `EVAL_ERROR`.
+
+Server methods:
+- `bot.action move_to` finds a path by default: `{x, y, z, tolerance?, sprint?, timeoutMs? (30000), path? (true), maxFall? (3), openDoors? (true), partial?}` → `{reached, reason: arrived|no_path|blocked|height|stuck|timeout|died, x, y, z, distance, path?: {nodes, length, complete}, replans?, closest?: {x, y, z}}`. `TOO_FAR` beyond 256 blocks.
+- New actions: `break_block {block: {x, y, z}, face?}` → `{broken, block, ticks, reason?, cancelledBy?}` (`OUT_OF_REACH`); `jump` → `{jumped, reason?}`; `sneak {on?}`; `sprint {on?}`; `drop {all?}` → `{dropped: item|null, cancelled?, held?}` (`NOTHING_HELD`); `swap_hands`. `state` adds `digging`, `sneaking`, `sprinting`.
