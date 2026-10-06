@@ -11,6 +11,7 @@ public final class AgentGameTests implements FabricClientGameTest {
             sp.getConnection().waitForChunksRender();
             LifecycleChecks.run(ctx, sp);
             StateChecks.run(ctx, sp);
+            HudChecks.run(ctx, sp);
             GuiChecks.run(ctx, sp);
             try {
                 CaptureChecks.run(ctx, sp);

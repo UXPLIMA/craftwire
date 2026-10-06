@@ -10,6 +10,9 @@ repositories {
     mavenCentral()
 }
 
+// HUD/scoreboard JSON shared with the Paper bots; both compile it against Mojang-mapped 26.2.
+sourceSets.main.java.srcDir rootProject.file('mc-shared/src/main/java')
+
 loom {
     mods {
         "craftwire-agent" {

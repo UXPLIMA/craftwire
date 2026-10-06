@@ -16,6 +16,8 @@ repositories {
 }
 
 sourceSets {
+    // HUD/scoreboard JSON shared with the Fabric agent; both compile it against Mojang-mapped 26.2.
+    main.java.srcDir rootProject.file('mc-shared/src/main/java')
     integrationTest {}
 }
 

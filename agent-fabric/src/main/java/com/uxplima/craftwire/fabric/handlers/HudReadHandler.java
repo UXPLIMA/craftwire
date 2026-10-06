@@ -7,14 +7,13 @@ import com.google.gson.JsonObject;
 import com.uxplima.craftwire.fabric.Params;
 import com.uxplima.craftwire.fabric.mixin.BossHealthOverlayAccessor;
 import com.uxplima.craftwire.fabric.mixin.HudAccessor;
-import java.util.Comparator;
+import com.uxplima.craftwire.fabric.mixin.PlayerTabOverlayAccessor;
+import com.uxplima.craftwire.mc.HudJson;
+import java.util.ArrayList;
+import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.LerpingBossEvent;
 import net.minecraft.client.multiplayer.PlayerInfo;
-import net.minecraft.network.chat.Component;
-import net.minecraft.world.scores.DisplaySlot;
-import net.minecraft.world.scores.Objective;
-import net.minecraft.world.scores.PlayerScoreEntry;
 import net.minecraft.world.scores.Scoreboard;
 
 final class HudReadHandler {
@@ -29,50 +28,34 @@ final class HudReadHandler {
         JsonArray bars = new JsonArray();
         for (LerpingBossEvent e : ((BossHealthOverlayAccessor) hud.craftwire$getBossOverlay()).craftwire$getEvents().values()) {
             JsonObject b = new JsonObject();
-            b.addProperty("name", e.getName().getString());
+            b.addProperty("name", HudJson.plain(e.getName()));
             b.addProperty("progress", e.getProgress());
             b.addProperty("color", e.getColor().name().toLowerCase());
             bars.add(b);
         }
         o.add("bossbars", bars);
-        o.add("actionbar", hud.craftwire$getOverlayMessageTime() > 0 ? text(hud.craftwire$getOverlayMessage()) : JsonNull.INSTANCE);
+        o.add("actionbar", hud.craftwire$getOverlayMessageTime() > 0 ? HudJson.text(hud.craftwire$getOverlayMessage()) : JsonNull.INSTANCE);
         boolean titleShown = hud.craftwire$getTitleTime() > 0;
-        o.add("title", titleShown ? text(hud.craftwire$getTitle()) : JsonNull.INSTANCE);
-        o.add("subtitle", titleShown ? text(hud.craftwire$getSubtitle()) : JsonNull.INSTANCE);
-        o.add("sidebar", sidebar(mc.level.getScoreboard()));
+        o.add("title", titleShown ? HudJson.text(hud.craftwire$getTitle()) : JsonNull.INSTANCE);
+        o.add("subtitle", titleShown ? HudJson.text(hud.craftwire$getSubtitle()) : JsonNull.INSTANCE);
+        Scoreboard board = mc.level.getScoreboard();
+        o.add("sidebar", HudJson.sidebar(board, mc.player.getScoreboardName()));
+        o.add("belowName", HudJson.belowName(board));
 
-        JsonArray tab = new JsonArray();
+        List<HudJson.TabEntry> listed = new ArrayList<>();
         if (mc.getConnection() != null) {
             for (PlayerInfo info : mc.getConnection().getListedOnlinePlayers()) {
-                Component display = info.getTabListDisplayName();
-                tab.add(display != null ? display.getString() : info.getProfile().name());
+                listed.add(new HudJson.TabEntry(info.getProfile().name(), info.getTabListDisplayName(), info.getLatency(),
+                        info.getGameMode(), info.getTabListOrder()));
             }
         }
-        o.add("tabList", tab);
+        List<HudJson.TabEntry> ordered = HudJson.tabOrder(board, listed);
+        PlayerTabOverlayAccessor overlay = (PlayerTabOverlayAccessor) mc.gui.hud.getTabList();
+        o.add("tab", HudJson.tab(board, overlay.craftwire$getHeader(), overlay.craftwire$getFooter(), ordered));
+        JsonArray tabList = new JsonArray();
+        for (HudJson.TabEntry e : ordered) tabList.add(HudJson.tabName(board, e));
+        o.add("tabList", tabList);
         o.addProperty("hidden", hud.craftwire$isHidden());
         return o;
-    }
-
-    private static JsonElement text(Component c) {
-        return c == null ? JsonNull.INSTANCE : new com.google.gson.JsonPrimitive(c.getString());
-    }
-
-    private static JsonElement sidebar(Scoreboard board) {
-        Objective obj = board.getDisplayObjective(DisplaySlot.SIDEBAR);
-        if (obj == null) return JsonNull.INSTANCE;
-        JsonObject s = new JsonObject();
-        s.addProperty("title", obj.getDisplayName().getString());
-        JsonArray entries = new JsonArray();
-        board.listPlayerScores(obj).stream()
-                .sorted(Comparator.comparingInt(PlayerScoreEntry::value).reversed())
-                .limit(15)
-                .forEach(e -> {
-                    JsonObject row = new JsonObject();
-                    row.addProperty("name", e.display() != null ? e.display().getString() : e.owner());
-                    row.addProperty("value", e.value());
-                    entries.add(row);
-                });
-        s.add("entries", entries);
-        return s;
     }
 }
