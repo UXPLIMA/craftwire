@@ -1,5 +1,6 @@
-import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { basename, join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { json, startHub } from "../test/helpers/hub.js";
 import { ensurePaper, freePort, gradleProperties, repoRoot } from "./paper.js";
@@ -63,6 +64,24 @@ describe("dev loop against a real Paper server", () => {
     expect(r.build?.command, JSON.stringify(r)).toContain(":test-fixtures:jar");
     expect(r.install.replaced).toHaveLength(1);
     expect(r.loaded.enabled).toBe(true);
+  });
+
+  it("stages a jar into plugins/update for a running server, and Paper swaps it in on restart", async () => {
+    const installed = join(serverDir, "plugins", basename(fixtureJar));
+    // Same plugin, different bytes: a zip comment changes the file without changing its entries.
+    const bytes = readFileSync(installed);
+    const eocd = bytes.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
+    const comment = Buffer.from("craftwire e2e update");
+    const changed = Buffer.concat([bytes.subarray(0, eocd + 20), Buffer.from([comment.length, 0]), comment]);
+    const newJar = join(mkdtempSync(join(tmpdir(), "cw-upd-")), basename(fixtureJar));
+    writeFileSync(newJar, changed);
+
+    const staged = json(await hub.call("plugin_deploy", { jar: newJar, serverDir, restart: false }));
+    expect(staged.install).toMatchObject({ installed: join(serverDir, "plugins", "update", basename(fixtureJar)), needsRestart: true });
+    expect(json(await hub.call("server_process", { action: "restart", serverDir, timeoutMs: 600_000 })).state).toBe("running");
+    expect(readFileSync(installed).equals(changed)).toBe(true);
+    expect(existsSync(join(serverDir, "plugins", "update", basename(fixtureJar)))).toBe(false);
+    expect(json(await hub.call("plugin_manage", { action: "info", name: "CraftwireFixture" })).enabled).toBe(true);
   });
 
   it("drives a bot through a plugin menu", async () => {
