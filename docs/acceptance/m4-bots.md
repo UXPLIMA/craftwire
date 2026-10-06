@@ -24,5 +24,5 @@
 ## Notes
 
 1. **`move_to` and height.** "Arrived" needs the bot within 1.5 blocks of the target's y. A target y in the air or underground therefore ends as `stuck` even when the bot stands right under or over it. The result's `x/y/z` and `distance` show what happened. Give the ground height, or read `y` from `world_query`.
-2. **Encoding.** `plugin_deploy` `problems` showed the plugin's em dash as `â€”`, while `logs` showed it correctly. The console of a server started from `start.bat` is decoded with the wrong charset there (M3 code, not bots).
+2. **Encoding (not a Craftwire fault).** The em dash looked like `â€”` in `plugin_deploy` output. The cause was the scratch script that printed the results: Python on this machine reads stdin as cp1254. Decoded as UTF-8, the same bytes give `—`.
 3. Bots leave `world/playerdata/<uuid>.dat` files for their offline UUIDs. `spawn-protection=16` would stop them building near spawn, because they are not op.
