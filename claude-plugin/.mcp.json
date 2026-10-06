@@ -2,7 +2,7 @@
   "mcpServers": {
     "craftwire": {
       "command": "npx",
-      "args": ["-y", "craftwire@0.4.2"]
+      "args": ["-y", "craftwire@0.5.0"]
     }
   }
 }

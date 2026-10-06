@@ -13,12 +13,16 @@ export const PINS = {
   fabricApiSha1: "332da34ebb72171e603a0c538de17f4c54ea9e29",
 } as const;
 
-/** The agent mod matching this hub: packed into the npm package by prepack, or built in a repo checkout. */
-export function agentJar(): string {
+/** dist/client/ (or src/client/ under vitest) → the package's agent/ folder, then a repo checkout's build output. */
+function agentJarDirs(): string[] {
   const here = dirname(fileURLToPath(import.meta.url));
+  return [join(here, "..", "..", "agent"), join(here, "..", "..", "..", "agent-fabric", "build", "libs")];
+}
+
+/** The agent mod matching this hub: packed into the npm package by prepack, or built in a repo checkout. */
+export function agentJar(dirs: string[] = agentJarDirs()): string {
   const name = `craftwire-agent-fabric-${HUB_VERSION}.jar`;
-  // dist/client/ (or src/client/ under vitest) → package root / repo root.
-  for (const dir of [join(here, "..", "..", "agent"), join(here, "..", "..", "..", "agent-fabric", "build", "libs")]) {
+  for (const dir of dirs) {
     if (existsSync(join(dir, name))) return join(dir, name);
   }
   throw new CraftwireError("AGENT_JAR_MISSING", `${name} is not next to the hub`,

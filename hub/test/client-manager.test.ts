@@ -119,6 +119,14 @@ describe("ClientManager", () => {
     expect(await start).toMatchObject({ code: "JOIN_FAILED", details: { screen: { type: "DisconnectedScreen" } } });
   });
 
+  it("a client that missed the timeout still becomes running once it is ready", async () => {
+    const { mgr, port, gameDirOf } = await setup();
+    await expect(mgr.start({ username: "Bob", timeoutMs: 1000 })).rejects.toMatchObject({ code: "TIMEOUT" });
+    expect(mgr.status().clients[0]!.state).toBe("starting");
+    await inWorldAgent(port, gameDirOf("Bob"));
+    expect(await waitUntil(() => mgr.status().clients[0]!.state === "running", 3000, 20)).toBe(true);
+  });
+
   it("a second start for a running username fails", async () => {
     const { mgr, port, gameDirOf } = await setup();
     const first = mgr.start({ username: "Bob" });

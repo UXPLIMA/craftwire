@@ -150,9 +150,10 @@ export class ClientManager {
     let timer: NodeJS.Timeout | undefined;
     const timeout = new Promise<"timeout">((r) => { timer = setTimeout(() => r("timeout"), timeoutMs); });
     const exit = m.exited!.then(() => "exit" as const);
+    const ready = this.ready(m);
     let first: "ready" | "exit" | "timeout";
     try {
-      first = await Promise.race([this.ready(m), exit, timeout]);
+      first = await Promise.race([ready, exit, timeout]);
     } catch (e) {
       // JOIN_FAILED: the game runs but is stuck on the disconnect screen; it is of no use.
       await this.doStop(m).catch(() => undefined);
@@ -160,14 +161,22 @@ export class ClientManager {
     } finally {
       clearTimeout(timer);
     }
-    if (first === "exit") throw this.crashError(m);
+    // The ready loop also ends when the process is gone; whichever branch won, a dead client is a crash.
+    if (first === "exit" || (m.state as ClientState) === "crashed") throw this.crashError(m);
     if (first === "timeout") {
+      // The process keeps running; status shows it as running once it gets there.
+      ready.then(() => this.markRunning(m), () => undefined);
       throw new CraftwireError("TIMEOUT", `The client was not ready within ${timeoutMs} ms`,
         "It may still be loading: watch client_process {action:'status'}, or stop it.", { logTail: m.log.toArray().slice(-40) });
     }
+    this.markRunning(m);
+    return this.snapshot(m, 10);
+  }
+
+  private markRunning(m: Managed): void {
+    if (m.state !== "starting") return;
     m.state = "running";
     m.readyMs = Date.now() - m.startedAt;
-    return this.snapshot(m, 10);
   }
 
   async stop(username?: string): Promise<{ username: string; stopped: true; forced: boolean; exitCode: number | null }> {
