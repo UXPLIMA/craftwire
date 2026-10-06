@@ -18,6 +18,9 @@ Craftwire sees a Minecraft client only through the **Craftwire Agent** mod. Load
    Add other mods the same way to test compatibility, e.g. Sodium. Fabric API must be on the classpath too: the agent needs it.
 3. Start the dev client in the background: `./gradlew runClient` (Windows: `.\gradlew.bat runClient`). Wait until `list_instances` shows a `client` instance, then open or create a world. Single-player is fine.
 
+## Without a Gradle dev client
+Testing the mod on a server (multiplayer behaviour, a plugin it talks to)? Build the mod jar and let the hub run the client: `client_process {action:"start", mods:["<absolute path to the built jar>"]}`. It joins the server started by `server_process` (`online-mode=false`) with a hidden window; restart it with `stop` + `start` after each build.
+
 ## The loop
 1. Edit the mod's code.
 2. Restart the dev client: stop the `runClient` task, run it again, and wait for `list_instances`. Fabric has no safe hot reload for most changes. A build error ends the task: read its output, fix the `file:line`, and start again.

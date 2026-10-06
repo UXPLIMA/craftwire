@@ -41,6 +41,8 @@ Get both jars from [Releases](https://github.com/uxplima/craftwire/releases):
 
 Both connect to the hub on their own. The hub listens on `127.0.0.1` only and writes a token to `~/.craftwire/hub.json`. Use one AI client with Craftwire at a time.
 
+No game open? The `client_process` tool starts a hidden client the hub runs itself. It downloads Minecraft and Fabric from their official servers on first use, then joins your dev server, which needs `online-mode=false`.
+
 Troubleshooting: `npx craftwire doctor`. Add `--server <folder>` to check a server folder too.
 
 Docs, tools and the protocol: https://github.com/uxplima/craftwire

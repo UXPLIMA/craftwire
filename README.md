@@ -57,6 +57,18 @@ Every picture on this page was taken by Craftwire itself, through the tools belo
 
 > *"Build my plugin, deploy it to ~/servers/test, spawn two bots, have one open /shop and buy the first item, and tell me what the plugin answered."*
 
+### Let the AI run its own client
+
+You don't have to keep the game open. `client_process` starts a Minecraft client the hub runs itself:
+- The window is hidden, the client runs in offline mode, and it joins the server that `server_process` started.
+- Every client tool then works on it: screenshots, menus, input, the HUD.
+- The first start downloads Minecraft and Fabric straight from Mojang and Fabric (about 250 MB, cached in `~/.craftwire/client`). Later starts take about 10 seconds.
+- `mods` loads extra jars next to the agent, such as the Fabric mod you are building or Sodium.
+
+The launcher is part of Craftwire: no third-party launcher, every file checked against its published sha1, and your own `.minecraft` is never touched. Offline mode needs a dev server with `online-mode=false`. You still need to own Minecraft Java Edition; this is the same model as Fabric's development client.
+
+> *"Start a client, open /kits on the test server and show me what the VIP kit's tooltip looks like."*
+
 ## Install
 
 You need three parts:
@@ -137,7 +149,7 @@ Then ask your AI: *"take a screenshot of what I'm looking at"* or *"what's the T
 | Hub | `list_instances` · `wait_for` · `get_request_status` · `logs` |
 | Client | `screenshot` · `camera` · `gui_read` · `gui_action` · `input` · `chat` · `hud_read` · `player_state` · `client_settings` |
 | Server | `server_command` · `server_eval` · `world_query` · `world_edit` · `server_info` · `plugin_manage` |
-| Dev loop | `server_process` · `plugin_deploy` |
+| Dev loop | `server_process` · `plugin_deploy` · `client_process` |
 | Bots | `bot_spawn` · `bot_action` · `bot_remove` |
 | CLI | `npx craftwire setup` · `npx craftwire doctor` |
 
@@ -164,6 +176,12 @@ The hub listens on `127.0.0.1` only. It writes its port and a random token to `~
 - **F8** in the game stops all AI input until you press it again.
 
 ## FAQ
+
+<details>
+<summary><b>Do I have to keep the game open while the AI works?</b></summary>
+
+No. Ask it to use `client_process`: the hub starts a hidden client of its own and joins your dev server. Your server needs `online-mode=false`, because these clients play offline. Open the game yourself only when you want to watch, or when you want shots with your own resource packs and shaders.
+</details>
 
 <details>
 <summary><b>Nothing connects. Where do I start?</b></summary>

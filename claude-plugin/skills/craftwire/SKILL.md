@@ -1,13 +1,19 @@
 ---
 name: craftwire
-description: Use when driving Minecraft or a Paper server through the craftwire MCP tools (screenshot, camera, gui_*, input, chat, server_command, server_eval, world_query, world_edit, logs, wait_for, server_process, plugin_deploy, bot_spawn, bot_action) — covers the reliable order of calls, menus, server scripting, safe world edits and recovering from errors.
+description: Use when driving Minecraft or a Paper server through the craftwire MCP tools (screenshot, camera, gui_*, input, chat, server_command, server_eval, world_query, world_edit, logs, wait_for, server_process, plugin_deploy, client_process, bot_spawn, bot_action) — covers the reliable order of calls, menus, server scripting, safe world edits and recovering from errors.
 ---
 
 # Driving Minecraft with Craftwire
 
 ## Always start here
-1. `list_instances` — if empty, the player must start Minecraft with the Craftwire Agent mod (and join a world/server). Never guess an `instance`; pass it only when several are listed.
+1. `list_instances` — if no client is listed, either the player starts Minecraft with the Craftwire Agent mod, or you start your own: `client_process {action:"start"}` (see below). Never guess an `instance`; pass it only when several are listed.
 2. `player_state` — where the player is, what they hold, what they look at.
+
+## Your own client (no game open)
+- `client_process {action:"start"}` downloads Minecraft + Fabric on first use (~250 MB, cached; later starts take ~10 s), starts a hidden client with the agent and joins the server started by `server_process`. The result's `instance` is the client for every client tool.
+- Offline mode: the server must run `online-mode=false`. On `ONLINE_MODE_SERVER` ask the user; never edit server.properties yourself.
+- `username` names the player (default `Craftwire`); several clients can run with different names. `mods:[…]` adds mod jars, e.g. Sodium or the mod being developed.
+- `client_process {action:"stop"}` when done; clients also stop when the hub exits. `status` shows download progress and the log tail.
 
 ## Opening and using a menu (plugin GUIs)
 1. `chat {action:"command", text:"/builders crew"}`
