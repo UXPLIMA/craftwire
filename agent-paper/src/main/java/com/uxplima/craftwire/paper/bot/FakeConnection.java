@@ -43,7 +43,13 @@ final class FakeConnection {
     }
 
     static void record(BotInbox inbox, BotHud hud, AtomicInteger pendingTeleport, Object msg, long now) {
-        if (!(msg instanceof ClientboundBundlePacket)) hud.accept(msg, now);
+        if (!(msg instanceof ClientboundBundlePacket)) {
+            try {
+                hud.accept(msg, now);
+            } catch (RuntimeException e) {
+                // A packet the HUD copy cannot apply (odd plugin ordering) must never break the bot's connection.
+            }
+        }
         if (msg instanceof ClientboundPlayerPositionPacket p) {
             pendingTeleport.set(p.id());
         } else if (msg instanceof ClientboundSystemChatPacket p) {
