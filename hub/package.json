@@ -1,7 +1,7 @@
 {
   "name": "craftwire",
-  "version": "0.7.0",
-  "mcpName": "io.github.uxplima/craftwire",
+  "version": "0.7.1",
+  "mcpName": "io.github.UXPLIMA/craftwire",
   "description": "MCP hub that lets AI agents see and drive Minecraft (Craftwire by UXPLIMA)",
   "license": "MIT",
   "repository": { "type": "git", "url": "git+https://github.com/uxplima/craftwire.git", "directory": "hub" },

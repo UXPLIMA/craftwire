@@ -13,6 +13,7 @@ describe("MCP registry entry (server.json)", () => {
     expect(server.version).toBe(HUB_VERSION);
     expect(server.packages).toEqual([expect.objectContaining({ registryType: "npm", identifier: pkg.name, version: pkg.version, transport: { type: "stdio" } })]);
     expect(server.description.length).toBeLessThanOrEqual(100);
-    expect(server.name).toMatch(/^io\.github\.uxplima\/[a-zA-Z0-9._-]+$/);
+    // The registry grants the namespace with the owner spelled as on GitHub, case-sensitively.
+    expect(server.name).toMatch(/^io\.github\.UXPLIMA\/[a-zA-Z0-9._-]+$/);
   });
 });

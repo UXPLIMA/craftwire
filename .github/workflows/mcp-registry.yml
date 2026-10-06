@@ -1,7 +1,7 @@
 name: MCP registry
 
 # Publishes hub/server.json to the MCP registry, signed in as this repository (GitHub OIDC), so the
-# io.github.uxplima namespace needs no personal login. Run it by hand once the version in server.json is on npm.
+# io.github.UXPLIMA namespace (case-sensitive: the owner as GitHub spells it) needs no personal login. Run it by hand once the version in server.json is on npm.
 on:
   workflow_dispatch:
 

@@ -1,6 +1,6 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.uxplima/craftwire",
+  "name": "io.github.UXPLIMA/craftwire",
   "title": "Craftwire",
   "description": "See and drive Minecraft: Fabric client, Paper server, bots, plugin tests, profiling.",
   "websiteUrl": "https://github.com/uxplima/craftwire",
@@ -9,12 +9,12 @@
     "source": "github",
     "subfolder": "hub"
   },
-  "version": "0.7.0",
+  "version": "0.7.1",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "craftwire",
-      "version": "0.7.0",
+      "version": "0.7.1",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"
