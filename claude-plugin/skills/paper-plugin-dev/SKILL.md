@@ -25,8 +25,8 @@ description: Use when developing or debugging a Paper/Bukkit plugin with the cra
 4. Repeat. Keep `restart:true` (default): Paper cannot reload plugins safely.
 
 ## Notes
-- `buildCommand` runs any build in projectDir. On Windows write wrappers with a path: `.\gradlew.bat shadowJar` (a bare `gradlew.bat` is not found from Claude Code's shell). `javaHome` sets the JDK for the build.
+- `buildCommand` runs any build in projectDir. On Windows write wrappers with a path: `.\gradlew.bat shadowJar` (a bare `gradlew.bat` is not found from the hub's shell). `javaHome` sets the JDK for the build.
 - Replaced jars are kept in `plugins/.craftwire-backup/`.
 - `restart:false` on a running server stages the jar in `plugins/update/`; it loads on the next start.
-- A server started by `server_process` stops when the hub exits (Claude Code closes). `server_process {action:"status", tail:100}` shows its console.
+- A server started by `server_process` stops when the hub exits (the AI client closes). `server_process {action:"status", tail:100}` shows its console.
 - `npx craftwire doctor --server <dir>` checks Node, Java, the hub, the EULA and the plugin.

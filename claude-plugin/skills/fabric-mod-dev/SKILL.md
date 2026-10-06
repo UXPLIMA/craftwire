@@ -1,6 +1,6 @@
 ---
 name: fabric-mod-dev
-description: Use when developing or debugging a Fabric client mod with the craftwire MCP tools — run the mod in a dev client that Claude can see and drive, check its screens, HUD and logs after each change, and automate the checks with client game tests.
+description: Use when developing or debugging a Fabric client mod with the craftwire MCP tools — run the mod in a dev client that the AI can see and drive, check its screens, HUD and logs after each change, and automate the checks with client game tests.
 ---
 
 # Fabric mod dev loop with Craftwire

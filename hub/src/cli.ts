@@ -1,5 +1,7 @@
 #!/usr/bin/env node
-import { join, resolve } from "node:path";
+import { existsSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { AgentServer } from "./agents.js";
 import { AuditLog } from "./audit.js";
@@ -8,6 +10,7 @@ import { ServerManager } from "./dev/server-manager.js";
 import { formatChecks, runDoctor } from "./doctor.js";
 import { OperationTracker } from "./operations.js";
 import { createCraftwireServer } from "./server.js";
+import { setupCommand, setupEnvFromProcess } from "./setup.js";
 import { HUB_VERSION } from "./version.js";
 
 const log = (msg: string) => process.stderr.write(`[craftwire] ${msg}\n`);
@@ -49,11 +52,28 @@ async function doctor(args: string[]): Promise<void> {
   process.exit(checks.some((c) => c.status === "fail") ? 1 : 0);
 }
 
+/** The skills: packaged next to dist/ by prepack, or the plugin's own folder in a repo checkout. */
+function skillsDir(): string | undefined {
+  const here = dirname(fileURLToPath(import.meta.url));
+  return [join(here, "..", "skills"), join(here, "..", "..", "claude-plugin", "skills")].find((d) => existsSync(d));
+}
+
+function setup(args: string[]): void {
+  process.stdout.write(setupCommand(args, setupEnvFromProcess(skillsDir())));
+}
+
 const argv = process.argv.slice(2);
 const fatal = (e: unknown) => {
   log(`fatal: ${e instanceof ConfigError ? e.message : e instanceof Error ? e.stack ?? e.message : String(e)}`);
   process.exit(1);
 };
 if (argv[0] === "doctor") doctor(argv.slice(1)).catch(fatal);
-else if (argv[0] === "--version") process.stdout.write(`${HUB_VERSION}\n`);
+else if (argv[0] === "setup") {
+  try {
+    setup(argv.slice(1));
+  } catch (e) {
+    process.stderr.write(`craftwire setup: ${e instanceof Error ? e.message : String(e)}\n`);
+    process.exit(1);
+  }
+} else if (argv[0] === "--version") process.stdout.write(`${HUB_VERSION}\n`);
 else main().catch(fatal);

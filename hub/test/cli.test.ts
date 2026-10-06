@@ -1,5 +1,5 @@
 import { execFileSync, execSync, spawn } from "node:child_process";
-import { mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -49,6 +49,43 @@ describe("craftwire CLI over stdio", () => {
     await connectFakeAgent(cfg.port, { token: cfg.token, name: "E2E" });
     const res = (await client.callTool({ name: "list_instances", arguments: {} })) as CallToolResult;
     expect(JSON.parse((res.content[0] as { text: string }).text).instances[0].name).toBe("E2E");
+  });
+
+  describe("setup", () => {
+    // A fake home for every OS variable a client path is built from: never the real configs.
+    const fake = mkdtempSync(join(tmpdir(), "cw-cli-setup-"));
+    const env = {
+      ...process.env, HOME: fake, USERPROFILE: fake, APPDATA: join(fake, "AppData", "Roaming"),
+      XDG_CONFIG_HOME: join(fake, ".config"), CODEX_HOME: join(fake, ".codex"),
+    };
+    const setup = (...args: string[]) =>
+      execFileSync(process.execPath, [join(hubDir, "dist", "cli.js"), "setup", ...args], { env, encoding: "utf8" });
+
+    it("with no client lists the known and the detected clients", () => {
+      mkdirSync(join(fake, ".cursor"), { recursive: true });
+      const out = setup();
+      expect(out).toContain("Found on this computer: cursor");
+      expect(out).toMatch(/antigravity.*codex.*gemini.*cursor.*windsurf.*vscode.*claude-desktop/s);
+    });
+
+    it("--dry-run shows the change and writes nothing", () => {
+      const out = setup("codex", "--dry-run");
+      expect(out).toContain("[mcp_servers.craftwire]");
+      expect(out).toMatch(/skills/i);
+      expect(existsSync(join(fake, ".codex"))).toBe(false);
+    });
+
+    it("writes the client config and the skills", () => {
+      const out = setup("codex");
+      expect(out).toContain("Restart Codex");
+      expect(readFileSync(join(fake, ".codex", "config.toml"), "utf8")).toContain(`craftwire@${HUB_VERSION}`);
+      expect(existsSync(join(fake, ".codex", "skills", "craftwire", "SKILL.md"))).toBe(true);
+      expect(existsSync(join(fake, ".codex", "skills", "fabric-mod-dev", "SKILL.md"))).toBe(true);
+    });
+
+    it("points Claude Code users to the plugin", () => {
+      expect(setup("claude-code")).toContain("/plugin install craftwire@uxplima");
+    });
   });
 
   it("exits cleanly when stdin closes (Claude Code went away)", async () => {
