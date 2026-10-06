@@ -19,6 +19,8 @@ export interface InstanceInfo {
   /** Server agents: the server's working directory and JVM pid (agents >= 0.3.0). */
   serverDir?: string;
   pid?: number;
+  /** Client agents: the game directory, which maps clients started by client_process to their agent (agents >= 0.5.0). */
+  gameDir?: string;
 }
 
 export interface RejectedAgent {
@@ -157,6 +159,7 @@ export class AgentServer extends EventEmitter {
         connectedAt: Date.now(),
         ...(params.serverDir !== undefined ? { serverDir: params.serverDir } : {}),
         ...(params.pid !== undefined ? { pid: params.pid } : {}),
+        ...(params.gameDir !== undefined ? { gameDir: params.gameDir } : {}),
       };
       const inst: Instance = { info, socket, pending: new Map(), events: new RingBuffer(this.opts.bufferSize ?? 5000), nextId: 1 };
       this.live.set(info.id, inst);

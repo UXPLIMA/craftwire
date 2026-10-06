@@ -20,6 +20,7 @@ public final class RpcCodec {
         params.addProperty("instanceName", h.instanceName());
         if (h.serverDir() != null) params.addProperty("serverDir", h.serverDir());
         if (h.pid() != null) params.addProperty("pid", h.pid());
+        if (h.gameDir() != null) params.addProperty("gameDir", h.gameDir());
         JsonObject o = envelope();
         o.addProperty("id", 0);
         o.addProperty("method", "hello");

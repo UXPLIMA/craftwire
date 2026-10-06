@@ -11,6 +11,7 @@ export const HelloParams = z.object({
   instanceName: z.string(),
   serverDir: z.string().optional(),
   pid: z.number().int().positive().optional(),
+  gameDir: z.string().optional(),
 });
 export type HelloParams = z.infer<typeof HelloParams>;
 

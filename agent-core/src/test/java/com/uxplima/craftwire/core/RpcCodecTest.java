@@ -13,6 +13,14 @@ class RpcCodecTest {
     }
 
     @Test
+    void helloCarriesTheClientGameDir() {
+        String json = RpcCodec.hello("t", new Hello("client", "0.5.0", "26.2", "Craftwire", null, null, "/tmp/cw/instances/Craftwire"));
+        JsonObject params = parse(json).getAsJsonObject("params");
+        assertEquals("/tmp/cw/instances/Craftwire", params.get("gameDir").getAsString());
+        assertFalse(params.has("serverDir"));
+    }
+
+    @Test
     void illegalArgumentIsInvalidParams() {
         JsonObject o = parse(RpcCodec.error(new JsonPrimitive(3), new IllegalArgumentException("slot must be >= 0")));
         assertEquals("INVALID_PARAMS", o.getAsJsonObject("error").getAsJsonObject("data").get("code").getAsString());

@@ -33,6 +33,12 @@ describe("AgentServer handshake", () => {
     expect(server.instances()).toMatchObject([{ id: "client-1", kind: "client", name: "Sirac", mcVersion: "26.2" }]);
   });
 
+  it("keeps a client's gameDir", async () => {
+    const { server, port } = await start();
+    const agent = await connectFakeAgent(port, { token: TOKEN, gameDir: "/cw/instances/Bob" });
+    expect(server.instances().find((i) => i.id === agent.instanceId)?.gameDir).toBe("/cw/instances/Bob");
+  });
+
   it("rejects a wrong token with 4001", async () => {
     const { port } = await start();
     await expect(connectFakeAgent(port, { token: "b".repeat(64) })).rejects.toThrow(/UNAUTHORIZED/);
