@@ -3,6 +3,10 @@
   "version": "0.4.1",
   "description": "MCP hub that lets AI agents see and drive Minecraft (Craftwire by UXPLIMA)",
   "license": "MIT",
+  "repository": { "type": "git", "url": "git+https://github.com/uxplima/craftwire.git", "directory": "hub" },
+  "homepage": "https://github.com/uxplima/craftwire#readme",
+  "bugs": { "url": "https://github.com/uxplima/craftwire/issues" },
+  "keywords": ["minecraft", "mcp", "model-context-protocol", "claude", "fabric", "paper", "ai-agent"],
   "type": "module",
   "bin": {
     "craftwire": "dist/cli.js"
