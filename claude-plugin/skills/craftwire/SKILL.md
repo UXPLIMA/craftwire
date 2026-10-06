@@ -13,6 +13,7 @@ description: Use when driving Minecraft or a Paper server through the craftwire 
 - `client_process {action:"start"}` downloads Minecraft + Fabric on first use (~250 MB, cached; later starts take ~10 s), starts a hidden client with the agent and joins the server started by `server_process`. The result's `instance` is the client for every client tool.
 - Offline mode: the server must run `online-mode=false`. On `ONLINE_MODE_SERVER` ask the user; never edit server.properties yourself.
 - `username` names the player (default `Craftwire`); several clients can run with different names. `mods:[…]` adds mod jars, e.g. Sodium or the mod being developed.
+- Singleplayer instead of a server: `client_process {action:"start", world:{name:"Test", create:{type:"flat"|"void"|"normal", replace:true}}}` (creative, cheats on, peaceful by default); without `create` an existing save opens. Commands then run as the player through `chat {action:"command"}`.
 - `client_process {action:"stop"}` when done; clients also stop when the hub exits. `status` shows download progress and the log tail.
 
 ## Opening and using a menu (plugin GUIs)

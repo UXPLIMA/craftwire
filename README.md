@@ -84,10 +84,13 @@ You don't have to keep the game open. `client_process` starts a Minecraft client
 - Every client tool then works on it: screenshots, menus, input, the HUD.
 - The first start downloads Minecraft and Fabric straight from Mojang and Fabric (about 250 MB, cached in `~/.craftwire/client`). Later starts take about 10 seconds.
 - `mods` loads extra jars next to the agent, such as the Fabric mod you are building or Sodium.
+- No server needed for a mod: `world` opens a singleplayer world instead, or creates one (`flat`, `void` or `normal`, creative with cheats by default; `replace` starts fresh every run).
 
 The launcher is part of Craftwire: no third-party launcher, every file checked against its published sha1, and your own `.minecraft` is never touched. Offline mode needs a dev server with `online-mode=false`. You still need to own Minecraft Java Edition; this is the same model as Fabric's development client.
 
 > *"Start a client, open /kits on the test server and show me what the VIP kit's tooltip looks like."*
+
+> *"Start a client in a fresh void world with my mod, place my machine block and show me what it looks like running."*
 
 ## Install
 

@@ -78,3 +78,52 @@ describe("client_process against a real Paper server", () => {
     expect(r).toMatchObject({ stopped: true, forced: false });
   });
 });
+
+describe("client_process with a singleplayer world", () => {
+  async function commandSays(instance: string, command: string, expected: string): Promise<void> {
+    const heard = hub.call("wait_for", { condition: "chat_match", pattern: expected, instance, timeoutMs: 15_000 });
+    await new Promise((r) => setTimeout(r, 200));
+    await hub.call("chat", { instance, action: "command", text: command });
+    const w = await heard;
+    const chat = w.isError ? JSON.stringify(json(await hub.call("chat", { instance, action: "read" }))) : "";
+    expect(w.isError, `${JSON.stringify(w.content)} chat: ${chat}`).toBeFalsy();
+  }
+
+  it("creates a fresh world, and what was built there is still there when it is opened again", async () => {
+    const created = json(await hub.call("client_process", {
+      action: "start", username: "Solo", timeoutMs: 600_000,
+      world: { name: "cw-e2e", create: { type: "flat", seed: "7", replace: true } },
+    }));
+    expect(created, JSON.stringify(created)).toMatchObject({ state: "running", world: "cw-e2e", instance: expect.stringMatching(/^client-\d+$/) });
+    expect(created.server).toBeUndefined();
+    const state = json(await hub.call("player_state", { instance: "Solo" }));
+    expect(state.gameMode).toBe("creative");
+    await commandSays("Solo", "setblock 3 -60 3 minecraft:diamond_block", "Changed the block");
+    expect(json(await hub.call("client_process", { action: "stop", username: "Solo" }))).toMatchObject({ stopped: true, forced: false });
+
+    const reopened = json(await hub.call("client_process", { action: "start", username: "Solo", timeoutMs: 600_000, world: { name: "cw-e2e" } }));
+    expect(reopened).toMatchObject({ state: "running", world: "cw-e2e" });
+    await commandSays("Solo", "execute if block 3 -60 3 minecraft:diamond_block", "Test passed");
+    expect(json(await hub.call("client_process", { action: "stop", username: "Solo" }))).toMatchObject({ stopped: true, forced: false });
+  });
+
+  it("creates a void world on every supported version", async () => {
+    for (const version of ["26.2", "26.3"]) {
+      const r = json(await hub.call("client_process", {
+        action: "start", username: "Void", version, timeoutMs: 600_000, world: { name: `cw-void-${version}`, create: { type: "void", replace: true } },
+      }));
+      expect(r, JSON.stringify(r)).toMatchObject({ state: "running", version, world: `cw-void-${version}` });
+      await commandSays("Void", "execute if biome 0 0 0 minecraft:the_void", "Test passed");
+      // Grass in a flat world; the void's stone start platform reaches 16 blocks around (8, 8).
+      await commandSays("Void", "execute if block 40 -61 40 minecraft:air", "Test passed");
+      expect(json(await hub.call("client_process", { action: "stop", username: "Void" }))).toMatchObject({ stopped: true });
+    }
+  });
+
+  it("refuses to create over an existing world without replace", async () => {
+    const r = json(await hub.call("client_process", {
+      action: "start", username: "Solo", timeoutMs: 600_000, world: { name: "cw-e2e", create: { type: "void" } },
+    }));
+    expect(r.code).toBe("WORLD_EXISTS");
+  });
+});

@@ -1,6 +1,6 @@
 import { type ChildProcess, spawn } from "node:child_process";
-import { existsSync, readdirSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readdirSync, rmSync, statSync } from "node:fs";
+import { join, relative, resolve, sep } from "node:path";
 import { createInterface } from "node:readline";
 import { setTimeout as sleep } from "node:timers/promises";
 import type { AgentServer, InstanceInfo } from "../agents.js";
@@ -14,9 +14,22 @@ import { pingServer } from "./server-ping.js";
 
 export type ClientState = "downloading" | "starting" | "running" | "stopping" | "stopped" | "crashed";
 
+/** How a new singleplayer world is made (the agent does it like the Create World screen). */
+export interface WorldCreate {
+  type?: "normal" | "flat" | "void";
+  seed?: string;
+  gameMode?: "survival" | "creative" | "adventure" | "spectator";
+  difficulty?: "peaceful" | "easy" | "normal" | "hard";
+  cheats?: boolean;
+  /** Delete a save with this name first, for a fresh world on every run. */
+  replace?: boolean;
+}
+
 export interface ClientStartOptions {
   /** host:port; default: the single server running under server_process. */
   server?: string;
+  /** A singleplayer world to open (or create) instead of joining a server. */
+  world?: { name: string; create?: WorldCreate };
   /** Minecraft version; default: the one the server reports, else the newest supported. */
   version?: McVersion;
   username?: string;
@@ -51,6 +64,7 @@ export interface ClientStatus {
   version?: McVersion;
   instance?: string | null;
   server?: string;
+  world?: string;
   pid?: number;
   gameDir?: string;
   progress?: { done: number; total: number };
@@ -88,6 +102,7 @@ interface Managed {
   version?: McVersion;
   log: RingBuffer<string>;
   server?: string;
+  world?: { name: string; create?: WorldCreate };
   gameDir?: string;
   child?: ChildProcess;
   exited?: Promise<number | null>;
@@ -101,6 +116,8 @@ interface Managed {
 }
 
 const USERNAME = /^[A-Za-z0-9_]{3,16}$/;
+/** A save folder name: no path separators or dots-only names, so it always stays inside saves/. */
+const WORLD_NAME = /^(?!\.+$)[A-Za-z0-9 _.-]{1,64}$/;
 
 interface DisconnectScreen {
   type?: string;
@@ -152,10 +169,17 @@ export class ClientManager {
     if (isLive(this.clients.get(username))) {
       throw new CraftwireError("ALREADY_RUNNING", `A client named ${username} is already running`, "Use it, stop it first, or pass another username.");
     }
-    const server = o.server ?? this.defaultServer();
+    if (o.world !== undefined) {
+      if (o.server !== undefined) throw new CraftwireError("INVALID_PARAMS", "Pass either server or world, not both", "world opens a singleplayer world; server joins a server.");
+      if (!WORLD_NAME.test(o.world.name)) {
+        throw new CraftwireError("INVALID_PARAMS", `"${o.world.name}" is not a usable world name`, "Use 1-64 letters, digits, spaces, '.', '-' and '_'.");
+      }
+    }
+    const server = o.world !== undefined ? undefined : o.server ?? this.defaultServer();
     const version = o.version ?? await this.serverVersion(server);
     const m: Managed = { username, version, state: "downloading", log: new RingBuffer(2000), startedAt: Date.now(), agent: null };
     if (server !== undefined) m.server = server;
+    if (o.world !== undefined) m.world = o.world;
     this.clients.set(username, m);
     this.pruneStopped();
 
@@ -173,6 +197,7 @@ export class ClientManager {
     }
     m.gameDir = prepared.gameDir;
     m.downloadedBytes = prepared.downloadedBytes;
+    if (o.world?.create?.replace) removeSave(prepared.gameDir, o.world.name);
     m.state = "starting";
     m.startedAt = Date.now();
     this.spawn(m, prepared.command, prepared.args);
@@ -300,7 +325,13 @@ export class ClientManager {
   /** Resolves when the agent is connected and, with a server, the player is in the world; throws JOIN_FAILED. */
   private async ready(m: Managed): Promise<"ready"> {
     if (!m.agent) await new Promise<void>((r) => { m.onAgent = r; });
-    if (m.server === undefined) return "ready";
+    if (m.world !== undefined) {
+      const { replace: _replace, ...create } = m.world.create ?? {};
+      const open = m.world.create !== undefined ? { name: m.world.name, create } : { name: m.world.name };
+      await this.openWorld(m, open);
+    } else if (m.server === undefined) {
+      return "ready";
+    }
     const poll = this.opts.readyPollMs ?? 500;
     for (;;) {
       if (!isLive(m)) return "ready"; // the exit branch of the race reports it
@@ -312,6 +343,21 @@ export class ClientManager {
         } catch (e) {
           if (e instanceof CraftwireError && e.code === "NOT_IN_WORLD") await this.checkDisconnected(agent, m.username);
         }
+      }
+      await sleep(poll);
+    }
+  }
+
+  /** world.open, retried while the client is still starting (NOT_READY) or a reply got lost (TIMEOUT). */
+  private async openWorld(m: Managed, params: Record<string, unknown>): Promise<void> {
+    const poll = this.opts.readyPollMs ?? 500;
+    for (;;) {
+      if (!isLive(m) || !m.agent) return;
+      try {
+        await this.opts.agents.request(m.agent, "world.open", params, Math.max(2000, poll * 10));
+        return;
+      } catch (e) {
+        if (!(e instanceof CraftwireError) || (e.code !== "NOT_READY" && e.code !== "TIMEOUT")) throw e;
       }
       await sleep(poll);
     }
@@ -356,6 +402,7 @@ export class ClientManager {
     if (m.version !== undefined) s.version = m.version;
     if (m.agent !== undefined) s.instance = m.agent;
     if (m.server !== undefined) s.server = m.server;
+    if (m.world !== undefined) s.world = m.world.name;
     if (isLive(m) && m.child?.pid !== undefined) s.pid = m.child.pid;
     if (m.gameDir !== undefined) s.gameDir = m.gameDir;
     if (m.state === "downloading" && m.progress) s.progress = m.progress;
@@ -372,4 +419,13 @@ function newestCrashReport(gameDir: string, since: number): string | undefined {
   if (!existsSync(dir)) return undefined;
   const files = readdirSync(dir).map((f) => join(dir, f)).filter((f) => statSync(f).mtimeMs >= since - 1000);
   return files.sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)[0];
+}
+
+/** Deletes saves/<name> of a client's game directory, refusing anything that would resolve outside saves/. */
+function removeSave(gameDir: string, name: string): void {
+  const saves = resolve(gameDir, "saves");
+  const target = resolve(saves, name);
+  const rel = relative(saves, target);
+  if (rel === "" || rel.startsWith("..") || rel.includes(sep)) throw new CraftwireError("INVALID_PARAMS", `"${name}" is not a save folder name`);
+  rmSync(target, { recursive: true, force: true });
 }

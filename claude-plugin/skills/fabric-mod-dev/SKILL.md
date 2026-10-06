@@ -20,6 +20,7 @@ Craftwire sees a Minecraft client only through the **Craftwire Agent** mod. Load
 
 ## Without a Gradle dev client
 Testing the mod on a server (multiplayer behaviour, a plugin it talks to)? Build the mod jar and let the hub run the client: `client_process {action:"start", mods:["<absolute path to the built jar>"]}`. It joins the server started by `server_process` (`online-mode=false`) with a hidden window; restart it with `stop` + `start` after each build.
+No server needed? Pass `world` instead: `client_process {action:"start", mods:[…], world:{name:"ModTest", create:{type:"flat", replace:true}}}` creates a fresh singleplayer world (creative, cheats on) and returns once the player is in it; `type:"void"` gives an empty world with a small stone platform for building test setups.
 
 ## The loop
 1. Edit the mod's code.

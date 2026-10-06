@@ -6,10 +6,21 @@ import { defineTool, ok, type ToolContext } from "./registry.js";
 
 export function registerClientProcessTools(server: McpServer, ctx: ToolContext): void {
   defineTool(server, ctx, "client_process",
-    "Start, stop or inspect a headless Minecraft client run by the hub (offline mode, hidden window), so client tools work without the user opening the game. start downloads Minecraft + Fabric on first use (about 150 MB per version, cached in ~/.craftwire/client; status shows progress). The version is the one `server` reports (asked with the server-list ping), else the newest supported; `version` overrides, starts the client with the Craftwire agent, joins `server` (default: the server started by server_process, which must run online-mode=false) and returns once the player is in the world; `instance` in the result is the client for screenshot, gui_read, input and the rest. mods adds extra mod jars (the mod you are developing, Sodium, …). Several clients can run with different usernames. Clients stop when the hub exits.",
+    "Start, stop or inspect a headless Minecraft client run by the hub (offline mode, hidden window), so client tools work without the user opening the game. start downloads Minecraft + Fabric on first use (about 150 MB per version, cached in ~/.craftwire/client; status shows progress). The version is the one `server` reports (asked with the server-list ping), else the newest supported; `version` overrides, starts the client with the Craftwire agent, joins `server` (default: the server started by server_process, which must run online-mode=false) or opens a singleplayer `world` (creating it with `create`), and returns once the player is in the world; `instance` in the result is the client for screenshot, gui_read, input and the rest. mods adds extra mod jars (the mod you are developing, Sodium, …). Several clients can run with different usernames. Clients stop when the hub exits.",
     {
       action: z.enum(["start", "stop", "status"]),
       server: z.string().regex(/^[^\s:]+(:\d{1,5})?$/).optional().describe("host:port to join. Default: the single server started by server_process; none → title screen."),
+      world: z.object({
+        name: z.string().describe("Save folder name in the client's saves/ (letters, digits, spaces, . - _)."),
+        create: z.object({
+          type: z.enum(["normal", "flat", "void"]).optional().describe("Default flat."),
+          seed: z.string().optional().describe("A number, or text that is hashed like the Create World screen does; default random."),
+          gameMode: z.enum(["survival", "creative", "adventure", "spectator"]).optional().describe("Default creative."),
+          difficulty: z.enum(["peaceful", "easy", "normal", "hard"]).optional().describe("Default peaceful (normal for type normal)."),
+          cheats: z.boolean().optional().describe("Allow commands. Default true."),
+          replace: z.boolean().optional().describe("Delete an existing save with this name first (a fresh world every run)."),
+        }).optional().describe("Create the world. Without it, an existing save is opened."),
+      }).optional().describe("Open a singleplayer world instead of joining a server: the client tools then work in it, with no server needed."),
       version: z.enum(SUPPORTED_VERSIONS as [string, ...string[]]).optional().describe(`Minecraft version (${SUPPORTED_VERSIONS.join(", ")}). Default: the server's, else the newest.`),
       username: z.string().regex(/^[A-Za-z0-9_]{3,16}$/).optional().describe("Offline player name (default Craftwire). stop: which client, when several run."),
       mods: z.array(z.string()).max(50).optional().describe("Absolute paths of extra mod jars, loaded next to Fabric API and the agent."),
@@ -29,7 +40,7 @@ export function registerClientProcessTools(server: McpServer, ctx: ToolContext):
           return ok(await c.clients.stop(a.username));
         case "start":
           return ok(await c.clients.start(definedOnly({
-            server: a.server, version: a.version as McVersion | undefined, username: a.username, mods: a.mods, visible: a.visible, windowSize: a.windowSize,
+            server: a.server, world: a.world, version: a.version as McVersion | undefined, username: a.username, mods: a.mods, visible: a.visible, windowSize: a.windowSize,
             java: a.java, sounds: a.sounds, timeoutMs: a.timeoutMs,
           })));
       }

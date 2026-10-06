@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -98,6 +98,54 @@ describe("ClientManager", () => {
     cleanups.push(() => agent.close());
     expect((await start).state).toBe("running");
     expect(prepared[0]!.server).toBeUndefined();
+  });
+
+  it("opens a singleplayer world: creates it through the agent and waits until the player is in it", async () => {
+    const { mgr, port, gameDirOf, prepared } = await setup({ servers: [{ serverDir: serverDir("server-port=25570\nonline-mode=false\n"), state: "running" }] });
+    const start = mgr.start({ username: "Bob", world: { name: "Test World", create: { type: "flat", seed: "42" } } });
+    await waitUntil(() => mgr.status().clients[0]?.state === "starting", 5000, 20);
+    const agent = await connectFakeAgent(port, { token: TOKEN, kind: "client", gameDir: gameDirOf("Bob") });
+    cleanups.push(() => agent.close());
+    let opened: Record<string, unknown> | undefined;
+    agent.onRequest("world.open", (p) => { opened = p; return { name: p.name, created: true }; });
+    agent.onRequest("player.state", () => (opened ? { position: {} } : notInWorld()));
+    const s = await start;
+    expect(s).toMatchObject({ state: "running", world: "Test World" });
+    expect(s.server).toBeUndefined();
+    expect(prepared[0]!.server).toBeUndefined();
+    expect(opened).toEqual({ name: "Test World", create: { type: "flat", seed: "42" } });
+  });
+
+  it("replace deletes the old save before the game starts, and only that save", async () => {
+    const { mgr, port, gameDirOf } = await setup();
+    mkdirSync(join(gameDirOf("Bob"), "saves", "Arena", "region"), { recursive: true });
+    mkdirSync(join(gameDirOf("Bob"), "saves", "Keep"), { recursive: true });
+    const start = mgr.start({ username: "Bob", world: { name: "Arena", create: { replace: true } } });
+    await waitUntil(() => mgr.status().clients[0]?.state === "starting", 5000, 20);
+    expect(existsSync(join(gameDirOf("Bob"), "saves", "Arena"))).toBe(false);
+    expect(existsSync(join(gameDirOf("Bob"), "saves", "Keep"))).toBe(true);
+    const agent = await inWorldAgent(port, gameDirOf("Bob"));
+    let opened: Record<string, unknown> | undefined;
+    agent.onRequest("world.open", (p) => { opened = p; return {}; });
+    await start;
+    expect(opened).toEqual({ name: "Arena", create: {} });
+  });
+
+  it("rejects world names that are not a plain folder name, and a world together with a server", async () => {
+    const { mgr } = await setup();
+    for (const name of ["..", "a/b", "c:\\x", "", "x".repeat(65)]) {
+      await expect(mgr.start({ world: { name } })).rejects.toMatchObject({ code: "INVALID_PARAMS" });
+    }
+    await expect(mgr.start({ world: { name: "ok" }, server: "127.0.0.1:25565" })).rejects.toMatchObject({ code: "INVALID_PARAMS" });
+  });
+
+  it("a world the agent cannot open fails the start with the agent's error", async () => {
+    const { mgr, port, gameDirOf } = await setup();
+    const start = mgr.start({ username: "Bob", world: { name: "Missing" } });
+    await waitUntil(() => mgr.status().clients[0]?.state === "starting", 5000, 20);
+    const agent = await inWorldAgent(port, gameDirOf("Bob"));
+    agent.onRequest("world.open", () => { throw Object.assign(new Error("No singleplayer world named Missing"), { code: "WORLD_NOT_FOUND", hint: "Pass create to make it." }); });
+    await expect(start).rejects.toMatchObject({ code: "WORLD_NOT_FOUND" });
   });
 
   it("reports CLIENT_CRASHED with the log tail when the game exits before ready", async () => {

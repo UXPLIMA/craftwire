@@ -17,5 +17,6 @@ public final class Handlers {
         agent.dispatcher().register("input", p -> s.call(() -> InputHandler.handle(p, s)));
         agent.dispatcher().register("client.settings", p -> s.call(() -> ClientSettingsHandler.handle(p)));
         agent.dispatcher().register("client.quit", p -> s.call(QuitHandler::quit));
+        agent.dispatcher().register("world.open", p -> s.call(() -> WorldHandler.open(p)));
     }
 }
