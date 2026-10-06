@@ -15,7 +15,7 @@
 | 6 | `bot_action gui_read` | `uxmBuilders`, a chest menu: Package Shop (slot 10), Active Builds (12, "Running: 0/1"), My Crew (14), … with their lore |
 | 7 | `bot_action gui_click {slot:10}` | The plugin opened its **Package Shop** menu: Houses / Castles / Farms tabs, Oak Cottage, Back, Close and "Your Balance: 0 $". The result already carried the new menu. |
 | 8 | `bot_action gui_close` | `closed: true` |
-| 9 | `bot_action {bot:"CwBot2", action:"move_to", x:-1162.5, y:78, z:16.5}` | Walked 5 blocks to 0.14 blocks of the target, but on lower ground (y 74). Result `reached:false, reason:"stuck"` (see note 1). |
+| 9 | `bot_action {bot:"CwBot2", action:"move_to", x:-1162.5, y:78, z:16.5}` | Walked 5 blocks to 0.14 blocks of the target, but on lower ground (y 74). Result `reached:false, reason:"stuck"` (see note 1; since 0.4.1 this case reports `reason:"height"` right away). |
 | 10 | `bot_action messages` | The bot's inbox held the join lines and uxmEssentials' welcome messages ("ᴡᴇʟᴄᴏᴍᴇ ᴛᴏ ᴛʜᴇ ꜱᴇʀᴠᴇʀ", "ɢʟᴀᴅ ᴛᴏ ʜᴀᴠᴇ ʏᴏᴜ ʜᴇʀᴇ, CwBot1!", …) |
 | 11 | `bot_remove {all:true}`, then `world_query players` | `removed: [CwBot1, CwBot2]`, `players: []` |
 | 12 | `logs {level:"WARN"}` | Plugin warnings only, none from the bots. uxmSupplyRush: no LuckPerms, a newer release is available. uxmEssentials: a legacy `commands` directory. uxmBuilders: no economy provider. Craftwire: the production warning. |

@@ -133,8 +133,9 @@ public final class Bot {
         double dx = move.x - pos.x;
         double dz = move.z - pos.z;
         double distance = Steering.horizontal(dx, dz);
-        if (distance <= move.tolerance && Math.abs(move.y - pos.y) <= 1.5) {
-            finish("arrived");
+        if (distance <= move.tolerance) {
+            // Over or under a target that is not at ground level, walking cannot get any closer.
+            finish(Math.abs(move.y - pos.y) <= 1.5 ? "arrived" : "height");
         } else if (now >= move.deadline) {
             finish("timeout");
         } else if (move.progress.stuck(distance, now)) {

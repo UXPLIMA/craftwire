@@ -70,6 +70,17 @@ class BotActionsIT {
     }
 
     @Test
+    void moveToReportsAWrongHeightInsteadOfStuck() throws Exception {
+        // Target 5 blocks above the ground: the bot gets under it and says so, rather than "stuck" after 2 s.
+        long started = System.currentTimeMillis();
+        JsonObject r = act("{\"bot\":\"Act\",\"action\":\"move_to\",\"x\":6.5,\"y\":-55,\"z\":0.5}");
+        assertEquals("height", r.get("reason").getAsString(), r.toString());
+        assertFalse(r.get("reached").getAsBoolean());
+        assertEquals(6.5, r.get("x").getAsDouble(), 0.6);
+        assertTrue(System.currentTimeMillis() - started < 3500, "should end on arrival, not after the stuck window");
+    }
+
+    @Test
     void moveToTimesOut() throws Exception {
         JsonObject r = act("{\"bot\":\"Act\",\"action\":\"move_to\",\"x\":200.5,\"y\":-60,\"z\":0.5,\"timeoutMs\":1000}");
         assertEquals("timeout", r.get("reason").getAsString(), r.toString());
