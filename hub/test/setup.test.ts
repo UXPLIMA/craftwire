@@ -88,6 +88,15 @@ describe("craftwire setup: JSON mcpServers clients", () => {
     expect(readFileSync(path, "utf8")).toContain("// my servers");
   });
 
+  it("reads a config saved with a byte order mark (Windows Notepad)", () => {
+    const env = fakeEnv();
+    put(paths.cursor(env), "﻿" + JSON.stringify({ mcpServers: { github: { command: "gh-mcp" } } }));
+    applySetup(planSetup("cursor", env));
+    const after = json(paths.cursor(env));
+    expect(after.mcpServers.github.command).toBe("gh-mcp");
+    expect(after.mcpServers.craftwire.command).toBe("npx");
+  });
+
   it("an empty config file counts as an empty object", () => {
     const env = fakeEnv();
     put(paths.windsurf(env), "");

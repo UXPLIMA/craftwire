@@ -148,7 +148,7 @@ function jsonConfig(path: string, text: string | undefined, format: Format, laun
   let data: Record<string, unknown> = {};
   if (text !== undefined && text.trim() !== "") {
     try {
-      data = JSON.parse(text) as Record<string, unknown>;
+      data = JSON.parse(withoutBom(text)) as Record<string, unknown>;
     } catch (e) {
       // Comments (JSONC) or a broken file: rewriting it would lose what the user wrote.
       throw new Error(`could not read ${path} as JSON (${(e as Error).message}); add the craftwire entry by hand, see docs/clients.md`);
@@ -165,9 +165,12 @@ function jsonConfig(path: string, text: string | undefined, format: Format, laun
   return out;
 }
 
+/** Windows Notepad saves UTF-8 with a byte order mark, which JSON.parse rejects. */
+const withoutBom = (text: string) => text.replace(/^﻿/, "");
+
 function sameJson(a: string, b: string): boolean {
   try {
-    return JSON.stringify(JSON.parse(a)) === JSON.stringify(JSON.parse(b));
+    return JSON.stringify(JSON.parse(withoutBom(a))) === JSON.stringify(JSON.parse(b));
   } catch {
     return false;
   }
