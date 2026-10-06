@@ -5,6 +5,7 @@ import com.google.gson.JsonObject;
 import com.uxplima.craftwire.core.AgentError;
 import com.uxplima.craftwire.paper.Args;
 import com.uxplima.craftwire.paper.Sync;
+import com.uxplima.craftwire.paper.compat.ServerCompat;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import java.util.Comparator;
 import java.util.Locale;
@@ -18,7 +19,6 @@ import net.minecraft.network.protocol.game.ServerboundAttackPacket;
 import net.minecraft.network.protocol.game.ServerboundContainerClickPacket;
 import net.minecraft.network.protocol.game.ServerboundContainerClosePacket;
 import net.minecraft.network.protocol.game.ServerboundInteractPacket;
-import net.minecraft.network.protocol.game.ServerboundSwingPacket;
 import net.minecraft.network.protocol.game.ServerboundUseItemOnPacket;
 import net.minecraft.network.protocol.game.ServerboundUseItemPacket;
 import net.minecraft.server.level.ServerPlayer;
@@ -121,7 +121,7 @@ final class BotGuiActions {
             b.listener().handleUseItem(new ServerboundUseItemPacket(hand, b.nextSequence(), sp.getYRot(), sp.getXRot()));
             r.addProperty("used", "air");
         }
-        b.listener().handleAnimate(new ServerboundSwingPacket(hand));
+        ServerCompat.get().swingAfterInteraction(b.listener(), hand);
         return r;
     }
 
@@ -145,7 +145,7 @@ final class BotGuiActions {
         lookAt(sp, center);
         double before = target instanceof LivingEntity l ? l.getHealth() : 0;
         b.listener().handleAttack(new ServerboundAttackPacket(target.getId()));
-        b.listener().handleAnimate(new ServerboundSwingPacket(InteractionHand.MAIN_HAND));
+        ServerCompat.get().swingAfterInteraction(b.listener(), InteractionHand.MAIN_HAND);
         JsonObject t = new JsonObject();
         t.addProperty("uuid", target.getUUID().toString());
         t.addProperty("type", EntityType.getKey(target.getType()).toString());

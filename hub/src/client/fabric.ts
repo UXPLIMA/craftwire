@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { CraftwireError } from "../errors.js";
 import type { FetchOptions, FileSpec } from "./download.js";
-import { PINS } from "./pins.js";
+import type { ClientPins } from "./pins.js";
 
 /** A library with its Maven coordinate, so Mojang's and Fabric's lists can be merged. */
 export interface NamedFile {
@@ -93,11 +93,11 @@ export async function fetchFabricProfile(minecraft: string, loader: string, cach
 }
 
 /** Fabric API, which the agent needs, from Fabric's own Maven at the pinned version and sha1. */
-export function fabricApiFile(modsDir: string): FileSpec {
-  const v = encodeURIComponent(PINS.fabricApi);
+export function fabricApiFile(modsDir: string, pins: ClientPins): FileSpec {
+  const v = encodeURIComponent(pins.fabricApi);
   return {
     url: `${MAVEN}net/fabricmc/fabric-api/fabric-api/${v}/fabric-api-${v}.jar`,
-    sha1: PINS.fabricApiSha1,
-    dest: join(modsDir, `fabric-api-${PINS.fabricApi}.jar`),
+    sha1: pins.fabricApiSha1,
+    dest: join(modsDir, `fabric-api-${pins.fabricApi}.jar`),
   };
 }

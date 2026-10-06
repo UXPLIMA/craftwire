@@ -2,6 +2,7 @@ package com.uxplima.craftwire.paper.bot;
 
 import com.google.gson.JsonObject;
 import com.mojang.authlib.GameProfile;
+import com.uxplima.craftwire.paper.compat.ServerCompat;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -10,7 +11,6 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import net.minecraft.network.Connection;
-import net.minecraft.network.protocol.game.ServerboundAcceptTeleportationPacket;
 import net.minecraft.network.protocol.game.ServerboundClientCommandPacket;
 import net.minecraft.network.protocol.game.ServerboundPlayerLoadedPacket;
 import net.minecraft.server.MinecraftServer;
@@ -112,7 +112,7 @@ public final class Bot {
      */
     void settle() {
         int teleport = pendingTeleport.getAndSet(-1);
-        if (teleport >= 0) listener.handleAcceptTeleportPacket(new ServerboundAcceptTeleportationPacket(teleport));
+        if (teleport >= 0) ServerCompat.get().acceptTeleport(listener, listener.player, teleport);
         if (!listener.hasClientLoaded()) listener.handleAcceptPlayerLoad(new ServerboundPlayerLoadedPacket());
     }
 

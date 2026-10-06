@@ -1,0 +1,5 @@
+plugins {
+    id 'net.fabricmc.fabric-loom' version "${loom_version}"
+}
+
+apply from: rootProject.file('gradle/fabric-compat.gradle')

@@ -1,4 +1,4 @@
-package com.uxplima.craftwire.fabric.mixin;
+package com.uxplima.craftwire.fabric.compat.v26_2.mixin;
 
 import net.minecraft.client.Minecraft;
 import org.lwjgl.glfw.GLFW;

@@ -6,6 +6,7 @@ import { AgentServer } from "../src/agents.js";
 import { ClientManager, type ClientManagerOptions, type PrepareClient } from "../src/client/client-manager.js";
 import { writeHubConfig } from "../src/config.js";
 import { waitUntil } from "../src/dev/server-manager.js";
+import { NEWEST_VERSION } from "../src/client/pins.js";
 import { connectFakeAgent, type FakeAgent } from "./helpers/fakeAgent.js";
 
 const TOKEN = "e".repeat(64);
@@ -119,6 +120,28 @@ describe("ClientManager", () => {
     expect(await start).toMatchObject({ code: "JOIN_FAILED", details: { screen: { type: "DisconnectedScreen" } } });
   });
 
+  it("says why a join failed and what fixes it (26.3 servers whitelist by default)", async () => {
+    const { mgr, port, gameDirOf } = await setup();
+    const start = mgr.start({ username: "Bob", server: "127.0.0.1:25599" }).catch((e: unknown) => e);
+    await waitUntil(() => mgr.status().clients[0]?.state === "starting", 5000, 20);
+    const agent = await connectFakeAgent(port, { token: TOKEN, kind: "client", gameDir: gameDirOf("Bob") });
+    cleanups.push(() => agent.close());
+    agent.onRequest("player.state", notInWorld);
+    agent.onRequest("gui.read", () => ({
+      open: true, type: "DisconnectedScreen", title: "Failed to connect to the server",
+      widgets: [
+        { index: 0, kind: "StringWidget", text: "Failed to connect to the server" },
+        { index: 1, kind: "MultiLineTextWidget", text: "You are not whitelisted on this server!" },
+        { index: 2, kind: "Plain", text: "Back to Server List" },
+      ],
+    }));
+    agent.onRequest("client.quit", () => ({ quitting: true }));
+    const e = await start as { code: string; message: string; hint: string };
+    expect(e.code).toBe("JOIN_FAILED");
+    expect(e.message).toContain("You are not whitelisted on this server!");
+    expect(e.hint).toContain("whitelist add Bob");
+  });
+
   it("a client that missed the timeout still becomes running once it is ready", async () => {
     const { mgr, port, gameDirOf } = await setup();
     await expect(mgr.start({ username: "Bob", timeoutMs: 1000 })).rejects.toMatchObject({ code: "TIMEOUT" });
@@ -174,6 +197,36 @@ describe("ClientManager", () => {
     await inWorldAgent(port, gameDirOf("Bob"));
     expect((await start).server).toBe("127.0.0.1:25601");
     expect(prepared[0]!.server).toBe("127.0.0.1:25601");
+  });
+
+  it("runs the Minecraft version the server reports", async () => {
+    const pinged: string[] = [];
+    const { mgr, port, gameDirOf, prepared } = await setup({
+      ping: async (host, p) => { pinged.push(`${host}:${p}`); return { name: "Paper 26.2", protocol: 1 }; },
+    });
+    const start = mgr.start({ username: "Bob", server: "127.0.0.1:25602" });
+    await waitUntil(() => mgr.status().clients[0]?.state === "starting", 5000, 20);
+    await inWorldAgent(port, gameDirOf("Bob"));
+    expect((await start).version).toBe("26.2");
+    expect(prepared[0]!.version).toBe("26.2");
+    expect(pinged).toEqual(["127.0.0.1:25602"]);
+  });
+
+  it("an explicit version wins, and an unreachable server or none means the newest", async () => {
+    const { mgr, port, gameDirOf, prepared } = await setup({ ping: async () => undefined });
+    const a = mgr.start({ username: "Ann", server: "127.0.0.1:25603", version: "26.2" });
+    const b = mgr.start({ username: "Ben", server: "127.0.0.1:25603" });
+    const c = mgr.start({ username: "Cid" });
+    await waitUntil(() => mgr.status().clients.filter((x) => x.state === "starting").length === 3, 5000, 20);
+    for (const n of ["Ann", "Ben", "Cid"]) await inWorldAgent(port, gameDirOf(n));
+    await Promise.all([a, b, c]);
+    expect(Object.fromEntries(prepared.map((p) => [p.username, p.version]))).toEqual({ Ann: "26.2", Ben: NEWEST_VERSION, Cid: NEWEST_VERSION });
+  });
+
+  it("refuses a server whose version no client can join, before downloading", async () => {
+    const { mgr, prepared } = await setup({ ping: async () => ({ name: "1.21.11", protocol: 774 }) });
+    await expect(mgr.start({ username: "Bob", server: "127.0.0.1:25604" })).rejects.toMatchObject({ code: "VERSION_UNSUPPORTED" });
+    expect(prepared).toHaveLength(0);
   });
 
   it("refuses an online-mode default server before downloading", async () => {

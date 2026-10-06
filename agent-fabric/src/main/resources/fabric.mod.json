@@ -11,10 +11,10 @@
   "entrypoints": {
     "client": ["com.uxplima.craftwire.fabric.CraftwireClient"]
   },
-  "mixins": ["craftwire-agent.mixins.json"],
+  "mixins": ["craftwire-agent.mixins.json", ${compatMixins}],
   "depends": {
     "fabricloader": ">=0.19.5",
-    "minecraft": "~26.2",
+    "minecraft": "${minecraft}",
     "java": ">=25",
     "fabric-api": "*"
   }

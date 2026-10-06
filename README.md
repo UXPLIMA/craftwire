@@ -6,7 +6,7 @@
   <a href="https://github.com/uxplima/craftwire/releases"><img alt="Release" src="https://img.shields.io/github/v/release/uxplima/craftwire?color=4c9a2a"></a>
   <a href="https://www.npmjs.com/package/craftwire"><img alt="npm" src="https://img.shields.io/npm/v/craftwire?color=cb3837"></a>
   <a href="https://github.com/uxplima/craftwire/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/uxplima/craftwire/actions/workflows/ci.yml/badge.svg"></a>
-  <img alt="Minecraft 26.2" src="https://img.shields.io/badge/Minecraft-26.2-62b47a">
+  <img alt="Minecraft 26.2 | 26.3" src="https://img.shields.io/badge/Minecraft-26.2%20%7C%2026.3-62b47a">
   <img alt="MIT" src="https://img.shields.io/badge/license-MIT-blue">
 </p>
 
@@ -76,7 +76,7 @@ You need three parts:
 - **The agent mod** for the Minecraft client (`craftwire-agent-fabric-<version>.jar`). It is a Fabric mod and needs Fabric API.
 - **The plugin** for a Paper server (`craftwire-paper-<version>.jar`), if you want the server tools.
 
-Both jars are on [Releases](https://github.com/uxplima/craftwire/releases), for Minecraft 26.2.
+Both jars are on [Releases](https://github.com/uxplima/craftwire/releases). One jar of each runs on Minecraft 26.2 and 26.3: it picks the right code for the game it is loaded into.
 
 ### 1. Connect your AI client
 
@@ -218,9 +218,11 @@ Many clients start commands without a shell and cannot find `npx`. `craftwire se
 ## Development
 
 - Hub: `cd hub && npm install && npm test`
-- Agents: `./gradlew :agent-core:test :agent-fabric:test :agent-fabric:runClientGameTest`
-- Paper plugin: `./gradlew :agent-paper:test :agent-paper:integrationTest` (downloads Paper 26.2 and runs the plugin in a real server)
-- Dev-loop E2E with a real Paper server: run `./gradlew :agent-paper:build :test-fixtures:build`, then `cd hub && npm run test:e2e`
-- Dev client with the mod: `./gradlew :agent-fabric:runClient`
+- Agents: `./gradlew build` (unit tests, both jars, and `checkCompat`: every game class, method and field the jars use must exist in every supported version)
+- Client game tests, per version: `./gradlew :fabric-gametest-v26_2:runClientGameTest` (or `v26_3`); they load the built agent jar
+- Paper plugin: `./gradlew :agent-paper:integrationTest -Pmc=26.3` (downloads that Paper build and runs the plugin in a real server; default 26.2)
+- Dev-loop E2E with a real Paper server: run `./gradlew :agent-paper:build :test-fixtures:build`, then `cd hub && npm run test:e2e` (`CRAFTWIRE_E2E_MC=26.3` for the other version)
+- Supported versions live in `versions/<mc>.properties` and `mc_versions` in `gradle.properties`; version-specific code in `agent-fabric/compat/<mc>` and `agent-paper/compat/<mc>`
+- Dev client with the built mod: `./gradlew :fabric-gametest-v26_3:runClient` (or `v26_2`)
 
 By [UXPLIMA](https://github.com/uxplima) · MIT licensed

@@ -1,5 +1,6 @@
 package com.uxplima.craftwire.paper.bot;
 
+import com.uxplima.craftwire.paper.compat.ServerCompat;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelOutboundHandlerAdapter;
 import io.netty.channel.ChannelPromise;
@@ -55,8 +56,7 @@ final class FakeConnection {
         } else if (msg instanceof ClientboundSystemChatPacket p) {
             inbox.add(p.overlay() ? "actionbar" : "system", p.content().getString(), null, now);
         } else if (msg instanceof ClientboundPlayerChatPacket p) {
-            String text = p.unsignedContent() != null ? p.unsignedContent().getString() : p.body().content();
-            inbox.add("chat", text, p.chatType().name().getString(), now);
+            inbox.add("chat", ServerCompat.get().chatText(p), p.chatType().name().getString(), now);
         } else if (msg instanceof ClientboundBundlePacket bundle) {
             for (Packet<?> sub : bundle.subPackets()) record(inbox, hud, pendingTeleport, sub, now);
         }

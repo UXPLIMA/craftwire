@@ -4,9 +4,11 @@ import static com.uxplima.craftwire.fabric.gametest.Calls.check;
 
 import com.uxplima.craftwire.fabric.CraftwireAgent;
 import com.uxplima.craftwire.fabric.CraftwireClient;
+import com.uxplima.craftwire.fabric.compat.ClientCompat;
+import com.uxplima.craftwire.fabric.compat.Versions;
+import com.mojang.blaze3d.platform.InputConstants;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
-import org.lwjgl.glfw.GLFW;
 
 final class LifecycleChecks {
     private LifecycleChecks() {}
@@ -17,8 +19,13 @@ final class LifecycleChecks {
         // client_process starts clients with -Dcraftwire.hidden=true; the game tests run that way too (build.gradle), so
         // every capture check below also proves that a hidden window still renders.
         boolean hidden = Boolean.getBoolean("craftwire.hidden");
-        int visible = ctx.computeOnClient(mc -> GLFW.glfwGetWindowAttrib(mc.getWindow().handle(), GLFW.GLFW_VISIBLE));
-        check((visible == GLFW.GLFW_FALSE) == hidden, "window visible=" + visible + " but craftwire.hidden=" + hidden);
+        boolean visible = ctx.computeOnClient(mc -> ClientCompat.get().windowVisible(mc.getWindow()));
+        check(visible != hidden, "window visible=" + visible + " but craftwire.hidden=" + hidden);
+
+        // The version-specific code matches the running game (this source compiles once per version).
+        String running = net.fabricmc.loader.api.FabricLoader.getInstance().getModContainer("minecraft").orElseThrow()
+                .getMetadata().getVersion().getFriendlyString();
+        check(running.startsWith(Versions.selected()), "compat " + Versions.selected() + " selected for Minecraft " + running);
 
         // Review Focus #1: a connected hub must stop the game from pausing when Claude Code takes focus.
         ctx.runOnClient(mc -> mc.options.pauseOnLostFocus = true);
@@ -36,21 +43,21 @@ final class LifecycleChecks {
                 "client log lines should be captured");
 
         // F8 kill switch toggles the dispatcher.
-        ctx.getInput().pressKey(GLFW.GLFW_KEY_F8);
+        ctx.getInput().pressKey(InputConstants.KEY_F8);
         ctx.waitTicks(2);
         check(agent.dispatcher().isPaused(), "F8 should pause");
         check("PAUSED_BY_USER".equals(Calls.error(ctx, "player.state", "{}").code()), "paused calls must fail with PAUSED_BY_USER");
-        ctx.getInput().pressKey(GLFW.GLFW_KEY_F8);
+        ctx.getInput().pressKey(InputConstants.KEY_F8);
         ctx.waitTicks(2);
         check(!agent.dispatcher().isPaused(), "second F8 should resume");
 
         // F8 must also work while a menu is open; that is where the AI spends most of its time.
         ctx.setScreen(() -> new net.minecraft.client.gui.screens.inventory.InventoryScreen(net.minecraft.client.Minecraft.getInstance().player));
         ctx.waitTicks(2);
-        ctx.getInput().pressKey(GLFW.GLFW_KEY_F8);
+        ctx.getInput().pressKey(InputConstants.KEY_F8);
         ctx.waitTicks(2);
         check(agent.dispatcher().isPaused(), "F8 should pause while a screen is open");
-        ctx.getInput().pressKey(GLFW.GLFW_KEY_F8);
+        ctx.getInput().pressKey(InputConstants.KEY_F8);
         ctx.waitTicks(2);
         check(!agent.dispatcher().isPaused(), "F8 should resume while a screen is open");
         ctx.setScreen(() -> null);

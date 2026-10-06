@@ -35,6 +35,8 @@ describe("client launch command", () => {
       "--accessToken", "0", "--uuid", offlineUuid("Craftwire"), "--gameDir", "/g", "--assetsDir", "/a", "--assetIndex", version.assetIndex.id,
     ]));
     expect(args).toContain("-Dcraftwire.hidden=true");
+    // A hidden client cannot show Fabric's error window: it must exit so the crash is reported at once.
+    expect(args).toContain("-Dfabric.noGui=true");
     expect(args).toContain("-Dlog4j.configurationFile=/a/log_configs/client.xml");
     expect(args).toContain("-DFabricMcEmu= net.minecraft.client.main.Main ");
   });
@@ -62,5 +64,6 @@ describe("client launch command", () => {
     const { args } = buildLaunch(input({ server: undefined, hidden: false }));
     expect(args).not.toContain("--quickPlayMultiplayer");
     expect(args).not.toContain("-Dcraftwire.hidden=true");
+    expect(args).not.toContain("-Dfabric.noGui=true");
   });
 });

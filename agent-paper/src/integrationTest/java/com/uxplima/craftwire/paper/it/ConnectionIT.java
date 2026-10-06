@@ -12,7 +12,7 @@ class ConnectionIT {
         JsonObject h = ItEnv.get().hello;
         assertEquals("server", h.get("agentKind").getAsString());
         assertEquals(1, h.get("protocolVersion").getAsInt());
-        assertEquals("26.2", h.get("mcVersion").getAsString());
+        assertEquals(System.getProperty("craftwire.mcVersion"), h.get("mcVersion").getAsString());
         assertEquals("server", h.get("instanceName").getAsString());
         assertEquals(System.getProperty("craftwire.version"), h.get("agentVersion").getAsString());
         Path expected = Path.of(System.getProperty("craftwire.itDir"), "server");
@@ -32,7 +32,7 @@ class ConnectionIT {
     @Test
     void serverInfoReportsVersionsAndPlugins() throws Exception {
         JsonObject info = ItEnv.get().hub.result("server.info", "{}").getAsJsonObject();
-        assertEquals("26.2", info.get("minecraftVersion").getAsString());
+        assertEquals(System.getProperty("craftwire.mcVersion"), info.get("minecraftVersion").getAsString());
         assertEquals(3, info.getAsJsonArray("tps").size());
         assertTrue(info.getAsJsonArray("plugins").toString().contains("\"name\":\"Craftwire\""), info.toString());
         assertEquals("world", info.getAsJsonArray("worlds").get(0).getAsJsonObject().get("name").getAsString());

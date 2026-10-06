@@ -7,7 +7,7 @@ This package is the MCP server (hub) of **Craftwire**. It lets AI agents **see a
 - On a **Paper server**: console commands, JavaScript against the Bukkit API, world reads and edits, logs and plugin control.
 - A plugin dev loop and server-side bots.
 
-Minecraft 26.2 · Fabric client · Paper server · MIT · by [UXPLIMA](https://github.com/uxplima)
+Minecraft 26.2 & 26.3 · Fabric client · Paper server · MIT · by [UXPLIMA](https://github.com/uxplima)
 
 ## Set up your AI client
 

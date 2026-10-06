@@ -6,6 +6,7 @@ import com.mojang.blaze3d.platform.Window;
 import com.uxplima.craftwire.core.AgentError;
 import com.uxplima.craftwire.fabric.ClientScheduler;
 import com.uxplima.craftwire.fabric.Params;
+import com.uxplima.craftwire.fabric.compat.ClientCompat;
 import com.uxplima.craftwire.fabric.mixin.AbstractContainerScreenAccessor;
 import com.uxplima.craftwire.fabric.mixin.MouseHandlerAccessor;
 import java.util.ArrayList;
@@ -22,9 +23,12 @@ import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.input.MouseButtonInfo;
 import net.minecraft.world.inventory.ContainerInput;
 import net.minecraft.world.inventory.Slot;
-import org.lwjgl.glfw.GLFW;
 
 public final class GuiActionHandler {
+    // Container-click buttons are protocol values (left 0, right 1), not mouse button codes, on every version.
+    private static final int CONTAINER_LEFT = 0;
+    private static final int CONTAINER_RIGHT = 1;
+
     private GuiActionHandler() {}
 
     public static CompletableFuture<JsonElement> act(JsonObject p, ClientScheduler s) {
@@ -64,14 +68,14 @@ public final class GuiActionHandler {
         Slot slot = slots.get(id);
         moveMouseTo(mc, acc.craftwire$getLeftPos() + slot.x + 8, acc.craftwire$getTopPos() + slot.y + 8);
         switch (action) {
-            case "click" -> acc.craftwire$slotClicked(slot, id, GLFW.GLFW_MOUSE_BUTTON_LEFT, ContainerInput.PICKUP);
-            case "right_click" -> acc.craftwire$slotClicked(slot, id, GLFW.GLFW_MOUSE_BUTTON_RIGHT, ContainerInput.PICKUP);
-            case "shift_click" -> acc.craftwire$slotClicked(slot, id, GLFW.GLFW_MOUSE_BUTTON_LEFT, ContainerInput.QUICK_MOVE);
+            case "click" -> acc.craftwire$slotClicked(slot, id, CONTAINER_LEFT, ContainerInput.PICKUP);
+            case "right_click" -> acc.craftwire$slotClicked(slot, id, CONTAINER_RIGHT, ContainerInput.PICKUP);
+            case "shift_click" -> acc.craftwire$slotClicked(slot, id, CONTAINER_LEFT, ContainerInput.QUICK_MOVE);
             case "drag" -> {
                 int toId = slotId(slots, p, "toSlot");
                 Slot to = slots.get(toId);
-                acc.craftwire$slotClicked(slot, id, GLFW.GLFW_MOUSE_BUTTON_LEFT, ContainerInput.PICKUP);
-                acc.craftwire$slotClicked(to, toId, GLFW.GLFW_MOUSE_BUTTON_LEFT, ContainerInput.PICKUP);
+                acc.craftwire$slotClicked(slot, id, CONTAINER_LEFT, ContainerInput.PICKUP);
+                acc.craftwire$slotClicked(to, toId, CONTAINER_LEFT, ContainerInput.PICKUP);
                 moveMouseTo(mc, acc.craftwire$getLeftPos() + to.x + 8, acc.craftwire$getTopPos() + to.y + 8);
             }
             default -> { /* hover: moving the mouse is the whole action */ }
@@ -111,7 +115,7 @@ public final class GuiActionHandler {
         double cx = w.getX() + w.getWidth() / 2.0;
         double cy = w.getY() + w.getHeight() / 2.0;
         moveMouseTo(mc, cx, cy);
-        MouseButtonEvent event = new MouseButtonEvent(cx, cy, new MouseButtonInfo(GLFW.GLFW_MOUSE_BUTTON_LEFT, 0));
+        MouseButtonEvent event = new MouseButtonEvent(cx, cy, new MouseButtonInfo(ClientCompat.get().mouseButtonLeft(), 0));
         screen.mouseClicked(event, false);
         screen.mouseReleased(event);
     }
@@ -127,7 +131,7 @@ public final class GuiActionHandler {
         Window window = mc.getWindow();
         double sx = guiX * window.getScreenWidth() / (double) window.getGuiScaledWidth();
         double sy = guiY * window.getScreenHeight() / (double) window.getGuiScaledHeight();
-        GLFW.glfwSetCursorPos(window.handle(), sx, sy);   // GLFW ignores this when unfocused: the user's cursor is never hijacked
+        ClientCompat.get().warpCursor(window, sx, sy);   // only while focused: the user's cursor is never hijacked
         MouseHandlerAccessor mouse = (MouseHandlerAccessor) mc.mouseHandler;
         mouse.craftwire$setXpos(sx);
         mouse.craftwire$setYpos(sy);

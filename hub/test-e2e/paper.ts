@@ -5,19 +5,29 @@ import { join } from "node:path";
 
 export const repoRoot = join(__dirname, "..", "..");
 
-export function gradleProperties(): Record<string, string> {
+function readProps(file: string): Record<string, string> {
   const out: Record<string, string> = {};
-  for (const line of readFileSync(join(repoRoot, "gradle.properties"), "utf8").split(/\r?\n/)) {
+  for (const line of readFileSync(file, "utf8").split(/\r?\n/)) {
     const m = /^([\w.]+)=(.*)$/.exec(line.trim());
     if (m) out[m[1]!] = m[2]!;
   }
   return out;
 }
 
+/**
+ * gradle.properties plus versions/<mc>.properties of the Minecraft version under test:
+ * CRAFTWIRE_E2E_MC (e.g. 26.3), default the oldest supported, like the Java integration tests.
+ */
+export function gradleProperties(): Record<string, string> {
+  const base = readProps(join(repoRoot, "gradle.properties"));
+  const mc = process.env.CRAFTWIRE_E2E_MC ?? base.mc_versions!.split(",")[0]!.trim();
+  return { ...base, ...readProps(join(repoRoot, "versions", `${mc}.properties`)) };
+}
+
 const sha256 = (b: Buffer) => createHash("sha256").update(b).digest("hex");
 const AGENT = "craftwire-e2e-tests (https://github.com/uxplima/craftwire)";
 
-/** The Paper build pinned in gradle.properties (same pin as the Java integration tests), checksum-verified. */
+/** The Paper build pinned for the version under test (same pin as the Java integration tests), checksum-verified. */
 export async function ensurePaper(cacheDir: string, props: Record<string, string>): Promise<string> {
   const mc = props.minecraft_version!;
   const build = props.paper_build!;

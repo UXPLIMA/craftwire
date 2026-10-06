@@ -10,7 +10,7 @@ import { fabricApiFile, fabricLibraryFiles, fetchFabricProfile, mergeLibraries }
 import { checkMods, prepareInstance } from "./instance.js";
 import { buildLaunch } from "./launch-args.js";
 import { assetFiles, currentOs, fetchAssetIndex, fetchVersion, namedLibraryFiles } from "./mojang.js";
-import { agentJar, PINS } from "./pins.js";
+import { agentJar, pinsFor } from "./pins.js";
 
 type Command = { command: string; args: string[] };
 
@@ -29,14 +29,14 @@ export function javaCandidates(env: NodeJS.ProcessEnv = process.env, platform: N
 }
 
 /** The first candidate whose major version is at least `need` (JAVA_HOME is often an older JDK than PATH's). */
-export async function pickJava(candidates: string[], probe: (java: string) => Promise<number>, need: number): Promise<string> {
+export async function pickJava(candidates: string[], probe: (java: string) => Promise<number>, need: number, minecraft = "Minecraft"): Promise<string> {
   const found: string[] = [];
   for (const java of candidates) {
     const major = await probe(java).catch(() => undefined);
     if (major !== undefined && major >= need) return java;
     found.push(`${java} (${major === undefined ? "not runnable" : `Java ${major}`})`);
   }
-  throw new CraftwireError("JAVA_TOO_OLD", `Minecraft ${PINS.minecraft} needs Java ${need}+; found ${found.join(", ")}`,
+  throw new CraftwireError("JAVA_TOO_OLD", `${minecraft} needs Java ${need}+; found ${found.join(", ")}`,
     `Install Java ${need}+, or pass java: the path to one.`);
 }
 
@@ -55,25 +55,26 @@ export function withDisplay(cmd: Command, platform: NodeJS.Platform = process.pl
  */
 export async function prepareClient(p: PrepareInput, o: FetchOptions = {}): Promise<{ command: string; args: string[]; gameDir: string; downloadedBytes: number }> {
   checkMods(p.mods);
+  const pins = pinsFor(p.version);
   const agent = agentJar();
   const os = currentOs();
   const dirs = {
     versions: join(p.root, "versions"),
     libraries: join(p.root, "libraries"),
     assets: join(p.root, "assets"),
-    natives: join(p.root, "natives", PINS.minecraft),
+    natives: join(p.root, "natives", pins.minecraft),
     fabricApi: join(p.root, "mods"),
   };
 
-  const version = await fetchVersion(PINS.minecraft, dirs.versions, o);
-  const java = await pickJava(p.java !== undefined ? [p.java] : javaCandidates(), probeJavaMajor, version.javaVersion.majorVersion);
+  const version = await fetchVersion(pins.minecraft, dirs.versions, o);
+  const java = await pickJava(p.java !== undefined ? [p.java] : javaCandidates(), probeJavaMajor, version.javaVersion.majorVersion, `Minecraft ${pins.minecraft}`);
 
-  const fabric = await fetchFabricProfile(PINS.minecraft, PINS.loader, dirs.versions, o);
+  const fabric = await fetchFabricProfile(pins.minecraft, pins.loader, dirs.versions, o);
   const libraries = mergeLibraries(namedLibraryFiles(version, os, dirs.libraries), await fabricLibraryFiles(fabric, dirs.libraries, o));
   const clientJar: FileSpec = { ...version.downloads.client, dest: join(dirs.versions, version.id, `${version.id}.jar`) };
   // Mojang's logging config (version.logging) prints log4j XML for launcher log viewers; without it the game logs
   // plain lines, which is what status logTail and crash diagnosis read.
-  const fabricApi = fabricApiFile(dirs.fabricApi);
+  const fabricApi = fabricApiFile(dirs.fabricApi, pins);
   const index = await fetchAssetIndex(version, dirs.assets, o);
   const files = [clientJar, ...libraries, fabricApi, ...assetFiles(index, join(dirs.assets, "objects"), p.sounds)];
   const downloadedBytes = await fetchAll(files, { ...o, onProgress: p.onProgress });

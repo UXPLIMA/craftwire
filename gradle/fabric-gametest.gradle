@@ -1,0 +1,44 @@
+// Client game tests for one Minecraft version (agent-fabric/gametest/<mc>), run against the built agent jar:
+// the jar users get is what is tested on every supported version. Sources are shared in agent-fabric/src/gametest.
+def mc = projectDir.name
+def props = rootProject.mcProps(mc)
+def agentJar = project(':agent-fabric').tasks.named('jar').flatMap { it.archiveFile }
+
+repositories { mavenCentral() }
+
+fabricApi {
+    configureTests {
+        createSourceSet = true
+        modId = "craftwire-agent-gametest"
+        enableClientGameTests = true
+        eula = true
+    }
+}
+
+sourceSets.gametest.java.srcDirs = [rootProject.file('agent-fabric/src/gametest/java')]
+sourceSets.gametest.resources.srcDirs = [rootProject.file('agent-fabric/src/gametest/resources')]
+
+dependencies {
+    minecraft "com.mojang:minecraft:${props.minecraft_version}"
+    implementation "net.fabricmc:fabric-loader:${loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${props.fabric_api_version}"
+    implementation files(agentJar)
+    gametestCompileOnly project(':agent-core')
+
+    // Optional: more mods in the test client, e.g. -PextraClientMods=C:/mods/sodium.jar (';'-separated).
+    if (project.hasProperty('extraClientMods')) {
+        runtimeOnly files(project.property('extraClientMods').toString().split(';'))
+    }
+}
+
+// Game tests run with the window hidden, like clients started by client_process.
+tasks.matching { it.name == 'runClientGameTest' }.configureEach {
+    dependsOn ':agent-fabric:jar'
+    jvmArgs '-Dcraftwire.hidden=true'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    dependsOn ':agent-fabric:jar'
+    options.release = 25
+    options.encoding = 'UTF-8'
+}

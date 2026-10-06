@@ -7,6 +7,12 @@ base {
     archivesName = 'craftwire-paper'
 }
 
+// The common plugin compiles against the oldest supported version; what differs lives in compat/<mc>.
+def baseProps = rootProject.mcProps(rootProject.baseMc)
+def compatProjects = rootProject.mcVersions.collect { ":paper-compat-${rootProject.mcId(it)}" }
+// Integration tests run the built jar on one version: -Pmc=26.3 (default: the oldest).
+def itProps = rootProject.mcProps(project.findProperty('mc') ?: rootProject.baseMc)
+
 evaluationDependsOn(':agent-core')
 evaluationDependsOn(':test-fixtures')
 
@@ -16,14 +22,14 @@ repositories {
 }
 
 sourceSets {
-    // HUD/scoreboard JSON shared with the Fabric agent; both compile it against Mojang-mapped 26.2.
+    // HUD/scoreboard JSON shared with the Fabric agent; both compile it against Mojang-mapped 26.x.
     main.java.srcDir rootProject.file('mc-shared/src/main/java')
     integrationTest {}
 }
 
 dependencies {
     // Paper API plus Mojang-mapped server internals; only the bot package touches the internals.
-    paperweight.paperDevBundle("${paper_api_version}")
+    paperweight.paperDevBundle(baseProps.paper_dev_bundle)
     compileOnly "org.apache.logging.log4j:log4j-core:${log4j_version}"
     // GraalJS comes from Paper's library loader at runtime (plugin.yml `libraries`), never from this jar.
     compileOnly "org.graalvm.polyglot:polyglot:${graal_version}"
@@ -47,12 +53,22 @@ jar {
     // agent-core is bundled as plain classes; Gson and log4j are provided by Paper.
     dependsOn ':agent-core:classes'
     from project(':agent-core').sourceSets.main.output
+    // Every supported version's server code; ServerCompat picks one at runtime.
+    compatProjects.each { path ->
+        dependsOn "${path}:classes"
+        from { project(path).sourceSets.main.output }
+    }
 }
 
 processResources {
     def props = [version: project.version.toString(), graalVersion: graal_version]
     inputs.properties props
     filesMatching('plugin.yml') { expand props }
+    // Tells the plugin which compat code the jar carries (see compat/ServerCompat).
+    from(rootProject.file('gradle.properties')) {
+        rename { 'craftwire-compat.properties' }
+        filter { line -> line.startsWith('mc_versions=') ? 'versions=' + line.substring('mc_versions='.length()) : null }
+    }
 }
 
 tasks.withType(JavaCompile).configureEach {
@@ -73,11 +89,11 @@ tasks.register('integrationTest', Test) {
     dependsOn tasks.named('jar'), ':test-fixtures:jar'
     def pluginJar = tasks.named('jar').flatMap { it.archiveFile }
     def fixtureJar = project(':test-fixtures').tasks.named('jar').flatMap { it.archiveFile }
-    def itDir = layout.buildDirectory.dir('it')
+    def itDir = layout.buildDirectory.dir("it/${itProps.minecraft_version}")
     inputs.files(pluginJar, fixtureJar)
-    systemProperty 'craftwire.mcVersion', minecraft_version
-    systemProperty 'craftwire.paperBuild', paper_build
-    systemProperty 'craftwire.paperSha256', paper_sha256
+    systemProperty 'craftwire.mcVersion', itProps.minecraft_version
+    systemProperty 'craftwire.paperBuild', itProps.paper_build
+    systemProperty 'craftwire.paperSha256', itProps.paper_sha256
     systemProperty 'craftwire.version', project.version.toString()
     doFirst {
         systemProperty 'craftwire.pluginJars', [pluginJar.get().asFile, fixtureJar.get().asFile]*.absolutePath.join(File.pathSeparator)
@@ -89,3 +105,6 @@ tasks.register('integrationTest', Test) {
         exceptionFormat 'full'
     }
 }
+
+ext.compatPrefix = 'paper-compat-'
+apply from: rootProject.file('gradle/compat-check.gradle')

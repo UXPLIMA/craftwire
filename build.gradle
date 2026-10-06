@@ -2,3 +2,16 @@ allprojects {
     group = 'com.uxplima.craftwire'
     version = project.property('craftwire_version')
 }
+
+// Supported Minecraft versions (oldest first) and the per-version data in versions/<mc>.properties.
+ext.mcVersions = (project.property('mc_versions') as String).split(',')*.trim()
+ext.baseMc = mcVersions[0]
+ext.mcProps = { String mc ->
+    def f = rootProject.file("versions/${mc}.properties")
+    if (!f.exists()) throw new GradleException("No versions/${mc}.properties (supported: ${mcVersions.join(', ')})")
+    def p = new Properties()
+    f.withReader('UTF-8') { p.load(it) }
+    return p
+}
+// Package-safe id of a version: 26.3 -> v26_3.
+ext.mcId = { String mc -> 'v' + mc.replace('.', '_') }

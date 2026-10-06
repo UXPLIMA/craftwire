@@ -1,0 +1,30 @@
+// Registers checkCompat: the built jar must link against every supported Minecraft version (tools/compat-check).
+// Each version's classpath (game, loader/server, libraries) is the compile classpath of that version's compat
+// project, which writes it to a file (writeCompatClasspath) so no project resolves another's configuration.
+// Applied from agent-fabric and agent-paper with ext.compatPrefix = 'fabric-compat-' or 'paper-compat-'.
+configurations { compatCheckTool }
+dependencies { compatCheckTool project(':compat-check') }
+
+def checks = rootProject.mcVersions.collect { mc ->
+    def id = rootProject.mcId(mc)
+    def path = ":${compatPrefix}${id}"
+    def listFile = rootProject.project(path).layout.buildDirectory.file('compat-classpath.txt')
+    tasks.register("checkCompat${id.capitalize()}", JavaExec) {
+        group = 'verification'
+        description = "Checks that the jar links against Minecraft ${mc}."
+        dependsOn tasks.named('jar'), "${path}:writeCompatClasspath"
+        classpath = configurations.compatCheckTool
+        mainClass = 'com.uxplima.craftwire.compatcheck.CompatCheck'
+        def jarFile = tasks.named('jar').flatMap { it.archiveFile }
+        inputs.files(jarFile, listFile)
+        argumentProviders.add({
+            [jarFile.get().asFile.absolutePath, id] + listFile.get().asFile.readLines('UTF-8').findAll { it }
+        } as CommandLineArgumentProvider)
+    }
+}
+tasks.register('checkCompat') {
+    group = 'verification'
+    description = 'Checks that the jar links against every supported Minecraft version.'
+    dependsOn checks
+}
+tasks.named('check') { dependsOn 'checkCompat' }

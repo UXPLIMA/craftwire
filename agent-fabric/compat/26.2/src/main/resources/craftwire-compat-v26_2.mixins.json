@@ -1,0 +1,8 @@
+{
+  "required": true,
+  "package": "com.uxplima.craftwire.fabric.compat.v26_2.mixin",
+  "plugin": "com.uxplima.craftwire.fabric.compat.VersionMixinPlugin",
+  "compatibilityLevel": "JAVA_25",
+  "client": ["HiddenWindowMixin"],
+  "injectors": { "defaultRequire": 1 }
+}

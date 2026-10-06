@@ -9,3 +9,15 @@ pluginManagement {
 
 rootProject.name = 'craftwire'
 include 'agent-core', 'agent-fabric', 'agent-paper', 'test-fixtures'
+include 'compat-check'
+project(':compat-check').projectDir = file('tools/compat-check')
+
+// Per supported Minecraft version: the version-specific code of each agent (bundled into its single jar)
+// and a Fabric project that runs the client game tests against the built agent jar on that version.
+for (String mc : (providers.gradleProperty('mc_versions').get()).split(',')*.trim()) {
+    String id = 'v' + mc.replace('.', '_')
+    include "fabric-compat-$id", "fabric-gametest-$id", "paper-compat-$id"
+    project(":fabric-compat-$id").projectDir = file("agent-fabric/compat/$mc")
+    project(":fabric-gametest-$id").projectDir = file("agent-fabric/gametest/$mc")
+    project(":paper-compat-$id").projectDir = file("agent-paper/compat/$mc")
+}

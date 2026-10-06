@@ -32,7 +32,7 @@ beforeAll(async () => {
   writeFileSync(join(serverDir, "server.properties"), [
     "server-ip=127.0.0.1", `server-port=${await freePort()}`, "online-mode=false", "level-type=minecraft\\:flat",
     "generate-structures=false", "view-distance=4", "simulation-distance=4", "max-players=4", "motd=craftwire-e2e-client",
-    "spawn-protection=0", "difficulty=peaceful",
+    "spawn-protection=0", "difficulty=peaceful", "white-list=false", // 26.3+ whitelists new servers by default
   ].join("\n") + "\n");
   const java = javaHome ? join(javaHome, "bin", process.platform === "win32" ? "java.exe" : "java") : "java";
   writeFileSync(join(serverDir, process.platform === "win32" ? "start.bat" : "start.sh"), `"${java}" -Xmx2G -jar paper.jar --nogui\n`);
@@ -49,6 +49,8 @@ describe("client_process against a real Paper server", () => {
   it("downloads, starts a hidden client and joins the server started by server_process", async () => {
     const r = json(await hub.call("client_process", { action: "start", username: "E2E", timeoutMs: 600_000 }));
     expect(r, JSON.stringify(r)).toMatchObject({ state: "running", username: "E2E", instance: expect.stringMatching(/^client-\d+$/) });
+    // The client runs the version the server reports.
+    expect(r.version).toBe(props.minecraft_version);
     const players = json(await hub.call("server_command", { command: "list", collectMs: 300 }));
     expect(players.output.join("\n")).toContain("E2E");
   });

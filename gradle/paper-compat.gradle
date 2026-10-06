@@ -1,0 +1,35 @@
+// Version-specific server code (agent-paper/compat/<mc>): compiled against that Paper version and bundled into the
+// single plugin jar, which picks it at runtime. Applied from agent-paper/compat/<mc>/build.gradle.
+def mc = projectDir.name
+def props = rootProject.mcProps(mc)
+
+base { archivesName = "craftwire-paper-compat-${mc}" }
+repositories {
+    maven { name = 'PaperMC'; url = 'https://repo.papermc.io/repository/maven-public/' }
+    mavenCentral()
+}
+
+dependencies {
+    paperweight.paperDevBundle(props.paper_dev_bundle)
+    // The common plugin code (interfaces such as ServerCompat), compiled against the oldest version.
+    compileOnly files(rootProject.file('agent-paper/build/classes/java/main'))
+    compileOnly project(':agent-core')
+    // Loaded by Paper's library loader at runtime (plugin.yml `libraries`), so part of the server's classpath.
+    compileOnly "org.graalvm.polyglot:polyglot:${graal_version}"
+}
+
+tasks.named('compileJava') { dependsOn ':agent-paper:compileJava' }
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 25
+    options.encoding = 'UTF-8'
+}
+
+// The classpath this version compiles against, for the agents' checkCompat (gradle/compat-check.gradle).
+tasks.register('writeCompatClasspath') {
+    def out = layout.buildDirectory.file('compat-classpath.txt')
+    def cp = configurations.named('compileClasspath')
+    outputs.file(out)
+    outputs.upToDateWhen { false }   // cheap; listing paths only, the files themselves are not inputs
+    doLast { out.get().asFile.text = cp.get().files*.absolutePath.join('\n') }
+}

@@ -10,7 +10,11 @@ repositories {
     mavenCentral()
 }
 
-// HUD/scoreboard JSON shared with the Paper bots; both compile it against Mojang-mapped 26.2.
+// The common agent compiles against the oldest supported version; what differs lives in compat/<mc>.
+def baseProps = rootProject.mcProps(rootProject.baseMc)
+def compatProjects = rootProject.mcVersions.collect { ":fabric-compat-${rootProject.mcId(it)}" }
+
+// HUD/scoreboard JSON shared with the Paper bots; both compile it against Mojang-mapped 26.x.
 sourceSets.main.java.srcDir rootProject.file('mc-shared/src/main/java')
 
 loom {
@@ -21,19 +25,10 @@ loom {
     }
 }
 
-fabricApi {
-    configureTests {
-        createSourceSet = true
-        modId = "craftwire-agent-gametest"
-        enableClientGameTests = true
-        eula = true
-    }
-}
-
 dependencies {
-    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    minecraft "com.mojang:minecraft:${baseProps.minecraft_version}"
     implementation "net.fabricmc:fabric-loader:${project.loader_version}"
-    implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${baseProps.fabric_api_version}"
 
     implementation project(':agent-core')
     include project(':agent-core')
@@ -41,23 +36,31 @@ dependencies {
     testImplementation platform('org.junit:junit-bom:5.13.4')
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-
-    // Optional: run the client game tests with more mods, e.g. -PextraClientMods=C:/mods/sodium.jar (';'-separated).
-    if (project.hasProperty('extraClientMods')) {
-        runtimeOnly files(project.property('extraClientMods').toString().split(';'))
-    }
-}
-
-// Game tests run with the window hidden, like clients started by client_process.
-tasks.matching { it.name == 'runClientGameTest' }.configureEach {
-    jvmArgs '-Dcraftwire.hidden=true'
 }
 
 processResources {
-    def version = project.version
-    inputs.property "version", version
-    filesMatching("fabric.mod.json") {
-        expand "version": version
+    def versions = rootProject.mcVersions
+    def last = versions[-1].tokenize('.')
+    def props = [
+        version: project.version.toString(),
+        // e.g. ">=26.2 <26.4-": every supported release, no newer snapshot.
+        minecraft: ">=${versions[0]} <${last[0]}.${(last[1] as int) + 1}-",
+        compatMixins: versions.collect { '"craftwire-compat-' + rootProject.mcId(it) + '.mixins.json"' }.join(', '),
+    ]
+    inputs.properties props
+    filesMatching("fabric.mod.json") { expand props }
+    // Tells the agent which compat code the jar carries (see compat/Versions).
+    from(rootProject.file('gradle.properties')) {
+        rename { 'craftwire-compat.properties' }
+        filter { line -> line.startsWith('mc_versions=') ? 'versions=' + line.substring('mc_versions='.length()) : null }
+    }
+}
+
+// The jar carries every version's compat classes and mixin configs.
+jar {
+    compatProjects.each { path ->
+        dependsOn "${path}:classes"
+        from { project(path).sourceSets.main.output }
     }
 }
 
@@ -74,3 +77,6 @@ java {
 test {
     useJUnitPlatform()
 }
+
+ext.compatPrefix = 'fabric-compat-'
+apply from: rootProject.file('gradle/compat-check.gradle')

@@ -12,7 +12,7 @@ class EvalIT {
 
     @Test
     void seesTheBukkitApi() throws Exception {
-        assertEquals("26.2", eval("{\"code\":\"server.getMinecraftVersion()\"}").get("result").getAsString());
+        assertEquals(System.getProperty("craftwire.mcVersion"), eval("{\"code\":\"server.getMinecraftVersion()\"}").get("result").getAsString());
     }
 
     @Test

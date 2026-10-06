@@ -65,7 +65,8 @@ export function buildLaunch(i: LaunchInput): { command: string; args: string[] }
     "-Xmx2G",
     // Windows JVMs write a pipe in the ANSI code page; the hub decodes UTF-8.
     "-Dstdout.encoding=UTF-8", "-Dstderr.encoding=UTF-8",
-    ...(i.hidden ? ["-Dcraftwire.hidden=true"] : []),
+    // Hidden: Fabric must not open its error window (nobody can close it); the game exits and the crash is reported.
+    ...(i.hidden ? ["-Dcraftwire.hidden=true", "-Dfabric.noGui=true"] : []),
   ];
   const features = { has_custom_resolution: true, is_quick_play_multiplayer: i.server !== undefined };
   const game = dropEmptyOptions([...argumentList(i.version.arguments.game, i.os, features), ...(i.fabric.arguments.game ?? [])].map(fill));

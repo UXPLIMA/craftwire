@@ -12,7 +12,8 @@ repositories {
 }
 
 dependencies {
-    compileOnly "io.papermc.paper:paper-api:${paper_api_version}"
+    // Paper API only, so the fixture plugin runs on every supported version.
+    compileOnly "io.papermc.paper:paper-api:${rootProject.mcProps(rootProject.baseMc).paper_dev_bundle}"
 }
 
 processResources {

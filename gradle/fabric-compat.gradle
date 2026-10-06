@@ -1,0 +1,32 @@
+// Version-specific client code (agent-fabric/compat/<mc>). Compiled against that Minecraft version and bundled
+// into the single agent jar; the agent picks it at runtime. Applied from agent-fabric/compat/<mc>/build.gradle.
+def mc = projectDir.name
+def props = rootProject.mcProps(mc)
+
+base { archivesName = "craftwire-fabric-compat-${mc}" }
+repositories { mavenCentral() }
+
+dependencies {
+    minecraft "com.mojang:minecraft:${props.minecraft_version}"
+    implementation "net.fabricmc:fabric-loader:${loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${props.fabric_api_version}"
+    // The common agent code (interfaces such as ClientCompat), compiled against the oldest version.
+    compileOnly files(rootProject.file('agent-fabric/build/classes/java/main'))
+    compileOnly project(':agent-core')
+}
+
+tasks.named('compileJava') { dependsOn ':agent-fabric:compileJava' }
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 25
+    options.encoding = 'UTF-8'
+}
+
+// The classpath this version compiles against, for the agents' checkCompat (gradle/compat-check.gradle).
+tasks.register('writeCompatClasspath') {
+    def out = layout.buildDirectory.file('compat-classpath.txt')
+    def cp = configurations.named('compileClasspath')
+    outputs.file(out)
+    outputs.upToDateWhen { false }   // cheap; listing paths only, the files themselves are not inputs
+    doLast { out.get().asFile.text = cp.get().files*.absolutePath.join('\n') }
+}

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { fabricApiFile, fabricLibraryFiles, libraryKey, mavenPath, mergeLibraries } from "../src/client/fabric.js";
+import { pinsFor } from "../src/client/pins.js";
 
 const slash = (p: string) => p.replace(/\\/g, "/");
 
@@ -56,11 +57,12 @@ describe("Fabric loader profile", () => {
       mkdtempSync(join(tmpdir(), "cw-sha-")), { fetchImpl: html })).rejects.toMatchObject({ code: "DOWNLOAD_FAILED" });
   });
 
-  it("points Fabric API at the pinned version on Fabric's Maven", () => {
-    const f = fabricApiFile("/m");
+  it("points Fabric API at the pinned version of each Minecraft version on Fabric's Maven", () => {
+    const f = fabricApiFile("/m", pinsFor("26.2"));
     expect(f.url).toBe("https://maven.fabricmc.net/net/fabricmc/fabric-api/fabric-api/0.161.0%2B26.2/fabric-api-0.161.0%2B26.2.jar");
     expect(f.sha1).toBe("332da34ebb72171e603a0c538de17f4c54ea9e29");
     expect(slash(f.dest)).toBe("/m/fabric-api-0.161.0+26.2.jar");
+    expect(fabricApiFile("/m", pinsFor("26.3")).url).toContain("fabric-api-0.162.0%2B26.3.jar");
   });
 });
 

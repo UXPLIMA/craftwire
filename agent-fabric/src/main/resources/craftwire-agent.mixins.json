@@ -2,7 +2,7 @@
   "required": true,
   "package": "com.uxplima.craftwire.fabric.mixin",
   "compatibilityLevel": "JAVA_25",
-  "client": ["AbstractContainerScreenAccessor", "BossHealthOverlayAccessor", "CameraMixin", "HudAccessor", "HudChatMixin", "MouseHandlerAccessor", "HiddenWindowMixin", "PlayerTabOverlayAccessor"],
+  "client": ["AbstractContainerScreenAccessor", "BossHealthOverlayAccessor", "CameraMixin", "HudAccessor", "HudChatMixin", "MouseHandlerAccessor", "PlayerTabOverlayAccessor"],
   "injectors": { "defaultRequire": 1 },
   "overwrites": { "requireAnnotations": true }
 }

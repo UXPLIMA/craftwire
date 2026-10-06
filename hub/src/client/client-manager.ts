@@ -9,12 +9,16 @@ import { serverAddress } from "../dev/launch.js";
 import { samePath } from "../dev/paths.js";
 import { killTree } from "../dev/server-manager.js";
 import { RingBuffer } from "../ringbuffer.js";
+import { type McVersion, NEWEST_VERSION, SUPPORTED_VERSIONS, supportedVersion } from "./pins.js";
+import { pingServer } from "./server-ping.js";
 
 export type ClientState = "downloading" | "starting" | "running" | "stopping" | "stopped" | "crashed";
 
 export interface ClientStartOptions {
   /** host:port; default: the single server running under server_process. */
   server?: string;
+  /** Minecraft version; default: the one the server reports, else the newest supported. */
+  version?: McVersion;
   username?: string;
   mods?: string[];
   visible?: boolean;
@@ -26,6 +30,7 @@ export interface ClientStartOptions {
 
 export interface PrepareInput {
   root: string;
+  version: McVersion;
   username: string;
   server?: string;
   mods: string[];
@@ -43,6 +48,7 @@ export type PrepareClient = (p: PrepareInput) => Promise<{ command: string; args
 export interface ClientStatus {
   username: string;
   state: ClientState;
+  version?: McVersion;
   instance?: string | null;
   server?: string;
   pid?: number;
@@ -72,11 +78,14 @@ export interface ClientManagerOptions {
   stopTimeoutMs?: number;
   quitTimeoutMs?: number;
   readyPollMs?: number;
+  /** Asks a server for its version (Server List Ping); injectable for tests. */
+  ping?: (host: string, port: number) => Promise<{ name: string; protocol: number } | undefined>;
 }
 
 interface Managed {
   username: string;
   state: ClientState;
+  version?: McVersion;
   log: RingBuffer<string>;
   server?: string;
   gameDir?: string;
@@ -92,6 +101,27 @@ interface Managed {
 }
 
 const USERNAME = /^[A-Za-z0-9_]{3,16}$/;
+
+interface DisconnectScreen {
+  type?: string;
+  title?: string;
+  widgets?: { kind?: string; text?: string }[];
+}
+
+/** The server's reason from a disconnect screen (title plus message lines, without buttons) and how to fix it. */
+export function joinFailure(screen: DisconnectScreen, username: string): { reason: string; hint: string } {
+  const lines = (screen.widgets ?? [])
+    .filter((w) => w.text && /Text|String/.test(w.kind ?? ""))
+    .map((w) => w.text!)
+    .filter((t) => t !== screen.title);
+  const reason = [screen.title ?? screen.type, ...lines].filter(Boolean).join(": ");
+  if (/whitelist/i.test(reason)) {
+    return { reason, hint: `Ask the user to allow the player on this dev server: server_command "whitelist add ${username}", or white-list=false in server.properties (servers since 26.3 whitelist by default).` };
+  }
+  if (/banned/i.test(reason)) return { reason, hint: `The player is banned on this server: server_command "pardon ${username}" if the user agrees.` };
+  if (/outdated|incompatible|version/i.test(reason)) return { reason, hint: "The server runs another Minecraft version: pass version, or let client_process detect it." };
+  return { reason, hint: "Check that the server runs, the address is right and online-mode=false." };
+}
 const LIVE: readonly ClientState[] = ["downloading", "starting", "running", "stopping"];
 const isLive = (m: Managed | undefined): m is Managed => m !== undefined && LIVE.includes(m.state);
 const KEEP_STOPPED = 10;
@@ -123,7 +153,8 @@ export class ClientManager {
       throw new CraftwireError("ALREADY_RUNNING", `A client named ${username} is already running`, "Use it, stop it first, or pass another username.");
     }
     const server = o.server ?? this.defaultServer();
-    const m: Managed = { username, state: "downloading", log: new RingBuffer(2000), startedAt: Date.now(), agent: null };
+    const version = o.version ?? await this.serverVersion(server);
+    const m: Managed = { username, version, state: "downloading", log: new RingBuffer(2000), startedAt: Date.now(), agent: null };
     if (server !== undefined) m.server = server;
     this.clients.set(username, m);
     this.pruneStopped();
@@ -131,7 +162,7 @@ export class ClientManager {
     let prepared: Awaited<ReturnType<PrepareClient>>;
     try {
       prepared = await this.opts.prepare({
-        root: this.root, username, mods: o.mods ?? [], visible: o.visible ?? false,
+        root: this.root, version, username, mods: o.mods ?? [], visible: o.visible ?? false,
         width: o.windowSize?.width ?? 1280, height: o.windowSize?.height ?? 720, sounds: o.sounds ?? false,
         ...(server !== undefined ? { server } : {}), ...(o.java !== undefined ? { java: o.java } : {}),
         onProgress: (done, total) => { m.progress = { done, total }; },
@@ -200,6 +231,20 @@ export class ClientManager {
     for (const m of stopped.slice(KEEP_STOPPED)) this.clients.delete(m.username);
   }
 
+  /** The supported version matching what `server` reports; the newest when there is no server or it does not answer. */
+  private async serverVersion(server: string | undefined): Promise<McVersion> {
+    if (server === undefined) return NEWEST_VERSION;
+    const [host, port] = server.includes(":") ? [server.slice(0, server.lastIndexOf(":")), Number(server.slice(server.lastIndexOf(":") + 1))] : [server, 25565];
+    const reported = await (this.opts.ping ?? pingServer)(host, port);
+    if (reported === undefined) return NEWEST_VERSION;
+    const v = supportedVersion(reported.name);
+    if (v === undefined) {
+      throw new CraftwireError("VERSION_UNSUPPORTED", `${server} runs ${reported.name}; client_process runs Minecraft ${SUPPORTED_VERSIONS.join(", ")}`,
+        "Use a server on one of those versions, or start the client without a server.");
+    }
+    return v;
+  }
+
   private defaultServer(): string | undefined {
     const running = this.opts.servers.status().servers.filter((s) => s.state === "running");
     if (running.length === 0) return undefined;
@@ -265,18 +310,18 @@ export class ClientManager {
           await this.opts.agents.request(agent, "player.state", {}, 5000);
           return "ready";
         } catch (e) {
-          if (e instanceof CraftwireError && e.code === "NOT_IN_WORLD") await this.checkDisconnected(agent);
+          if (e instanceof CraftwireError && e.code === "NOT_IN_WORLD") await this.checkDisconnected(agent, m.username);
         }
       }
       await sleep(poll);
     }
   }
 
-  private async checkDisconnected(agent: string): Promise<void> {
-    const screen = (await this.opts.agents.request(agent, "gui.read", {}, 5000).catch(() => undefined)) as { type?: string; title?: string } | undefined;
+  private async checkDisconnected(agent: string, username: string): Promise<void> {
+    const screen = (await this.opts.agents.request(agent, "gui.read", {}, 5000).catch(() => undefined)) as DisconnectScreen | undefined;
     if (screen?.type && /Disconnected/i.test(screen.type)) {
-      throw new CraftwireError("JOIN_FAILED", `The client could not join the server: ${screen.title ?? screen.type}`,
-        "Check that the server runs, the address is right and online-mode=false.", { screen });
+      const { reason, hint } = joinFailure(screen, username);
+      throw new CraftwireError("JOIN_FAILED", `The client could not join the server: ${reason}`, hint, { screen });
     }
   }
 
@@ -308,6 +353,7 @@ export class ClientManager {
 
   private snapshot(m: Managed, tail: number): ClientStatus {
     const s: ClientStatus = { username: m.username, state: m.state, logTail: tail > 0 ? m.log.toArray().slice(-tail) : [] };
+    if (m.version !== undefined) s.version = m.version;
     if (m.agent !== undefined) s.instance = m.agent;
     if (m.server !== undefined) s.server = m.server;
     if (isLive(m) && m.child?.pid !== undefined) s.pid = m.child.pid;
