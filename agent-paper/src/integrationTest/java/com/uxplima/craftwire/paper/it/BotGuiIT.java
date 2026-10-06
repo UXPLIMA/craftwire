@@ -85,7 +85,14 @@ class BotGuiIT {
         assertEquals("block", r.get("used").getAsString());
         Thread.sleep(100);
         JsonObject b = hub.result("world.query", "{\"action\":\"block\",\"x\":24,\"y\":-60,\"z\":22}").getAsJsonObject();
-        assertEquals("minecraft:stone", b.get("block").getAsString(), b.toString());
+        if (!"minecraft:stone".equals(b.get("block").getAsString())) {
+            // Seen once on CI only: collect what the bot and the world looked like.
+            Thread.sleep(500);
+            fail("no stone placed: " + b + " | after 500 ms: " + hub.result("world.query", "{\"action\":\"block\",\"x\":24,\"y\":-60,\"z\":22}")
+                    + " | below: " + hub.result("world.query", "{\"action\":\"block\",\"x\":24,\"y\":-61,\"z\":22}")
+                    + " | state: " + act("{\"bot\":\"Gui\",\"action\":\"state\"}")
+                    + " | messages: " + act("{\"bot\":\"Gui\",\"action\":\"messages\"}"));
+        }
         assertEquals("OUT_OF_REACH", hub.error("bot.action", "{\"bot\":\"Gui\",\"action\":\"use\",\"block\":{\"x\":60,\"y\":-61,\"z\":60}}").get("code").getAsString());
     }
 
