@@ -8,9 +8,12 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
+import java.util.random.RandomGenerator;
 
 /**
  * Samples the stack of one thread every few milliseconds and sums the samples into a {@link ProfileReport}.
@@ -38,6 +41,16 @@ public final class Profiler {
         return new Session(thread, intervalMs, index, eventOf);
     }
 
+    /**
+     * The wait before the next sample: anywhere from half the interval to one and a half, so the samples average
+     * the interval without keeping step with the game loop. At a fixed 10 ms against a 50 ms tick every sample falls
+     * at the same few moments of each tick, and work that always runs at another moment is never seen.
+     */
+    static long nextDelayNanos(int intervalMs, RandomGenerator random) {
+        long interval = intervalMs * 1_000_000L;
+        return interval / 2 + random.nextLong(interval);
+    }
+
     private static long threadId(String name) {
         for (Thread t : Thread.getAllStackTraces().keySet()) {
             if (t.getName().equals(name)) return t.threadId();
@@ -63,7 +76,20 @@ public final class Profiler {
             this.intervalMs = intervalMs;
             this.threadId = threadId(thread);
             this.report = new ProfileReport(index, eventOf);
-            if (threadId >= 0) sampler.scheduleAtFixedRate(this::sample, 0, intervalMs, TimeUnit.MILLISECONDS);
+            if (threadId >= 0) sampler.execute(this::sampleAndReschedule);
+        }
+
+        private void sampleAndReschedule() {
+            try {
+                sample();
+            } finally {
+                try {
+                    sampler.schedule(this::sampleAndReschedule,
+                            nextDelayNanos(intervalMs, ThreadLocalRandom.current()), TimeUnit.NANOSECONDS);
+                } catch (RejectedExecutionException stopped) {
+                    // finish() or cancel() shut the sampler down
+                }
+            }
         }
 
         private void sample() {
