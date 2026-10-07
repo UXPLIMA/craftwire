@@ -73,15 +73,19 @@ public final class ClientEval {
     }
 
     static boolean allowed() {
-        String prop = System.getProperty("craftwire.allowEval");
+        return allowed(System.getProperty("craftwire.allowEval"), FabricLoader.getInstance().getConfigDir().resolve("craftwire.properties"));
+    }
+
+    /** The system property, else allow-eval in the config file; a file that cannot be read keeps scripts off. */
+    static boolean allowed(String prop, Path file) {
         if (prop != null) return Boolean.parseBoolean(prop);
-        Path file = FabricLoader.getInstance().getConfigDir().resolve("craftwire.properties");
-        if (!Files.isRegularFile(file)) return true;
+        if (!Files.exists(file)) return true;
         Properties props = new Properties();
         try (InputStream in = Files.newInputStream(file)) {
             props.load(in);
-        } catch (IOException e) {
-            return true;
+        } catch (IOException | IllegalArgumentException e) {
+            throw new AgentError("EVAL_DISABLED", file.getFileName() + " could not be read (" + e.getMessage() + "), so client_eval stays off",
+                    "Fix or delete " + file + "; ask the user.");
         }
         return Boolean.parseBoolean(props.getProperty("allow-eval", "true").strip());
     }

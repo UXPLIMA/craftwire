@@ -40,6 +40,17 @@ describe("resources", () => {
     expect(text(await hub.client.readResource({ uri: `craftwire://instances/${agent.instanceId}/log` }))).toBe(log);
   });
 
+  it("encodes instance names that are not URI-safe, and reads them back", async () => {
+    hub = await startHub();
+    const agent = await connectFakeAgent(hub.port, { token: TOKEN, kind: "server", name: "Test Server #2" });
+    agent.emit("log", { level: "INFO", logger: "Minecraft", message: "Done (3.1s)!" });
+    const h = hub;
+    await vi.waitFor(() => expect(h.agents.events(agent.instanceId)).toHaveLength(1));
+    const uri = (await hub.client.listResources()).resources.map((r) => r.uri).find((u) => u.endsWith("/log"));
+    expect(uri).toBe("craftwire://instances/Test%20Server%20%232/log");
+    expect(text(await hub.client.readResource({ uri: uri! }))).toMatch(/Done \(3\.1s\)!/);
+  });
+
   it("reads a client's chat and takes a screenshot when read", async () => {
     hub = await startHub();
     const client = await connectFakeAgent(hub.port, { token: TOKEN, kind: "client", name: "Steve" });

@@ -20,7 +20,17 @@ function docsDir(): string | undefined {
   return [join(here, "..", "..", "docs"), join(here, "..", "docs")].find((d) => existsSync(join(d, "scenarios.md")));
 }
 
-function instanceOf(ctx: ToolContext, key: string): InstanceInfo {
+/** A URI segment back to the name or id it encodes (a malformed escape is taken as written). */
+function decoded(segment: string): string {
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return segment;
+  }
+}
+
+function instanceOf(ctx: ToolContext, segment: string): InstanceInfo {
+  const key = decoded(segment);
   const all = ctx.agents.instances();
   const hit = all.find((i) => i.id === key) ?? all.find((i) => i.name.toLowerCase() === key.toLowerCase());
   if (!hit) throw new CraftwireError("NO_INSTANCE", `No instance matches "${key}"`, "Read craftwire://instances for what is connected.");
@@ -64,7 +74,7 @@ export function registerResources(server: McpServer, ctx: ToolContext): void {
     new ResourceTemplate(`craftwire://instances/{instance}/${path}`, {
       list: async () => ({
         resources: ctx.agents.instances().filter((i) => kind === "any" || i.kind === kind).map((i) => ({
-          uri: `craftwire://instances/${i.name}/${path}`, name: `${i.name} ${path}`, description: what(i), mimeType,
+          uri: `craftwire://instances/${encodeURIComponent(i.name)}/${path}`, name: `${i.name} ${path}`, description: what(i), mimeType,
         })),
       }),
       complete: { instance: (v) => ctx.agents.instances().map((i) => i.name).filter((n) => n.toLowerCase().startsWith(v.toLowerCase())) },
@@ -140,7 +150,8 @@ function subscriptions(server: McpServer, ctx: ToolContext): void {
     if (!inst) return;
     for (const uri of subscribed) {
       const m = /^craftwire:\/\/instances\/([^/]+)\/(.+)$/.exec(uri);
-      if (m && m[2] === path && (m[1] === inst.id || m[1]!.toLowerCase() === inst.name.toLowerCase())) announce(uri);
+      const key = m ? decoded(m[1]!) : "";
+      if (m && m[2] === path && (key === inst.id || key.toLowerCase() === inst.name.toLowerCase())) announce(uri);
     }
   };
 

@@ -123,4 +123,16 @@ class GraalRuntimeTest {
         assertEquals("DOWNLOAD_FAILED", e.code());
         assertTrue(e.hint().contains("network"), e.hint());
     }
+
+    @Test
+    void eachScriptEngineBuildGetsItsOwnJarSoAnotherGameNeverHasItsJarReplaced() throws Exception {
+        byte[] older = "engine of one agent version".getBytes(StandardCharsets.UTF_8);
+        byte[] newer = "engine of another agent version".getBytes(StandardCharsets.UTF_8);
+        Path a = GraalRuntime.scriptJar(dir, older);
+        Path b = GraalRuntime.scriptJar(dir, newer);
+        assertNotEquals(a, b);
+        assertArrayEquals(older, Files.readAllBytes(a), "the jar another game may have open is left alone");
+        assertArrayEquals(newer, Files.readAllBytes(b));
+        assertEquals(a, GraalRuntime.scriptJar(dir, older), "the same build reuses its jar");
+    }
 }

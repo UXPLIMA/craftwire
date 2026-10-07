@@ -134,6 +134,17 @@ class JfrTest {
     }
 
     @Test
+    void oneTraceAtATimeBecauseFlightRecorderMergesTheirFilters() throws Exception {
+        MethodTracer.Session first = MethodTracer.start(Busy.class.getName() + "::hot", 0, 8, 5, INDEX);
+        AgentError e = assertThrows(AgentError.class, () -> MethodTracer.start(Busy.class.getName() + "::work", 0, 8, 5, INDEX));
+        assertEquals("ALREADY_RUNNING", e.code());
+        first.finish();
+        MethodTracer.Session second = MethodTracer.start(Busy.class.getName() + "::work", 0, 8, 5, INDEX);
+        second.cancel();
+        MethodTracer.start(Busy.class.getName() + "::work", 0, 8, 5, INDEX).finish();   // cancel freed it too
+    }
+
+    @Test
     void rejectsFiltersThatAreNotAClassOrMethod() {
         for (String bad : new String[] {"", "com.x.Y::", "not a class", "com.x.Y::a::b", "x;y;z;w;v;u", "com.x.*"}) {
             AgentError e = assertThrows(AgentError.class, () -> MethodTracer.validate(bad), bad);

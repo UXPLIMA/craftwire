@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 import jdk.jfr.consumer.RecordedEvent;
 import jdk.jfr.consumer.RecordedMethod;
@@ -25,6 +26,8 @@ import jdk.jfr.consumer.RecordingStream;
 public final class MethodTracer {
     /** A trace stops once it has seen this many calls, so a very hot method cannot flood the game. */
     static final int MAX_CALLS = 100_000;
+    /** Whether a trace is running in this JVM. */
+    private static final AtomicBoolean RUNNING = new AtomicBoolean();
 
     private static final String NAME = "[A-Za-z_$][\\w$]*";
     private static final Pattern ONE = Pattern.compile(
@@ -50,7 +53,17 @@ public final class MethodTracer {
             throw new AgentError("UNSUPPORTED", "Method tracing needs Java 25 or newer (this game runs " + Runtime.version() + ")",
                     "Run the game or server on Java 25+.");
         }
-        return new Session(filter, minMs, stackDepth, limit, index);
+        // Flight Recorder merges the filters of every running recording, so a second trace would see the first's methods.
+        if (!RUNNING.compareAndSet(false, true)) {
+            throw new AgentError("ALREADY_RUNNING", "Another trace is running in this game",
+                    "Wait for it to finish (at most its durationMs), or trace several methods at once: separate them with ';'.");
+        }
+        try {
+            return new Session(filter, minMs, stackDepth, limit, index);
+        } catch (RuntimeException e) {
+            RUNNING.set(false);
+            throw e;
+        }
     }
 
     public static final class Session {
@@ -65,6 +78,7 @@ public final class MethodTracer {
         private final PriorityQueue<Call> slowest = new PriorityQueue<>(Comparator.comparingLong(Call::nanos));
         private final Map<String, Integer> callers = new HashMap<>();
         private final CompletableFuture<Void> flooded = new CompletableFuture<>();
+        private final AtomicBoolean closed = new AtomicBoolean();
         private long calls;
 
         private record Timing(String method, long invocations, Duration average, Duration maximum) {}
@@ -130,7 +144,7 @@ public final class MethodTracer {
             } catch (IllegalStateException ignored) {
                 // already stopped
             } finally {
-                stream.close();
+                close();
             }
             synchronized (this) {
                 JsonObject o = new JsonObject();
@@ -187,7 +201,12 @@ public final class MethodTracer {
         }
 
         public void cancel() {
+            close();
+        }
+
+        private void close() {
             stream.close();
+            if (!closed.getAndSet(true)) RUNNING.set(false);
         }
 
         private JsonObject owned(String qualified) {

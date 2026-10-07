@@ -160,18 +160,30 @@ public final class GraalRuntime {
 
     /** The script engine's own jar, shipped inside the agent jar (where the game's class loader does not look). */
     private static Path scriptJar(Path dir) {
-        Path out = dir.resolve("craftwire-script.jar");
         try (InputStream in = GraalRuntime.class.getResourceAsStream(SCRIPT_JAR)) {
             if (in == null) throw new IOException(SCRIPT_JAR + " is missing from the agent jar");
-            byte[] bytes = in.readAllBytes();
-            if (!Files.isRegularFile(out) || !java.util.Arrays.equals(Files.readAllBytes(out), bytes)) {
-                Path part = dir.resolve("craftwire-script.jar.part");
-                Files.write(part, bytes);
-                Files.move(part, out, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-            }
-            return out;
+            return scriptJar(dir, in.readAllBytes());
         } catch (IOException e) {
             throw new AgentError("EVAL_UNAVAILABLE", "This agent build cannot run scripts: " + e.getMessage(), "Reinstall the Craftwire agent mod.");
         }
+    }
+
+    /**
+     * The jar for these engine bytes, named by their hash: games running other agent versions share the GraalJS
+     * folder, and Windows refuses to replace a jar another game has open, so an existing jar is never rewritten.
+     */
+    static Path scriptJar(Path dir, byte[] bytes) throws IOException {
+        String hash = sha256(bytes);
+        Path out = dir.resolve("craftwire-script-" + hash.substring(0, 16) + ".jar");
+        if (!matches(out, hash)) {
+            Path part = Files.createTempFile(dir, "craftwire-script-", ".part");
+            try {
+                Files.write(part, bytes);
+                Files.move(part, out, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            } finally {
+                deleteQuietly(part);
+            }
+        }
+        return out;
     }
 }
