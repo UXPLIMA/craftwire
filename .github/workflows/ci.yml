@@ -5,7 +5,7 @@ on:
 
 jobs:
   hub:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: hub
@@ -23,7 +23,7 @@ jobs:
   # Unit tests, the jars, and checkCompat: every class/method/field the agent jars use exists in every
   # supported Minecraft version (tools/compat-check).
   java:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -35,7 +35,7 @@ jobs:
 
   # The same agent jar, on every supported version (versions/<mc>.properties).
   client-gametest:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: java
     # A game that cannot open its window waits forever instead of exiting.
     timeout-minutes: 30
@@ -78,7 +78,7 @@ jobs:
             agent-fabric/gametest/${{ matrix.mc }}/build/run/**/craftwire-camera-shots/
 
   paper-it:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: java
     strategy:
       fail-fast: false
@@ -99,7 +99,7 @@ jobs:
           path: agent-paper/build/it/${{ matrix.mc }}/server/logs/
 
   dev-loop-e2e:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [java, hub]
     timeout-minutes: 40
     strategy:
