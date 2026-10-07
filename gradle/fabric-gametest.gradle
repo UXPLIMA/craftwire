@@ -38,6 +38,14 @@ tasks.matching { it.name == 'runClientGameTest' }.configureEach {
     dependsOn ':agent-fabric:jar'
     jvmArgs '-Dcraftwire.hidden=true'
     environment 'CRAFTWIRE_HOME', new File(gradle.gradleUserHomeDir, 'craftwire-test-home').absolutePath
+    // Silent, like client_process clients: a hidden test game must not play sounds through the developer's speakers.
+    def options = layout.buildDirectory.file('run/clientGameTest/options.txt')
+    doFirst {
+        def f = options.get().asFile
+        f.parentFile.mkdirs()
+        def lines = f.exists() ? f.readLines('UTF-8').findAll { !it.startsWith('soundCategory_master:') } : []
+        f.write((lines + 'soundCategory_master:0.0').join('\n') + '\n', 'UTF-8')
+    }
 }
 
 tasks.withType(JavaCompile).configureEach {
