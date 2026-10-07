@@ -126,14 +126,23 @@ public final class GuiActionHandler {
         text.codePoints().forEach(cp -> screen.charTyped(new CharacterEvent(cp)));
     }
 
-    /** Moves the logical (and, when the window has focus, the real) cursor to GUI-scaled coordinates. */
+    /** Moves the logical cursor to GUI-scaled coordinates, and the real one too when {@link #movesRealCursor} says so. */
     public static void moveMouseTo(Minecraft mc, double guiX, double guiY) {
         Window window = mc.getWindow();
         double sx = guiX * window.getScreenWidth() / (double) window.getGuiScaledWidth();
         double sy = guiY * window.getScreenHeight() / (double) window.getGuiScaledHeight();
-        ClientCompat.get().warpCursor(window, sx, sy);   // only while focused: the user's cursor is never hijacked
+        ClientCompat compat = ClientCompat.get();
+        if (movesRealCursor(compat.windowVisible(window), window.isFocused())) compat.warpCursor(window, sx, sy);
         MouseHandlerAccessor mouse = (MouseHandlerAccessor) mc.mouseHandler;
         mouse.craftwire$setXpos(sx);
         mouse.craftwire$setYpos(sy);
+    }
+
+    /**
+     * Whether the system cursor follows: only in a window the user sees and is using. A hidden game can still
+     * report focus on Windows, and moving the cursor there would take the user's mouse away from their own work.
+     */
+    static boolean movesRealCursor(boolean windowVisible, boolean windowFocused) {
+        return windowVisible && windowFocused;
     }
 }
