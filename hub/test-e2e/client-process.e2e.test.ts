@@ -64,6 +64,23 @@ describe("client_process against a real Paper server", () => {
     expect(statSync(shot).size).toBeGreaterThan(50_000);
   });
 
+  it("records a video with sound while the camera circles the player", async () => {
+    const video = join(e2eDir, "client-video.mp4");
+    rmSync(video, { force: true });
+    const { position } = json(await hub.call("player_state", { instance: "E2E" }));
+    const r = json(await hub.call("record", {
+      instance: "E2E", action: "start", savePath: video, preset: "balanced", wait: true,
+      camera: { action: "orbit", center: position, radius: 8, height: 3, durationMs: 3000 },
+    }));
+    expect(r, JSON.stringify(r)).toMatchObject({ reason: "duration", audio: true, savedPath: video, codec: "h264" });
+    expect(Math.abs(r.durationMs - 3000)).toBeLessThanOrEqual(20);
+    expect(r.frames).toBe(90);
+    // A moving camera over a rendered world; a black or frozen picture compresses to almost nothing.
+    expect(statSync(video).size).toBeGreaterThan(30_000);
+    const after = json(await hub.call("camera", { instance: "E2E", action: "reset" }));
+    expect(after.active).toBe(false);
+  });
+
   it("reads a plugin menu opened on the client", async () => {
     await hub.call("chat", { instance: "E2E", action: "command", text: "cwfixture menu" });
     const w = await hub.call("wait_for", { condition: "screen_open", instance: "E2E", timeoutMs: 15_000 });

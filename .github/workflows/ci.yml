@@ -123,7 +123,7 @@ jobs:
           cache-dependency-path: hub/package-lock.json
       - run: ./gradlew :agent-paper:jar :agent-fabric:jar :test-fixtures:jar
       # client_process runs its client under xvfb-run on a machine without a display.
-      - run: sudo apt-get update && sudo apt-get install -y xvfb libegl1 libegl-mesa0
+      - run: sudo apt-get update && sudo apt-get install -y xvfb libegl1 libegl-mesa0 ffmpeg
       - uses: actions/cache@v4
         with:
           path: hub/.e2e/client-cache
