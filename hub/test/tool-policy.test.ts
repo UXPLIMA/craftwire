@@ -24,6 +24,8 @@ describe("ToolPolicy", () => {
     expect(p.refusal("bot_action", { action: "messages" })).toBeUndefined();
     expect(p.refusal("bot_action", { action: "attack" })).toMatch(/read-only/);
     expect(p.refusal("events", { action: "watch" })).toBeUndefined();
+    expect(p.refusal("record", { action: "status" })).toBeUndefined();
+    expect(p.refusal("record", { action: "start", savePath: "a.mp4" })).toMatch(/read-only/);
     expect(p.refusal("client_settings", {})).toBeUndefined();
     expect(p.refusal("client_settings", { fov: 90 })).toMatch(/read-only/);
   });

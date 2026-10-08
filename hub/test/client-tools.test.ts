@@ -68,6 +68,45 @@ describe("client tools", () => {
     expect(seen).toMatchObject({ hud: false, chat: false, maxSize: 1600, savePath: resolve("shots/a.png") });
   });
 
+  it("camera path and orbit forward the motion", async () => {
+    const { hub, agent } = await withAgent();
+    const got: Record<string, unknown>[] = [];
+    agent.onRequest("camera", (p) => { got.push(p); return { active: true }; });
+    const keyframes = [{ t: 0, x: 0, y: 70, z: 0, yaw: 0, pitch: 10 }, { t: 3000, x: 20, y: 75, z: 5, yaw: 90, pitch: 20 }];
+    expect((await hub.call("camera", { action: "path", keyframes, interpolation: "linear", ease: "none" })).isError).toBeFalsy();
+    expect((await hub.call("camera", { action: "orbit", center: { x: 1, y: 64, z: 2 }, radius: 12, durationMs: 8000 })).isError).toBeFalsy();
+    expect(got[0]).toMatchObject({ action: "path", keyframes, interpolation: "linear", ease: "none" });
+    expect(got[1]).toMatchObject({ action: "orbit", center: { x: 1, y: 64, z: 2 }, radius: 12, durationMs: 8000 });
+  });
+
+  it("record start absolutises savePath and forwards the settings", async () => {
+    const { hub, agent } = await withAgent();
+    let seen: Record<string, unknown> = {};
+    agent.onRequest("record", (p) => { seen = p; return { recording: true, savePath: p.savePath }; });
+    const res = json(await hub.call("record", { action: "start", savePath: "videos/promo.mp4", preset: "light", fps: 60, resolution: "720p", audio: false }));
+    expect(res).toEqual({ recording: true, savePath: resolve("videos/promo.mp4") });
+    expect(seen).toMatchObject({ action: "start", savePath: resolve("videos/promo.mp4"), preset: "light", fps: 60, resolution: "720p", audio: false });
+  });
+
+  it("record start can carry a camera motion; stop and status forward as they are", async () => {
+    const { hub, agent } = await withAgent();
+    const got: Record<string, unknown>[] = [];
+    agent.onRequest("record", (p) => { got.push(p); return { ok: true }; });
+    await hub.call("record", { action: "start", savePath: "a.mp4", wait: true, camera: { action: "orbit", center: { x: 0, y: 64, z: 0 }, radius: 10, durationMs: 5000 } });
+    await hub.call("record", { action: "stop" });
+    await hub.call("record", { action: "status" });
+    expect(got[0]).toMatchObject({ action: "start", wait: true, camera: { action: "orbit", radius: 10, durationMs: 5000 } });
+    expect(got[1]).toEqual({ action: "stop" });
+    expect(got[2]).toEqual({ action: "status" });
+  });
+
+  it("record rejects settings outside their range before reaching the game", async () => {
+    const { hub } = await withAgent();
+    for (const bad of [{ preset: "ultra" }, { fps: 200 }, { crf: 60 }, { codec: "vp9" }, { resolution: "8k" }, { speed: "warp" }]) {
+      expect((await hub.call("record", { action: "start", savePath: "a.mp4", ...bad })).isError, JSON.stringify(bad)).toBe(true);
+    }
+  });
+
   it("chat send and command forward to chat.send", async () => {
     const { hub, agent } = await withAgent();
     const got: unknown[] = [];

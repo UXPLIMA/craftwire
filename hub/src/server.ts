@@ -16,7 +16,7 @@ import { HUB_VERSION } from "./version.js";
 
 const INSTRUCTIONS = [
   "Craftwire lets you see and drive Minecraft.",
-  "Start with list_instances. Client tools (screenshot, camera, gui_*, input, chat, hud_read, player_state, client_settings) act on a game client.",
+  "Start with list_instances. Client tools (screenshot, record, camera, gui_*, input, chat, hud_read, player_state, client_settings) act on a game client.",
   "Server tools (server_command, server_eval, world_query, world_edit, world_render, server_info, plugin_manage, events) act on a Paper server running the Craftwire plugin; logs reads either, exceptions groups the stack traces of both into bugs.",
   "Dev loop: server_process starts/stops a local Paper server; plugin_deploy builds a plugin project (or takes a jar), installs it, restarts the server and reports whether it enabled.",
   "scenario_run runs plugin tests written as JSON steps (bots, commands, checks) and reports the failing step with context.",

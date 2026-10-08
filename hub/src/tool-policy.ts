@@ -1,7 +1,7 @@
 /** The tool groups `--tools` takes. Tools not listed here (added by plugins and mods) are the "extensions" group. */
 export const TOOL_GROUPS: Record<string, readonly string[]> = {
   hub: ["list_instances", "get_request_status", "wait_for", "logs", "exceptions"],
-  client: ["screenshot", "camera", "gui_read", "gui_action", "input", "chat", "hud_read", "player_state", "client_settings"],
+  client: ["screenshot", "record", "camera", "gui_read", "gui_action", "input", "chat", "hud_read", "player_state", "client_settings"],
   server: ["server_command", "server_eval", "world_query", "world_edit", "world_render", "server_info", "plugin_manage", "events"],
   dev: ["server_process", "plugin_deploy", "client_process", "scenario_run"],
   bots: ["bot_spawn", "bot_action", "bot_remove"],
@@ -24,6 +24,7 @@ const READING_ACTIONS: Record<string, readonly string[]> = {
   client_process: ["status"],
   plugin_manage: ["list", "info"],
   chat: ["read"],
+  record: ["status"],
   bot_action: ["messages", "state", "gui_read", "hud_read"],
   // watch only starts recording more event types.
   events: ["summary", "query", "listeners", "watch"],

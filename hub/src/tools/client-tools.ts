@@ -7,6 +7,22 @@ import { defineTool, forward, ok, targetArgs, type ToolContext } from "./registr
 
 const vec3 = { x: z.number(), y: z.number(), z: z.number() };
 
+// Camera moves over time: `camera` path/orbit, and record start's `camera`.
+const keyframe = z.object({ t: z.number().min(0), ...vec3, yaw: z.number().optional(), pitch: z.number().min(-90).max(90).optional() });
+const motionShape = {
+  keyframes: z.array(keyframe).min(2).max(64).optional().describe("path: timed keyframes; t in ms from the start"),
+  interpolation: z.enum(["smooth", "linear"]).optional().describe("path: smooth curves (default) or straight lines"),
+  ease: z.enum(["inOut", "none"]).optional().describe("start and stop gently (path default) or keep a constant speed (orbit default)"),
+  lookAt: z.object(vec3).optional().describe("path: keep aiming at this point; keyframe yaw/pitch are then optional"),
+  center: z.object(vec3).optional().describe("orbit: the point to circle and face"),
+  radius: z.number().positive().optional(),
+  height: z.number().optional().describe("orbit: camera height above the center (default radius / 2)"),
+  startAngle: z.number().optional().describe("orbit: degrees, 0 = south of the center (default: where the camera is now)"),
+  degrees: z.number().optional().describe("orbit: how far to turn (default 360; negative turns the other way)"),
+  durationMs: z.number().int().positive().max(600_000).optional(),
+};
+const cameraMotion = z.object({ action: z.enum(["path", "orbit"]), ...motionShape });
+
 const fwd = (method: string, timeoutMs?: number) => async (args: Record<string, unknown>, c: ToolContext) =>
   ok(await forward(c, "client", method, args, timeoutMs));
 
@@ -46,16 +62,17 @@ export function registerClientTools(server: McpServer, ctx: ToolContext): void {
     }, fwd("input"));
 
   defineTool(server, ctx, "camera",
-    "Control the render camera without moving the player (client-side only). set: x,y,z,yaw,pitch. look_at: aim at `target`. frame_area: fit `area` (min/max corners) in view. frame_entity: fit `entity` (UUID or name). freecam_on/freecam_off. reset returns to the player's eyes. Keep the camera within render distance of the player.",
+    "Control the render camera without moving the player (client-side only). set: x,y,z,yaw,pitch. look_at: aim at `target`. frame_area: fit `area` (min/max corners) in view. frame_entity: fit `entity` (UUID or name). freecam_on/freecam_off. reset returns to the player's eyes. Moves that play over time (for videos, see record): path flies through `keyframes` [{t ms, x,y,z, yaw,pitch}] (interpolation smooth|linear, ease inOut|none, optional `lookAt` point instead of yaw/pitch); orbit circles `center` at `radius` (height above it, startAngle, degrees, durationMs, ease), always facing it. A move holds its last pose when it ends; set/reset stop it. Keep the camera within render distance of the player.",
     {
       ...targetArgs,
-      action: z.enum(["set", "look_at", "frame_area", "frame_entity", "freecam_on", "freecam_off", "reset"]),
+      action: z.enum(["set", "look_at", "frame_area", "frame_entity", "freecam_on", "freecam_off", "reset", "path", "orbit"]),
       x: z.number().optional(), y: z.number().optional(), z: z.number().optional(),
       yaw: z.number().optional(), pitch: z.number().min(-90).max(90).optional(),
       target: z.object(vec3).optional(),
       area: z.object({ min: z.object(vec3), max: z.object(vec3) }).optional(),
       entity: z.string().optional(),
       distanceScale: z.number().min(0.2).max(5).default(1),
+      ...motionShape,
     }, fwd("camera"));
 
   defineTool(server, ctx, "client_settings",
@@ -89,6 +106,36 @@ export function registerClientTools(server: McpServer, ctx: ToolContext): void {
       return { content: [{ type: "image", data: r.data, mimeType: r.mime }, { type: "text", text: JSON.stringify(meta) }] };
     });
 
+  defineTool(server, ctx, "record",
+    "Record a video (MP4, H.264/H.265) of the game frame with its sound, in real time, encoded by the user's ffmpeg (FFMPEG_NOT_FOUND says how to install it). start: savePath (.mp4, relative to the current directory); preset max (best, CPU-heavy, 60 fps) | high (default) | balanced (fast, small; good for 60 fps on weaker PCs) | light (720p, small files for Discord); fps, resolution (source/2160p/1440p/1080p/720p/480p, only scales down), codec h264|h265, crf (0-51, lower = better), speed (x264 preset ultrafast..veryslow) and audioBitrate override the preset. audio:false records without sound (with sound, the game is silent on the speakers while it records). hud:false (default) hides the HUD like F1, open menus stay visible; chat:false hides chat lines. durationMs stops by itself; camera {action:'path'|'orbit', ...camera tool fields} starts with the first frame and sets the length; wait:true returns the finished video. maxSeconds (default 120, max 600) is the safety stop. stop finishes the file and returns {savedPath, durationMs, frames, duplicatedFrames, droppedFrames, sizeBytes, ...}; status shows progress or the last result.",
+    {
+      ...targetArgs,
+      action: z.enum(["start", "stop", "status"]),
+      savePath: z.string().optional(),
+      preset: z.enum(["max", "high", "balanced", "light"]).optional(),
+      fps: z.number().int().min(10).max(120).optional(),
+      resolution: z.enum(["source", "2160p", "1440p", "1080p", "720p", "480p"]).optional(),
+      codec: z.enum(["h264", "h265"]).optional(),
+      crf: z.number().int().min(0).max(51).optional(),
+      speed: z.enum(["ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow"]).optional(),
+      audio: z.boolean().optional(),
+      audioBitrate: z.number().int().min(64).max(320).optional(),
+      hud: z.boolean().optional(),
+      chat: z.boolean().optional(),
+      durationMs: z.number().int().min(100).max(600_000).optional(),
+      maxSeconds: z.number().int().min(1).max(600).optional(),
+      camera: cameraMotion.optional(),
+      waitForTerrain: z.boolean().optional(),
+      wait: z.boolean().optional(),
+    },
+    async (args, c) => {
+      const params = args.savePath ? { ...args, savePath: resolvePath(args.savePath) } : args;
+      // A waiting start lasts as long as the video plus the encoding; the rest answer quickly.
+      const length = args.durationMs ?? args.camera?.durationMs ?? motionLength(args.camera?.keyframes) ?? (args.maxSeconds ?? 120) * 1000;
+      const timeoutMs = args.action === "start" && args.wait ? length + 120_000 : args.action === "stop" ? 150_000 : 30_000;
+      return ok(await forward(c, "client", "record", params, timeoutMs));
+    });
+
   defineTool(server, ctx, "chat",
     "send: say `text` in chat. command: run `text` as a command (leading / optional). read: recent chat and actionbar messages from the hub buffer, optionally filtered by `contains` (case-insensitive) and `since` (epoch ms).",
     {
@@ -114,4 +161,9 @@ export function registerClientTools(server: McpServer, ctx: ToolContext): void {
       if (!args.text) throw new CraftwireError("INVALID_PARAMS", "`text` is required for send/command", "Pass text, e.g. {action:'command', text:'/time set noon'}.");
       return ok(await forward(c, "client", "chat.send", { instance: args.instance, operationId: args.operationId, text: args.text, command: args.action === "command" }));
     });
+}
+
+function motionLength(keyframes: Array<{ t: number }> | undefined): number | undefined {
+  if (!keyframes || keyframes.length < 2) return undefined;
+  return keyframes[keyframes.length - 1]!.t - keyframes[0]!.t;
 }
