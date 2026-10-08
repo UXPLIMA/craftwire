@@ -49,7 +49,10 @@ public final class Recorder {
     private final class Session {
         final RecordParams params;
         final Path ffmpeg;
+        /** Completed on the render thread once the recorder is idle again: callers then see it idle. */
         final CompletableFuture<JsonObject> done = new CompletableFuture<>();
+        /** Completed by the finishing thread when the file is in place (game shutdown waits on this). */
+        final CompletableFuture<Void> written = new CompletableFuture<>();
         State state = State.PREPARING;
         Saved saved;
         boolean audio;
@@ -279,7 +282,7 @@ public final class Recorder {
         if (s.state == State.RECORDING) finish(s, "quit", System.nanoTime());
         if (s.process != null) finalizeAsync(s);
         try {
-            s.done.get(15, TimeUnit.SECONDS);
+            s.written.get(15, TimeUnit.SECONDS);
         } catch (Exception e) {
             CraftwireAgent.LOGGER.warn("Craftwire could not finish the video before the game closed", e);
         }
@@ -305,20 +308,22 @@ public final class Recorder {
         Thread.ofPlatform().daemon().name("Craftwire video finish").start(() -> {
             try {
                 JsonObject result = complete(s, process, pad, finishing);
+                s.written.complete(null);
                 Minecraft.getInstance().execute(() -> {
                     if (session == s) session = null;
                     last = result;
                     lastError = null;
+                    s.done.complete(result);
                 });
-                s.done.complete(result);
             } catch (AgentError e) {
                 deleteTemps(s);
+                s.written.complete(null);
                 Minecraft.getInstance().execute(() -> {
                     if (session == s) session = null;
                     last = null;
                     lastError = e;
+                    s.done.completeExceptionally(e);
                 });
-                s.done.completeExceptionally(e);
             }
         });
     }

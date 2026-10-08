@@ -121,7 +121,11 @@ final class RecordChecks {
         String path = String.format(Locale.ROOT, "{\"action\":\"path\",\"lookAt\":%s,\"keyframes\":[{\"t\":0,\"x\":%f,\"y\":%f,\"z\":%f},{\"t\":1500,\"x\":%f,\"y\":%f,\"z\":%f}]}",
                 center, eye.x + 10, eye.y + 5, eye.z, eye.x, eye.y + 5, eye.z + 10);
         CompletableFuture<JsonElement> fl = Calls.start(ctx, "record", "{\"action\":\"start\",\"savePath\":\"" + json(flight) + "\",\"preset\":\"light\",\"audio\":false,\"wait\":true,\"camera\":" + path + "}");
+        // Whoever gets the finished video sees the recorder idle already (a status or a new start right after).
+        CompletableFuture<Boolean> idleWhenDone = fl.thenApply(x -> !com.uxplima.craftwire.fabric.video.Recorder.INSTANCE.status().get("recording").getAsBoolean());
         JsonObject flown = result(ctx, fl);
+        ctx.waitFor(mc -> idleWhenDone.isDone(), 400);
+        check(idleWhenDone.join(), "the recorder is idle by the time the result arrives");
         check("duration".equals(flown.get("reason").getAsString()) && Math.abs(flown.get("durationMs").getAsLong() - 1500) <= 20, "path length: " + flown);
         check(ctx.computeOnClient(mc -> CameraOverride.INSTANCE.get()) == null, "camera given back to the player");
         check(!CaptureOptions.hideChat, "chat hiding undone");
