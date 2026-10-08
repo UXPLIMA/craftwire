@@ -16,8 +16,12 @@ public final class AgentGameTests implements FabricClientGameTest {
             try {
                 CaptureChecks.run(ctx, sp);
                 CameraRenderChecks.run(ctx, sp);
+                RecordChecks.run(ctx, sp);
             } catch (java.io.IOException e) {
                 throw new java.io.UncheckedIOException(e);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new AssertionError(e);
             }
             InputSettingsChecks.run(ctx, sp);
             ExtensionChecks.run(ctx);

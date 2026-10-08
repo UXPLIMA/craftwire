@@ -108,7 +108,7 @@ final class ScreenshotHandler {
      * Waits until every visible section is built (vanilla and Sodium both answer hasRenderedAllSections), so a shot
      * right after a camera move, or on a slow renderer, does not show missing terrain. Gives up after the deadline.
      */
-    private static CompletableFuture<Void> sectionsBuilt(ClientScheduler s, long deadline) {
+    static CompletableFuture<Void> sectionsBuilt(ClientScheduler s, long deadline) {
         return s.call(() -> {
             Minecraft mc = Minecraft.getInstance();
             return mc.level == null || mc.levelRenderer.hasRenderedAllSections();

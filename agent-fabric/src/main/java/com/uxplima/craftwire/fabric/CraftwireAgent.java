@@ -12,6 +12,8 @@ import com.uxplima.craftwire.core.OperationCache;
 import com.uxplima.craftwire.core.profile.ProfileTools;
 import com.uxplima.craftwire.fabric.handlers.Handlers;
 import com.uxplima.craftwire.fabric.script.ClientEval;
+import com.uxplima.craftwire.fabric.video.Recorder;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.entrypoint.EntrypointContainer;
@@ -80,6 +82,8 @@ public final class CraftwireAgent {
         });
         ChatBridge.register(this);
         Indicator.register(this);
+        // A recording running when the game closes is finished into a playable file first.
+        ClientLifecycleEvents.CLIENT_STOPPING.register(mc -> Recorder.INSTANCE.shutdown());
 
         hub = new HubClient(() -> HubConfig.load(HubConfig.defaultHome()), this::hello, dispatcher, new HubClient.Listener() {
             @Override public void onConnected(String instanceId) { onHubConnected(instanceId); }

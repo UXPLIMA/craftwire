@@ -3,6 +3,6 @@
   "package": "com.uxplima.craftwire.fabric.compat.v26_3.mixin",
   "plugin": "com.uxplima.craftwire.fabric.compat.VersionMixinPlugin",
   "compatibilityLevel": "JAVA_25",
-  "client": ["HiddenWindowMixin"],
+  "client": ["FrameRenderedMixin", "HiddenWindowMixin"],
   "injectors": { "defaultRequire": 1 }
 }

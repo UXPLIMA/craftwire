@@ -1,8 +1,11 @@
 package com.uxplima.craftwire.fabric.compat.v26_3;
 
+import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.blaze3d.platform.Window;
 import com.uxplima.craftwire.fabric.compat.ClientCompat;
+import java.nio.ByteBuffer;
+import java.util.function.Consumer;
 import org.lwjgl.sdl.SDLMouse;
 import org.lwjgl.sdl.SDLVideo;
 
@@ -27,5 +30,17 @@ public final class ClientCompatImpl implements ClientCompat {
     @Override
     public boolean windowVisible(Window window) {
         return (SDLVideo.SDL_GetWindowFlags(window.handle()) & SDLVideo.SDL_WINDOW_HIDDEN) == 0;
+    }
+
+    private final FrameReader frames = new FrameReader();
+
+    @Override
+    public void readPixels(RenderTarget target, Consumer<ByteBuffer> done) {
+        frames.read(target, done);
+    }
+
+    @Override
+    public void releaseReadBuffers() {
+        frames.release();
     }
 }
