@@ -126,8 +126,13 @@ final class RecordChecks {
         check(ctx.computeOnClient(mc -> CameraOverride.INSTANCE.get()) == null, "camera given back to the player");
         check(!CaptureOptions.hideChat, "chat hiding undone");
 
-        // 6. A bad codec choice fails with ffmpeg's reason, and the game is left as it was.
-        if (!encoders(ffmpeg).contains("libx265")) {
+        // 6. h265 plays where it is built in (tagged hvc1); without libx265 it fails with ffmpeg's reason.
+        if (encoders(ffmpeg).contains("libx265")) {
+            Path hevc = dir.resolve("hevc.mp4");
+            JsonObject h = result(ctx, Calls.start(ctx, "record", "{\"action\":\"start\",\"savePath\":\"" + json(hevc) + "\",\"codec\":\"h265\",\"preset\":\"light\",\"audio\":false,\"durationMs\":800,\"wait\":true}"));
+            check("h265".equals(h.get("codec").getAsString()), "h265 result: " + h);
+            check("hevc".equals(stream(probe(ffprobe, hevc), "video").get("codec_name").getAsString()), "an HEVC stream");
+        } else {
             AgentError noX265 = errorOf(ctx, Calls.start(ctx, "record", "{\"action\":\"start\",\"savePath\":\"" + json(dir.resolve("x.mp4")) + "\",\"codec\":\"h265\",\"audio\":false,\"durationMs\":500,\"wait\":true}"));
             check("RECORD_FAILED".equals(noX265.code()), "h265 without libx265: " + noX265.code());
         }

@@ -158,4 +158,4 @@ result.
 
 - Real time only. A frame-exact "render mode" that slows the game down for perfectly smooth 4K is not there yet.
 - The field of view is not animated.
-- One client records at a time per game; several clients can each record their own.
+- One recording at a time per client; several clients can each record their own.
