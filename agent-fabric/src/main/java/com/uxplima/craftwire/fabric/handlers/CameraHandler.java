@@ -5,6 +5,8 @@ import com.google.gson.JsonObject;
 import com.uxplima.craftwire.core.AgentError;
 import com.uxplima.craftwire.fabric.Params;
 import com.uxplima.craftwire.fabric.camera.CameraMath;
+import com.uxplima.craftwire.fabric.camera.CameraMotion;
+import com.uxplima.craftwire.fabric.camera.CameraMotionJson;
 import com.uxplima.craftwire.fabric.camera.CameraOverride;
 import com.uxplima.craftwire.fabric.camera.CameraOverride.Pose;
 import net.minecraft.client.Camera;
@@ -43,6 +45,7 @@ final class CameraHandler {
                 AABB box = e.getBoundingBox().inflate(1.0);
                 frame(mc, p, current, new CameraMath.Vec(box.minX, box.minY, box.minZ), new CameraMath.Vec(box.maxX, box.maxY, box.maxZ));
             }
+            case "path", "orbit" -> CameraOverride.INSTANCE.play(CameraMotionJson.parse(p, current), System.nanoTime());
             case "freecam_on" -> CameraOverride.INSTANCE.set(current);
             case "freecam_off", "reset" -> CameraOverride.INSTANCE.clear();
             default -> throw Params.invalid("unknown action: " + action);
@@ -88,6 +91,13 @@ final class CameraHandler {
         o.addProperty("z", p.z());
         o.addProperty("yaw", p.yaw());
         o.addProperty("pitch", p.pitch());
+        CameraMotion m = CameraOverride.INSTANCE.motion();
+        if (m != null) {
+            JsonObject motion = new JsonObject();
+            motion.addProperty("kind", m.kind());
+            motion.addProperty("durationMs", m.durationMs());
+            o.add("motion", motion);
+        }
         double limit = mc.options.renderDistance().get() * 16.0;
         double dist = mc.player.getEyePosition().distanceTo(new Vec3(p.x(), p.y(), p.z()));
         if (dist > limit) o.addProperty("warning", String.format("Camera is %.0f blocks from the player; chunks beyond render distance (%.0f) are not drawn.", dist, limit));
