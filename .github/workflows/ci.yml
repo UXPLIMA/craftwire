@@ -58,7 +58,8 @@ jobs:
         with:
           path: ~/.gradle/craftwire-test-home/lib
           key: graaljs-${{ hashFiles('gradle.properties') }}
-      - run: sudo apt-get update && sudo apt-get install -y xvfb libegl1 libegl-mesa0
+      # ffmpeg: the record game tests encode real videos and check them with ffprobe.
+      - run: sudo apt-get update && sudo apt-get install -y xvfb libegl1 libegl-mesa0 ffmpeg
       - id: v
         run: |
           echo "id=v$(echo '${{ matrix.mc }}' | tr . _)" >> "$GITHUB_OUTPUT"

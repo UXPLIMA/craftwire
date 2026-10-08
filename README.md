@@ -24,6 +24,15 @@ Every picture on this page was taken by Craftwire itself, through the tools belo
 
 <img src="docs/images/camera.jpg" alt="The same scene from above, from behind and from the front, all rendered without moving the player" width="100%">
 
+### Record promo videos
+
+`record` films the client with its sound and saves an MP4 through your ffmpeg. The camera can circle a build or fly a path while the game plays on: bots walk, menus open, your plugin does its thing. Presets go from `max` (60 fps, near-lossless, for editing) to `light` (720p, small enough for Discord), and every setting can be changed on its own. See [docs/video.md](docs/video.md).
+
+```jsonc
+record {action:"start", savePath:"videos/castle.mp4", preset:"high", wait:true,
+        camera:{action:"orbit", center:{x:120, y:70, z:-40}, radius:30, height:12, durationMs:12000}}
+```
+
 ### Read and click menus like a player
 
 `gui_read` returns the open screen as data: every slot with its item, name and lore, plus buttons and text fields. `gui_action` hovers, clicks, drags and types. Plugin menus built from chests work like any other screen.
@@ -190,20 +199,20 @@ Then ask your AI: *"take a screenshot of what I'm looking at"* or *"what's the T
 | Area | Tools |
 |---|---|
 | Hub | `list_instances` · `wait_for` · `get_request_status` · `logs` · `exceptions` |
-| Client | `screenshot` · `camera` · `gui_read` · `gui_action` · `input` · `chat` · `hud_read` · `player_state` · `client_settings` |
+| Client | `screenshot` · `record` · `camera` · `gui_read` · `gui_action` · `input` · `chat` · `hud_read` · `player_state` · `client_settings` |
 | Server | `server_command` · `server_eval` · `world_query` · `world_edit` · `world_render` · `server_info` · `plugin_manage` · `events` |
 | Dev loop | `server_process` · `plugin_deploy` · `client_process` · `scenario_run` |
 | Bots | `bot_spawn` · `bot_action` · `bot_remove` |
 | Debugging | `profile` · `trace` · `client_eval` |
 | CLI | `npx craftwire setup` · `npx craftwire doctor` · `npx craftwire test` · `npx craftwire serve` |
 
-Resources: `craftwire://instances`, `craftwire://exceptions`, each game's log (`craftwire://instances/<name>/log`), a client's chat and a fresh screenshot, and the docs (`craftwire://docs/scenarios`, `extensions`, `http`). Prompts: `test_plugin`, `debug_lag`, `write_scenario` and `setup`.
+Resources: `craftwire://instances`, `craftwire://exceptions`, each game's log (`craftwire://instances/<name>/log`), a client's chat and a fresh screenshot, and the docs (`craftwire://docs/scenarios`, `extensions`, `http`, `video`). Prompts: `test_plugin`, `debug_lag`, `write_scenario` and `setup`.
 
 Skills that teach the agent the workflows ship with the Claude Code plugin, and `setup` installs them for Codex and Gemini CLI:
 - `craftwire`: the tools in general.
 - `paper-plugin-dev`: the plugin dev loop.
 - `fabric-mod-dev`: Fabric mod development.
-- `minecraft-promo-shots`: promo screenshots.
+- `minecraft-promo-shots`: promo screenshots and videos.
 
 ## How it works
 

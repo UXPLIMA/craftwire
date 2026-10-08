@@ -1,6 +1,6 @@
 ---
 name: craftwire
-description: Use when driving Minecraft or a Paper server through the craftwire MCP tools (screenshot, camera, gui_*, input, chat, server_command, server_eval, world_query, world_edit, logs, exceptions, events, wait_for, server_process, plugin_deploy, client_process, bot_spawn, bot_action, profile, trace, client_eval) — covers the reliable order of calls, menus, server scripting, safe world edits and recovering from errors.
+description: Use when driving Minecraft or a Paper server through the craftwire MCP tools (screenshot, record, camera, gui_*, input, chat, server_command, server_eval, world_query, world_edit, logs, exceptions, events, wait_for, server_process, plugin_deploy, client_process, bot_spawn, bot_action, profile, trace, client_eval) — covers the reliable order of calls, menus, server scripting, safe world edits and recovering from errors.
 ---
 
 # Driving Minecraft with Craftwire
@@ -29,6 +29,7 @@ If `gui_action` returns `SLOT_OUT_OF_RANGE` or `NO_SCREEN_OPEN`, the screen chan
 - `savePath` writes the full-resolution PNG (relative paths are relative to the current project); the image you see is downscaled to `maxSize`.
 - For a fixed angle use `camera {action:"set", …}` once, then take several screenshots; `camera {action:"reset"}` afterwards.
 - The camera is render-only and should stay within render distance of the player.
+- `camera {action:"orbit"|"path"}` moves the camera over time; `record` films it (MP4 via the user's ffmpeg). Videos: see the minecraft-promo-shots skill and craftwire://docs/video.
 
 ## Server (Paper + Craftwire plugin)
 - `server_info` first: TPS, plugins, worlds.

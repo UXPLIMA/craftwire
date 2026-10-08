@@ -6,4 +6,4 @@ const from = fileURLToPath(new URL("../../docs/", import.meta.url));
 const to = fileURLToPath(new URL("../docs/", import.meta.url));
 rmSync(to, { recursive: true, force: true });
 mkdirSync(to, { recursive: true });
-for (const topic of ["scenarios", "extensions", "http"]) copyFileSync(`${from}${topic}.md`, `${to}${topic}.md`);
+for (const topic of ["scenarios", "extensions", "http", "video"]) copyFileSync(`${from}${topic}.md`, `${to}${topic}.md`);
