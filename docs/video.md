@@ -67,7 +67,7 @@ Pick a preset for the job, and override any single value.
 
 The resolution comes from the game window. For a 1080p or 4K video, size the window first:
 `client_settings {windowSize:{width:1920, height:1080}}`, or start a hidden client with
-`client_process {action:"start", width:3840, height:2160}`.
+`client_process {action:"start", windowSize:{width:3840, height:2160}, sounds:true}`.
 
 Recording is real time: each frame is encoded while the game runs. If the encoder cannot keep up, frames repeat the
 one before (`droppedFrames` in the result, with a note) so the video keeps its real length. Then use a faster preset,
@@ -128,6 +128,8 @@ The game's own mix is recorded: blocks, mobs, menus, music, as the player would 
   instead. Sounds that were playing when the recording started restart; music may restart.
 - A muted game (master volume 0, as hidden `client_process` clients are) is turned up to 100% for the recording,
   heard by nobody, and set back afterwards.
+- `client_process` clients download no sound files unless started with `sounds:true` (about 360 MB, once). Without
+  them the video is silent; `record` says so in a `note`.
 - `audio:false` leaves the speakers alone.
 
 ## Ending a recording

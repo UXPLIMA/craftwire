@@ -75,6 +75,18 @@ describe("ClientManager", () => {
     expect(s.pid).toBeGreaterThan(0);
   });
 
+  it("applies windowSize again once the game is ready (a hidden 26.3 window keeps its first framebuffer size)", async () => {
+    const { mgr, port, gameDirOf } = await setup();
+    const start = mgr.start({ username: "Bob", server: "127.0.0.1:25599", windowSize: { width: 1920, height: 1080 } });
+    await waitUntil(() => mgr.status().clients[0]?.state === "starting", 5000, 20);
+    const agent = await inWorldAgent(port, gameDirOf("Bob"));
+    const sizes: unknown[] = [];
+    agent.onRequest("client.settings", (p) => { sizes.push(p.windowSize); return {}; });
+    await start;
+    expect(sizes).toEqual([{ width: 1920, height: 1080 }]);
+    expect(mgr.status().clients[0]?.state).toBe("running");
+  });
+
   it("waits for the player to reach the world, not just for the agent", async () => {
     const { mgr, port, gameDirOf } = await setup();
     const start = mgr.start({ username: "Bob", server: "127.0.0.1:25599" });

@@ -225,6 +225,11 @@ export class ClientManager {
       throw new CraftwireError("TIMEOUT", `The client was not ready within ${timeoutMs} ms`,
         "It may still be loading: watch client_process {action:'status'}, or stop it.", { logTail: m.log.toArray().slice(-40) });
     }
+    // A hidden window from 26.3 (SDL3) reports the asked size but keeps drawing at its first framebuffer size
+    // until it is resized once; screenshots and videos would come out at 1280x720.
+    if (o.windowSize && m.agent) {
+      await this.opts.agents.request(m.agent, "client.settings", { windowSize: o.windowSize }, 5000).catch(() => undefined);
+    }
     this.markRunning(m);
     return this.snapshot(m, 10);
   }

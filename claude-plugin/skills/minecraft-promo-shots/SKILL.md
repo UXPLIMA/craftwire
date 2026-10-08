@@ -23,7 +23,7 @@ description: Use when producing marketing/promo screenshots or videos of a Minec
 ## Videos (`record`, see craftwire://docs/video)
 Needs ffmpeg on the game's computer (`FFMPEG_NOT_FOUND` gives the install command; tell the user, do not install it yourself).
 
-1. **Size the window first**: the video has the window's resolution. `client_settings {windowSize:{width:1920, height:1080}}`, or a hidden client started with `width`/`height`.
+1. **Size the window first**: the video has the window's resolution. `client_settings {windowSize:{width:1920, height:1080}}`, or a hidden client started with `client_process {windowSize:{width:1920, height:1080}, sounds:true}` (without `sounds:true` it has no sound files and the video is silent).
 2. **Pick the preset for where it goes**: `max` for an editor or the final trailer (60 fps, needs a strong CPU), `high` by default, `balanced` for 60 fps on an average PC, `light` for Discord/chat (720p, small). Override single values (`fps`, `crf`, `resolution`, `codec`) only when asked.
 3. **Plan the camera before recording**: look at the frame with `screenshot {camera:{...}}` at the start and end poses of a move.
    - Showcase a build: `camera:{action:"orbit", center, radius, height, durationMs:10000-15000}` — slow is better; one turn of a 30-block build in 12 s reads well.

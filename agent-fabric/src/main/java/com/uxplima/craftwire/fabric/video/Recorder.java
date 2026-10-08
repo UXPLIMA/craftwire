@@ -27,6 +27,7 @@ import java.util.concurrent.TimeUnit;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.OptionInstance;
 import net.minecraft.client.sounds.SoundEngine;
+import net.minecraft.resources.Identifier;
 import net.minecraft.sounds.SoundSource;
 
 /**
@@ -53,6 +54,7 @@ public final class Recorder {
         Saved saved;
         boolean audio;
         boolean soundLost;   // the WAV could not be written: the video is kept without sound
+        boolean noSoundFiles;   // a client_process client started without sounds:true has no .ogg files
         int width, height;
         int[] output;
         long t0, stopNanos, finishDeadline;
@@ -71,6 +73,8 @@ public final class Recorder {
             this.ffmpeg = ffmpeg;
         }
     }
+
+    private static final String NO_SOUND_FILES = "This game has no sound files, so the video is silent: start the client with client_process {sounds:true}.";
 
     private Session session;
     private JsonObject last;
@@ -109,6 +113,7 @@ public final class Recorder {
                 if (s.saved.masterVolume() != null) master.set(1.0);
                 openLoopback(mc);
                 s.audio = true;
+                s.noSoundFiles = mc.getResourceManager().getResource(Identifier.fromNamespaceAndPath("minecraft", "sounds/random/click.ogg")).isEmpty();
             }
         } catch (RuntimeException e) {
             restore(s);
@@ -183,6 +188,7 @@ public final class Recorder {
         o.addProperty("audio", s.audio);
         if (p.durationMs() != null) o.addProperty("durationMs", p.durationMs());
         o.addProperty("maxSeconds", p.maxSeconds());
+        if (s.noSoundFiles) o.addProperty("note", NO_SOUND_FILES);
         return o;
     }
 
@@ -363,9 +369,12 @@ public final class Recorder {
             o.addProperty("speed", p.settings().speed());
             o.addProperty("sizeBytes", Files.size(p.savePath()));
             o.addProperty("encodeMs", (System.nanoTime() - finishing) / 1_000_000);
+            List<String> notes = new java.util.ArrayList<>();
             if (s.writer.dropped() > 0) {
-                o.addProperty("note", "The encoder could not keep up, so some frames repeat the one before. Use a faster preset (balanced or light), a lower fps or resolution.");
+                notes.add("The encoder could not keep up, so some frames repeat the one before. Use a faster preset (balanced or light), a lower fps or resolution.");
             }
+            if (s.noSoundFiles) notes.add(NO_SOUND_FILES);
+            if (!notes.isEmpty()) o.addProperty("note", String.join(" ", notes));
             return o;
         } catch (IOException e) {
             throw new AgentError("RECORD_FAILED", "Could not write the video: " + e.getMessage(), "Check free disk space and that savePath is writable.");
