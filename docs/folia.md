@@ -28,7 +28,7 @@ Every tool works on both. Where Folia changes what a tool does:
 | `world_query`, `world_edit`, `world_render` | Unchanged. Work is split by chunk and runs on the thread that owns each chunk; snapshots are saved and restored chunk by chunk. A schematic (`save_schematic`, `paste_schematic`) is one structure, so its box must lie in one region. |
 | `wait_for` | Block conditions are checked on the block's region, player conditions on the player's thread. |
 | `server_info` | Adds `folia: true`, `regions` (the TPS `[5s, 15s, 1m, 5m, 15m]` of the region at each world's spawn and at each player) and `slowestRegion`. `tps` and `mspt` are the global region's. |
-| `profile` | Samples every region thread. `thread` is `Folia Region Scheduler Thread #*` and `threads` lists the busy samples per thread. Tick times come from every region, so the average is lower than on Paper; look at `max` and `slowest`. |
+| `profile` | Samples every region thread. `thread` is `Folia Region Scheduler Thread #*` and `threads` lists the busy samples per thread. Tick times come from every region, so the average is lower than on Paper; look at `max` and `slowest`. With nobody online no region ticks and there are no tick times. |
 | `plugin_manage` | `enable` and `disable` are refused with `UNSUPPORTED`: Folia cannot stop a plugin while the server runs. Use `plugin_deploy`, which restarts the server. |
 | `exceptions` | A Folia thread violation gets `folia: {owner, touched, fix}`: the first frame of your code, what it touched (`block`, `chunk`, `entity`, `player`, `world`, or `scheduler` for the Bukkit scheduler Folia does not have) and the scheduler to use instead. |
 

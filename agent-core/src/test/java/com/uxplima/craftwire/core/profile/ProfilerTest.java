@@ -44,4 +44,46 @@ class ProfilerTest {
         }
         assertEquals(10.0, sum / (double) n / MS, 0.05);
     }
+
+    /** Spins on a thread with this name until the returned handle is interrupted. */
+    private static Thread busy(String name) {
+        Thread t = new Thread(() -> {
+            long x = 0;
+            while (!Thread.currentThread().isInterrupted()) x += System.nanoTime() & 7;
+            if (x == 42) System.out.print("");
+        }, name);
+        t.setDaemon(true);
+        t.start();
+        return t;
+    }
+
+    private static com.google.gson.JsonObject profile(String label, java.util.function.Predicate<String> threads) throws InterruptedException {
+        Profiler.Session s = Profiler.start(label, threads, 5, OwnerIndex.builder().build(), f -> null);
+        Thread.sleep(300);
+        return s.finish(5);
+    }
+
+    @Test
+    void threadsMatchedByAPatternAreListedEvenWhenThereIsOnlyOne() throws InterruptedException {
+        Thread t = busy("Test Region Thread #0");
+        try {
+            com.google.gson.JsonObject r = profile("Test Region Thread #*", n -> n.startsWith("Test Region Thread"));
+            assertEquals("Test Region Thread #0", r.getAsJsonArray("threads").get(0).getAsJsonObject().get("name").getAsString(), r.toString());
+            assertTrue(r.getAsJsonArray("threads").get(0).getAsJsonObject().get("samples").getAsInt() > 0, r.toString());
+        } finally {
+            t.interrupt();
+        }
+    }
+
+    @Test
+    void theOneNamedGameThreadIsNotListed() throws InterruptedException {
+        Thread t = busy("Test Server thread");
+        try {
+            com.google.gson.JsonObject r = profile("Test Server thread", "Test Server thread"::equals);
+            assertFalse(r.has("threads"), r.toString());
+            assertTrue(r.get("samples").getAsInt() > 0, r.toString());
+        } finally {
+            t.interrupt();
+        }
+    }
 }

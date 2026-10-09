@@ -7,6 +7,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -17,6 +18,13 @@ class ProfileIT {
     @BeforeAll
     static void connect() throws Exception {
         hub = ItEnv.get().hub;
+        // Folia fires the tick events from regions; with nobody online no region ticks, so a bot keeps one going.
+        if (ItEnv.folia()) hub.result("bot.spawn", "{\"names\":[\"Prof\"]}");
+    }
+
+    @AfterAll
+    static void cleanUp() throws Exception {
+        if (ItEnv.folia()) hub.result("bot.remove", "{\"name\":\"Prof\"}");
     }
 
     private static void lag(int ticks) throws Exception {

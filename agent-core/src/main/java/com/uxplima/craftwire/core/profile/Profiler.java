@@ -75,7 +75,7 @@ public final class Profiler {
         private final int intervalMs;
         private final Map<Long, String> threadIds;
         private final long[] ids;
-        /** Busy samples per thread name (reported when there are several threads). */
+        /** Busy samples per thread name (reported unless the one thread is the label itself). */
         private final Map<String, Integer> busy = new TreeMap<>();
         private final ProfileReport report;
         private final long started = System.nanoTime();
@@ -152,7 +152,8 @@ public final class Profiler {
             o.addProperty("intervalMs", intervalMs);
             synchronized (report) {
                 report.json(top).entrySet().forEach(e -> o.add(e.getKey(), e.getValue()));
-                if (busy.size() > 1) {
+                // Listed whenever the label is not simply the one sampled thread (Folia: its region threads, even one).
+                if (!(busy.size() == 1 && busy.containsKey(thread))) {
                     JsonArray threads = new JsonArray();
                     busy.forEach((name, n) -> {
                         JsonObject t = new JsonObject();
