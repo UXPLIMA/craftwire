@@ -64,6 +64,10 @@ describe("resolveLaunch", () => {
     expect(l.jar).toMatch(/paper-26\.2-130\.jar$/);
   });
 
+  it("finds a single folia jar too", () => {
+    expect(resolveLaunch(dir({ "folia-26.2-7.jar": "" })).jar).toMatch(/folia-26\.2-7\.jar$/);
+  });
+
   it("fails clearly without a server jar", () => {
     expect(() => resolveLaunch(dir({}))).toThrow(expect.objectContaining({ code: "SERVER_JAR_NOT_FOUND" }));
   });

@@ -85,7 +85,7 @@ export function resolveLaunch(serverDir: string, p: LaunchParams = {}): Launch {
   const script = SCRIPTS.find((s) => existsSync(join(serverDir, s)));
   const parsed = script ? parseStartScript(readFileSync(join(serverDir, script), "utf8")) : undefined;
   const jarName = p.jar ?? parsed?.jar ?? defaultJar(serverDir);
-  if (!jarName) throw new CraftwireError("SERVER_JAR_NOT_FOUND", `No server jar in ${serverDir}`, "Put the Paper jar there as server.jar, or pass jar.");
+  if (!jarName) throw new CraftwireError("SERVER_JAR_NOT_FOUND", `No server jar in ${serverDir}`, "Put the Paper (or Folia) jar there as server.jar, or pass jar.");
   const jar = resolve(serverDir, jarName);
   if (!existsSync(jar)) throw new CraftwireError("SERVER_JAR_NOT_FOUND", `${jar} does not exist`, "Check the jar name, or pass jar.");
   const jvm = p.jvmArgs ?? parsed?.jvmArgs ?? DEFAULT_JVM_ARGS;
@@ -105,7 +105,7 @@ export function resolveLaunch(serverDir: string, p: LaunchParams = {}): Launch {
 function defaultJar(dir: string): string | undefined {
   if (existsSync(join(dir, "server.jar"))) return "server.jar";
   if (!existsSync(dir)) return undefined;
-  const papers = readdirSync(dir).filter((f) => /^paper.*\.jar$/i.test(f));
+  const papers = readdirSync(dir).filter((f) => /^(paper|folia).*\.jar$/i.test(f));
   return papers.length === 1 ? papers[0] : undefined;
 }
 

@@ -65,3 +65,12 @@ M8 (protocol version unchanged; older agents answer `UNKNOWN_METHOD`, and `camer
 Client methods:
 - `record` `{action: "start"|"stop"|"status", ...}`. `start` `{savePath (.mp4, absolute), preset? (max|high|balanced|light, high), fps? (10-120), resolution? (source|2160p|1440p|1080p|720p|480p), codec? (h264|h265), crf? (0-51), speed? (x264 preset), audio? (true), audioBitrate? (64-320), hud? (false), chat? (true), durationMs? (>= 100), maxSeconds? (1-600, 120), camera? ({action: path|orbit, ...} as `camera`), waitForTerrain? (true), wait? (false)}` → `{recording, savePath, width, height, fps, preset, audio, durationMs?, maxSeconds}`, or with `wait` the `stop` result. `stop` → `{savedPath, reason: requested|duration|maxSeconds|resized|quit, durationMs, fps, width, height, frames, duplicatedFrames, droppedFrames, audio, codec, preset, crf, speed, sizeBytes, encodeMs, note?}`; after a recording ended by itself, its result. `status` → `{recording, state?: preparing|recording|finishing, savePath?, elapsedMs?, frames?, duplicatedFrames?, droppedFrames?, queuedFrames?, last?, lastError?: {code, message}}`. Errors: `FFMPEG_NOT_FOUND`, `ALREADY_RECORDING`, `NOT_RECORDING`, `RECORD_STARTING`, `AUDIO_UNAVAILABLE`, `RECORD_FAILED`, `INVALID_PARAMS`.
 - `camera` new actions: `path` `{keyframes: [{t, x, y, z, yaw?, pitch?}] (2-64), interpolation? (smooth|linear), ease? (inOut|none, inOut), lookAt? {x, y, z}}`, `orbit` `{center {x, y, z}, radius, height? (radius / 2), startAngle?, degrees? (360), durationMs, ease? (none)}`. The reply adds `motion: {kind, durationMs}` while a move plays or holds its last pose.
+
+M9 (protocol version unchanged; the same plugin runs on Paper and Folia):
+
+Server methods:
+- `server.eval` adds `asPlayer?` (run on that online player's thread; `PLAYER_NOT_FOUND`). `at` loads its chunk first. On Folia a script touching a block, entity or player off its thread fails with `WRONG_THREAD` (also `server.command`, `wait`, `world.edit`).
+- `server.info` on Folia adds `folia: true`, `regions: [{world, chunkX, chunkZ, tps: [5s, 15s, 1m, 5m, 15m], at: spawn|player, player?}]`, `slowestRegion?`.
+- `profile.run` on Folia samples every region thread: `thread` is `Folia Region Scheduler Thread #*`, plus `threads: [{name, samples}]`.
+- `plugin.manage enable|disable` on Folia → `UNSUPPORTED`.
+- `bot.*` on a bot that left between the lookup and the action → `BOT_NOT_FOUND`.

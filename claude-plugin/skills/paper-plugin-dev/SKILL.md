@@ -37,6 +37,9 @@ Once a flow works, keep it as a scenario so it is checked after every change: wr
 ## When it lags
 `profile` during the slow part (bots walking, a minigame running) names the plugin, the listener and its event or the task, and the hot methods; `trace` that method for call counts and times; fix, redeploy, profile again to show the difference.
 
+## Folia
+The same tools work on a Folia server (`folia-*.jar`; the plugin needs `folia-supported: true`). To find thread bugs: spawn bots in far-apart regions (e.g. one at spawn, one at x/z 5000), drive the plugin's features with both, then read `exceptions`; entries with `folia {owner, touched, fix}` name the line and the scheduler to use. `server_eval` needs `at {x,z}` or `asPlayer` to touch blocks, entities or players; `plugin_manage enable/disable` is refused (deploy restarts instead). Details: `craftwire://docs/folia`.
+
 ## Notes
 - `buildCommand` runs any build in projectDir. On Windows write wrappers with a path: `.\gradlew.bat shadowJar` (a bare `gradlew.bat` is not found from the hub's shell). `javaHome` sets the JDK for the build.
 - Replaced jars are kept in `plugins/.craftwire-backup/`.

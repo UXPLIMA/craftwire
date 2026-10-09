@@ -55,6 +55,8 @@ record {action:"start", savePath:"videos/castle.mp4", preset:"high", wait:true,
 
 `bot_spawn` puts fake players on the Paper server. They join with a join event and a tab-list entry. `bot_action` makes them chat, run commands (and returns what the server answered), walk, look, use items, attack, break blocks, sneak, sprint, jump, drop items, open and click plugin menus, and read their own HUD (scoreboard sidebar, tab list, boss bars, titles). `move_to` finds a path: around walls, up steps, down drops, through doors and gates, up ladders and through water, never into lava or fire. Plugins see the same events a real client would cause, so you can test a shop, a minigame or a permission check without a second account.
 
+On [Folia](docs/folia.md) the bots tick on their own region threads. Put them in far-apart regions and `exceptions` names the line of your plugin that touched a block or entity from the wrong thread, and the scheduler to use instead.
+
 <img src="docs/images/bots.jpg" alt="Three bots named BuilderBot, MinerBot and ScoutBot standing in a meadow, holding items" width="100%">
 
 ### Drive the server and your plugin dev loop
@@ -186,7 +188,7 @@ Run it over stdio: command `npx`, arguments `-y craftwire`. On Windows use `cmd 
 ### 2. Add the game side
 
 - **Client:** put the agent mod and Fabric API in your Fabric profile's `mods/` folder and start the game. When the hub is running, a green **⚡ Craftwire connected** appears in the top-left corner. **F8** pauses AI control at any time.
-- **Server:** put the plugin in the Paper server's `plugins/` folder and start it. The plugin connects to the hub on its own. The first start downloads GraalJS (for `server_eval`), so it needs network access once.
+- **Server:** put the plugin in the Paper (or Folia) server's `plugins/` folder and start it. The plugin connects to the hub on its own. The first start downloads GraalJS (for `server_eval`), so it needs network access once.
 
 Then ask your AI: *"take a screenshot of what I'm looking at"* or *"what's the TPS, and which plugins logged errors since startup?"*.
 
@@ -263,6 +265,12 @@ No. ChatGPT only connects to remote HTTPS MCP servers, and the hub never leaves 
 - The client mod works on any server you join. Screenshots, menus and input happen on your own client.
 - The server tools need the Craftwire plugin, so they only work on servers you run.
 - The camera and screenshots are tested with Sodium.
+</details>
+
+<details>
+<summary><b>Does it work on Folia?</b></summary>
+
+Yes, on Minecraft 26.2 (Folia has no newer build yet). The same plugin jar runs on Paper and Folia. A few tools behave differently there: `server_eval` takes `at` or `asPlayer` to run where the data is, and `plugin_manage` cannot enable or disable plugins. See [docs/folia.md](docs/folia.md).
 </details>
 
 <details>

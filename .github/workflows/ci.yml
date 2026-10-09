@@ -84,7 +84,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        mc: ['26.2', '26.3']
+        include:
+          - { mc: '26.2', server: paper, dir: '26.2' }
+          - { mc: '26.3', server: paper, dir: '26.3' }
+          - { mc: '26.2', server: folia, dir: 'folia-26.2' }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -92,12 +95,12 @@ jobs:
           distribution: temurin
           java-version: 25
       - uses: gradle/actions/setup-gradle@v4
-      - run: ./gradlew :agent-paper:integrationTest -Pmc=${{ matrix.mc }}
+      - run: ./gradlew :agent-paper:integrationTest -Pmc=${{ matrix.mc }} -Pserver=${{ matrix.server }}
       - if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: paper-it-logs-${{ matrix.mc }}
-          path: agent-paper/build/it/${{ matrix.mc }}/server/logs/
+          name: paper-it-logs-${{ matrix.dir }}
+          path: agent-paper/build/it/${{ matrix.dir }}/server/logs/
 
   dev-loop-e2e:
     runs-on: ubuntu-24.04

@@ -23,6 +23,7 @@ describe("resources", () => {
     expect(uris).not.toContain("craftwire://instances/srv/chat");
     expect(uris).toContain("craftwire://docs/scenarios");
     expect(uris).toContain("craftwire://docs/video");
+    expect(uris).toContain("craftwire://docs/folia");
 
     const instances = JSON.parse(text(await hub.client.readResource({ uri: "craftwire://instances" })));
     expect(instances.map((i: { name: string }) => i.name).sort()).toEqual(["Steve", "srv"]);

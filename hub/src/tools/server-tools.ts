@@ -13,7 +13,7 @@ const call = (method: string, timeoutMs?: number) => async (args: Record<string,
 
 export function registerServerTools(server: McpServer, ctx: ToolContext): void {
   defineTool(server, ctx, "server_command",
-    "Run a server command as the console and return its feedback lines. The leading / is optional. Feedback a plugin sends up to collectMs after the command returns is included. asPlayer runs it as that online player instead (feedback then goes to the player's chat). Use the minecraft: prefix when a plugin overrides a vanilla command.",
+    "Run a server command as the console and return its feedback lines. The leading / is optional. Feedback a plugin sends up to collectMs after the command returns is included. asPlayer runs it as that online player instead (feedback then goes to the player's chat; on Folia it runs on that player's region thread). Use the minecraft: prefix when a plugin overrides a vanilla command. Folia has no /scoreboard and a few other vanilla commands.",
     {
       ...targetArgs,
       command: z.string().min(1).max(32_000),
@@ -22,13 +22,14 @@ export function registerServerTools(server: McpServer, ctx: ToolContext): void {
     }, call("server.command", 15_000));
 
   defineTool(server, ctx, "server_eval",
-    "Run JavaScript (GraalJS) on the server thread with full Bukkit/Paper API access. Globals: server, player(name), plugin(name), loc(x,y,z,world?), Java.type('fully.qualified.Class'), print(...). The last expression is returned as JSON (Java objects as {class,toString}); print output comes back in `output`. Globals persist until reset:true, a timeout, or a hub reconnect; store them on globalThis (top-level let/const cannot be re-declared on the next run).",
+    "Run JavaScript (GraalJS) on the server thread with full Bukkit/Paper API access. On Folia there is no single server thread: the script runs on the global region (server-wide state only) unless `at` puts it on the region of a position or `asPlayer` on a player's thread; touching a block, entity or player elsewhere fails with WRONG_THREAD. Globals: server, player(name), plugin(name), loc(x,y,z,world?), Java.type('fully.qualified.Class'), print(...). The last expression is returned as JSON (Java objects as {class,toString}); print output comes back in `output`. Globals persist until reset:true, a timeout, or a hub reconnect; store them on globalThis (top-level let/const cannot be re-declared on the next run).",
     {
       ...targetArgs,
       code: z.string().min(1),
       timeoutMs: z.number().int().min(100).max(60_000).default(5000),
       reset: z.boolean().default(false),
-      at: z.object({ world, x: z.number(), z: z.number() }).optional().describe("Run on the region that owns this position (Folia). Not needed on Paper."),
+      at: z.object({ world, x: z.number(), z: z.number() }).optional().describe("Run on the region that owns this position (Folia; its chunk is loaded first). Not needed on Paper."),
+      asPlayer: z.string().optional().describe("Run on this online player's thread (Folia: the player's region). Not needed on Paper."),
     },
     async (args, c) => ok(await forward(c, "server", "server.eval", args, args.timeoutMs + 5000)));
 
@@ -109,11 +110,11 @@ export function registerServerTools(server: McpServer, ctx: ToolContext): void {
     }, call("events"));
 
   defineTool(server, ctx, "server_info",
-    "Server health and metadata: TPS (1/5/15 min), MSPT, memory, versions, online players, worlds and plugins.",
+    "Server health and metadata: TPS (1/5/15 min), MSPT, memory, versions, online players, worlds and plugins. On Folia also folia:true, regions (the TPS [5s, 15s, 1m, 5m, 15m] of the region at each world's spawn and at each player) and slowestRegion; tps/mspt are then the global region's.",
     { ...targetArgs }, call("server.info"));
 
   defineTool(server, ctx, "plugin_manage",
-    "list: installed plugins with version and state. info: details for `name` (version, authors, depends, commands). enable/disable: toggle `name` at runtime (not Craftwire itself). Toggling is for quick checks; restart the server for a clean state.",
+    "list: installed plugins with version and state. info: details for `name` (version, authors, depends, commands). enable/disable: toggle `name` at runtime (not Craftwire itself). Toggling is for quick checks; restart the server for a clean state. Folia cannot toggle plugins (UNSUPPORTED): use plugin_deploy.",
     { ...targetArgs, action: z.enum(["list", "info", "enable", "disable"]), name: z.string().optional() },
     call("plugin.manage"));
 }

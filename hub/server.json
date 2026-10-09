@@ -9,12 +9,12 @@
     "source": "github",
     "subfolder": "hub"
   },
-  "version": "0.8.0",
+  "version": "0.9.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "craftwire",
-      "version": "0.8.0",
+      "version": "0.9.0",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"

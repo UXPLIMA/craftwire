@@ -122,3 +122,63 @@ describe("exceptions tool", () => {
     }
   });
 });
+
+const FOLIA_BLOCK = [
+  "java.lang.IllegalStateException: Thread failed main thread check: Cannot modify world asynchronously, context=[thread=Folia Region Scheduler Thread #3,class=io.papermc.paper.threadedregions.TickRegionScheduler$TickThreadRunner,region={null}], world=minecraft:overworld, block_pos=BlockPos{x=5000, y=-60, z=5000}",
+  "\tat ca.spottedleaf.moonrise.common.util.TickThread.ensureTickThread(TickThread.java:83)",
+  "\tat net.minecraft.world.level.Level.setBlock(Level.java:1050)",
+  "\tat org.bukkit.craftbukkit.block.CraftBlock.setTypeAndData(CraftBlock.java:190)",
+  "\tat org.bukkit.craftbukkit.block.CraftBlock.setType(CraftBlock.java:170)",
+  "\tat com.example.arena.ArenaReset.lambda$run$0(ArenaReset.java:31)",
+  "\tat io.papermc.paper.threadedregions.scheduler.FoliaGlobalRegionScheduler$GlobalScheduledTask.run(FoliaGlobalRegionScheduler.java:180)",
+].join("\n");
+
+const FOLIA_ENTITY = [
+  "java.lang.IllegalStateException: Thread failed main thread check: Accessing entity state off owning region's thread, context=[thread=Folia Region Scheduler Thread #1], entity=EntityZombie['Zombie'/12, uuid='x', l='ServerLevel[world]', x=100.50, y=-60.00, z=4.50]",
+  "\tat ca.spottedleaf.moonrise.common.util.TickThread.ensureTickThread(TickThread.java:83)",
+  "\tat org.bukkit.craftbukkit.entity.CraftEntity.teleport(CraftEntity.java:240)",
+  "\tat com.example.arena.Spawner.pull(Spawner.java:12)",
+].join("\n");
+
+const BUKKIT_SCHEDULER = [
+  "java.lang.UnsupportedOperationException",
+  "\tat org.bukkit.craftbukkit.scheduler.CraftScheduler.handle(CraftScheduler.java:520)",
+  "\tat org.bukkit.craftbukkit.scheduler.CraftScheduler.runTaskTimer(CraftScheduler.java:200)",
+  "\tat com.example.arena.ArenaPlugin.onEnable(ArenaPlugin.java:20)",
+].join("\n");
+
+describe("Folia thread violations", () => {
+  it("label a block changed off its region's thread with the plugin frame and the fix", () => {
+    const { t, log } = harness();
+    log("server-1", { level: "ERROR", logger: "Minecraft", message: "Task failed", thrown: FOLIA_BLOCK });
+    expect(t.list()[0]!.folia).toEqual({
+      owner: "com.example.arena.ArenaReset.lambda$run$0(ArenaReset.java:31)",
+      touched: "block",
+      fix: expect.stringContaining("getRegionScheduler()"),
+    });
+  });
+
+  it("label an entity touched off its region's thread", () => {
+    const { t, log } = harness();
+    log("server-1", { level: "ERROR", logger: "Arena", message: "Error", thrown: FOLIA_ENTITY });
+    const f = t.list()[0]!.folia!;
+    expect(f.touched).toBe("entity");
+    expect(f.owner).toBe("com.example.arena.Spawner.pull(Spawner.java:12)");
+    expect(f.fix).toContain("getScheduler()");
+  });
+
+  it("label the Bukkit scheduler, which Folia does not have", () => {
+    const { t, log } = harness();
+    log("server-1", { level: "ERROR", logger: "Minecraft", message: "Error occurred while enabling Arena v1.0 (Is it up to date?)", thrown: BUKKIT_SCHEDULER });
+    const f = t.list()[0]!.folia!;
+    expect(f.touched).toBe("scheduler");
+    expect(f.owner).toBe("com.example.arena.ArenaPlugin.onEnable(ArenaPlugin.java:20)");
+    expect(f.fix).toContain("GlobalRegionScheduler");
+  });
+
+  it("leave other exceptions unlabelled", () => {
+    const { t, log } = harness();
+    log("server-1", { level: "ERROR", logger: "Shop", message: "x", thrown: NPE });
+    expect(t.list()[0]!.folia).toBeUndefined();
+  });
+});

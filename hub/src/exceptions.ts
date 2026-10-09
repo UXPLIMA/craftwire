@@ -42,7 +42,7 @@ export function parseThrown(text: string): ParsedThrowable | undefined {
 }
 
 // Frames of the game, the server, the loaders and common libraries: not where a plugin or mod bug is.
-const PLATFORM = /^(java|javax|jdk|sun|com\.sun|net\.minecraft|com\.mojang|org\.bukkit|org\.spigotmc|io\.papermc|com\.destroystokyo|net\.fabricmc|org\.spongepowered|io\.netty|it\.unimi|com\.google|org\.apache|org\.slf4j|org\.graalvm|org\.lwjgl|org\.objectweb)\./;
+const PLATFORM = /^(java|javax|jdk|sun|com\.sun|net\.minecraft|com\.mojang|org\.bukkit|org\.spigotmc|io\.papermc|com\.destroystokyo|ca\.spottedleaf|net\.fabricmc|org\.spongepowered|io\.netty|it\.unimi|com\.google|org\.apache|org\.slf4j|org\.graalvm|org\.lwjgl|org\.objectweb)\./;
 
 const withoutLine = (frame: string) => frame.replace(/\(.*\)$/, "");
 const appFrames = (frames: string[]) => frames.filter((f) => !PLATFORM.test(f));
@@ -62,6 +62,49 @@ export function pluginOf(logger: string, message: string): string | undefined {
   return undefined;
 }
 
+/** A Folia thread violation: plugin code touched something its region thread does not own. */
+export interface FoliaViolation {
+  /** The first plugin/mod frame: the code that ran on the wrong thread. */
+  owner?: string;
+  touched: "block" | "chunk" | "entity" | "player" | "world" | "scheduler" | "unknown";
+  fix: string;
+}
+
+const FOLIA_FIX: Record<FoliaViolation["touched"], string> = {
+  block: "Change the block from its region: Bukkit.getRegionScheduler().run(plugin, location, task -> ...).",
+  chunk: "Work on the chunk from its region: Bukkit.getRegionScheduler().run(plugin, world, chunkX, chunkZ, task -> ...).",
+  entity: "Touch the entity from its own scheduler: entity.getScheduler().run(plugin, task -> ..., null).",
+  player: "Touch the player from its own scheduler: player.getScheduler().run(plugin, task -> ..., null).",
+  world: "Run world changes on the region that owns the location (Bukkit.getRegionScheduler()); server-wide state on Bukkit.getGlobalRegionScheduler().",
+  scheduler: "Folia has no Bukkit scheduler: use Bukkit.getGlobalRegionScheduler(), Bukkit.getRegionScheduler(), entity.getScheduler() or Bukkit.getAsyncScheduler().",
+  unknown: "Run the code on the thread that owns the data: the region scheduler for a location, entity.getScheduler() for an entity or player.",
+};
+
+/** Whether a trace is one of Folia's thread checks (or the Bukkit scheduler Folia lacks), and what it touched. */
+export function foliaViolation(p: ParsedThrowable): FoliaViolation | undefined {
+  const parts = p.root === p ? [p] : [p, p.root];
+  const check = parts.find((t) => t.message.includes("Thread failed main thread check")
+    || t.frames.some((f) => f.startsWith("ca.spottedleaf.moonrise.common.util.TickThread.ensureTickThread")));
+  const scheduler = parts.find((t) => t.type === "java.lang.UnsupportedOperationException"
+    && t.frames.some((f) => f.startsWith("org.bukkit.craftbukkit.scheduler.CraftScheduler.")));
+  const hit = check ?? scheduler;
+  if (!hit) return undefined;
+  const touched: FoliaViolation["touched"] = check === undefined ? "scheduler" : touchedBy(hit.message);
+  const v: FoliaViolation = { touched, fix: FOLIA_FIX[touched] };
+  const owner = appFrames(hit.frames)[0];
+  if (owner !== undefined) v.owner = owner;
+  return v;
+}
+
+function touchedBy(message: string): FoliaViolation["touched"] {
+  if (/entity=\S*Player|player/i.test(message)) return "player";
+  if (/entity=|\bentity\b/i.test(message)) return "entity";
+  if (/block_pos=|\bblock\b/i.test(message)) return "block";
+  if (/chunk/i.test(message)) return "chunk";
+  if (/\bworld\b/i.test(message)) return "world";
+  return "unknown";
+}
+
 export interface ExceptionGroup {
   id: string;
   type: string;
@@ -72,6 +115,8 @@ export interface ExceptionGroup {
   /** First frame outside the game/server/loaders: where to look. */
   origin?: string;
   plugin?: string;
+  /** Set when the exception is a Folia thread violation. */
+  folia?: FoliaViolation;
   /** Instance names (stable across reconnects) that logged it. */
   instances: string[];
 }
@@ -141,6 +186,7 @@ export class ExceptionTracker {
     };
     if (g.origin !== undefined) s.origin = g.origin;
     if (g.plugin !== undefined) s.plugin = g.plugin;
+    if (g.folia !== undefined) s.folia = g.folia;
     return s;
   }
 
@@ -207,6 +253,8 @@ export class ExceptionTracker {
     g.instances.add(name);
     if (origin !== undefined) g.origin = origin;
     if (plugin !== undefined) g.plugin = plugin;
+    const folia = foliaViolation(parsed);
+    if (folia !== undefined) g.folia = folia;
     if (!g.messages.includes(parsed.root.message) && g.messages.length < 5) g.messages.push(parsed.root.message);
   }
 }
