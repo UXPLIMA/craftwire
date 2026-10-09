@@ -2,6 +2,7 @@ name: CraftwireFixture
 version: '${version}'
 main: com.uxplima.craftwire.fixtures.FixturePlugin
 api-version: '26.2'
+folia-supported: true
 description: Test-only plugin for the Craftwire integration tests.
 softdepend: [Craftwire]
 commands:

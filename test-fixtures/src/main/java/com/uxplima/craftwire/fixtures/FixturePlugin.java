@@ -52,9 +52,19 @@ public final class FixturePlugin extends JavaPlugin implements Listener {
             showHud(player);
             return true;
         }
+        if (args.length == 1 && args[0].equals("wrongthread")) {
+            // A classic Folia bug: a block far from anyone changed from the global region thread. Paper allows it.
+            Bukkit.getGlobalRegionScheduler().run(this, task -> Bukkit.getWorlds().getFirst().getBlockAt(5000, -60, 5000).setType(Material.STONE));
+            sender.sendMessage(Component.text("fixture: wrong thread"));
+            return true;
+        }
         sender.sendMessage(Component.text("fixture: now"));
         // Many plugins answer a tick or more later (async lookups, menus); server_command must still see it.
-        Bukkit.getGlobalRegionScheduler().runDelayed(this, task -> sender.sendMessage(Component.text("fixture: later")), 2);
+        if (sender instanceof Player player) {
+            player.getScheduler().runDelayed(this, task -> sender.sendMessage(Component.text("fixture: later")), null, 2);
+        } else {
+            Bukkit.getGlobalRegionScheduler().runDelayed(this, task -> sender.sendMessage(Component.text("fixture: later")), 2);
+        }
         return true;
     }
 
@@ -64,6 +74,18 @@ public final class FixturePlugin extends JavaPlugin implements Listener {
      * a boss bar, a title and an action bar.
      */
     private static void showHud(Player player) {
+        try {
+            showScoreboard(player);
+        } catch (UnsupportedOperationException folia) {
+            // Folia has no scoreboards; the rest of the HUD works there too.
+        }
+        player.sendPlayerListHeaderAndFooter(Component.text("§6Fixture Network"), Component.text("fixture.example"));
+        player.showBossBar(BossBar.bossBar(Component.text("Event"), 0.5f, BossBar.Color.RED, BossBar.Overlay.PROGRESS));
+        player.showTitle(Title.title(Component.text("Welcome"), Component.text("to the fixture")));
+        player.sendActionBar(Component.text("Mana 10"));
+    }
+
+    private static void showScoreboard(Player player) {
         Scoreboard board = Bukkit.getScoreboardManager().getNewScoreboard();
         Objective side = board.registerNewObjective("side", Criteria.DUMMY, Component.text("§eMy Lobby"));
         side.setDisplaySlot(DisplaySlot.SIDEBAR);
@@ -83,10 +105,6 @@ public final class FixturePlugin extends JavaPlugin implements Listener {
         vip.prefix(Component.text("[VIP] "));
         vip.addEntry(player.getName());
         player.setScoreboard(board);
-        player.sendPlayerListHeaderAndFooter(Component.text("§6Fixture Network"), Component.text("fixture.example"));
-        player.showBossBar(BossBar.bossBar(Component.text("Event"), 0.5f, BossBar.Color.RED, BossBar.Overlay.PROGRESS));
-        player.showTitle(Title.title(Component.text("Welcome"), Component.text("to the fixture")));
-        player.sendActionBar(Component.text("Mana 10"));
     }
 
     /** Like a protection plugin: bookshelves cannot be broken. */
@@ -125,7 +143,7 @@ public final class FixturePlugin extends JavaPlugin implements Listener {
         if (e.getRawSlot() != 4) return;
         Player p = (Player) e.getWhoClicked();
         p.sendMessage(Component.text("fixture: clicked 4"));
-        Bukkit.getScheduler().runTask(this, () -> p.closeInventory());
+        p.getScheduler().run(this, task -> p.closeInventory(), null);
     }
 
     private static final class Menu implements InventoryHolder {

@@ -36,6 +36,9 @@ class ConnectionIT {
         assertEquals(3, info.getAsJsonArray("tps").size());
         assertTrue(info.getAsJsonArray("plugins").toString().contains("\"name\":\"Craftwire\""), info.toString());
         assertEquals("world", info.getAsJsonArray("worlds").get(0).getAsJsonObject().get("name").getAsString());
+        // Folia adds the regions' own tick rates; Paper has one main thread and no such fields.
+        assertEquals(ItEnv.folia(), info.has("folia"), info.toString());
+        if (ItEnv.folia()) assertTrue(info.getAsJsonArray("regions").toString().contains("\"at\":\"spawn\""), info.toString());
     }
 
     @Test

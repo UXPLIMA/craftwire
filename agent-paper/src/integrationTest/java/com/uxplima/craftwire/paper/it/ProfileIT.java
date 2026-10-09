@@ -33,8 +33,10 @@ class ProfileIT {
         lag(200);
         JsonObject r = hub.call("profile.run", "{\"durationMs\":3000}", 30_000).getAsJsonObject("result");
         assertNotNull(r, "profile failed");
-        assertEquals("Server thread", r.get("thread").getAsString());
+        assertEquals(ItEnv.folia() ? "Folia Region Scheduler Thread #*" : "Server thread", r.get("thread").getAsString());
         assertTrue(r.get("samples").getAsInt() > 20, r.toString());
+        // Folia: every region thread is sampled and listed; Paper has the one main thread.
+        assertEquals(ItEnv.folia(), r.has("threads"), r.toString());
 
         JsonObject fixture = find(r.getAsJsonArray("owners"), "owner", "CraftwireFixture");
         assertEquals("plugin", fixture.get("kind").getAsString());
@@ -50,7 +52,9 @@ class ProfileIT {
 
         JsonObject ticks = r.getAsJsonObject("ticks");
         assertTrue(ticks.get("count").getAsInt() >= 40, ticks.toString());
-        assertTrue(ticks.get("msptAvg").getAsDouble() >= 7, ticks.toString());
+        // Folia reports every region's ticks, most of them idle: only Paper's average reflects the 8 ms burn.
+        if (!ItEnv.folia()) assertTrue(ticks.get("msptAvg").getAsDouble() >= 7, ticks.toString());
+        assertTrue(ticks.get("max").getAsDouble() >= 7, ticks.toString());
         JsonArray slowest = ticks.getAsJsonArray("slowest");
         assertFalse(slowest.isEmpty());
     }
@@ -76,7 +80,8 @@ class ProfileIT {
         assertTrue(m.get("invocations").getAsLong() >= 20, r.toString());
         assertTrue(m.get("avgMs").getAsDouble() >= 7, r.toString());
         JsonObject call = r.getAsJsonArray("slowest").get(0).getAsJsonObject();
-        assertEquals("Server thread", call.get("thread").getAsString());
+        if (ItEnv.folia()) assertTrue(call.get("thread").getAsString().startsWith("Folia Region Scheduler Thread"), call.toString());
+        else assertEquals("Server thread", call.get("thread").getAsString());
         assertTrue(call.getAsJsonArray("stack").get(0).getAsJsonObject().get("method").getAsString()
                 .startsWith("com.uxplima.craftwire.fixtures.FixtureLag"), call.toString());
     }

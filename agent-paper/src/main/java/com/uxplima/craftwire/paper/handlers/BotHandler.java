@@ -5,9 +5,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.uxplima.craftwire.paper.Args;
 import com.uxplima.craftwire.paper.CraftwirePlugin;
-import com.uxplima.craftwire.paper.bot.Bot;
 import com.uxplima.craftwire.paper.bot.BotActions;
-import com.uxplima.craftwire.paper.bot.BotJson;
 import com.uxplima.craftwire.paper.bot.BotNames;
 import java.util.ArrayList;
 import java.util.List;
@@ -30,26 +28,27 @@ final class BotHandler {
                 String prefix = Args.optString(p, "namePrefix").orElse("Bot");
                 names = BotNames.allocate(prefix, count, n -> self.bots().isBot(n) || Bukkit.getPlayerExact(n) != null);
             }
+            return self.bots().spawn(names, location(p));
+        }).thenCompose(f -> f).thenApply(summaries -> {
             JsonArray out = new JsonArray();
-            for (Bot b : self.bots().spawn(names, location(p))) out.add(BotJson.summary(b));
+            summaries.forEach(out::add);
             JsonObject r = new JsonObject();
             r.add("bots", out);
-            return r;
+            return (JsonElement) r;
         });
     }
 
     static CompletableFuture<JsonElement> remove(JsonObject p, CraftwirePlugin self) {
         self.agentConfig().require(self.agentConfig().allowBots(), "allow-bots");
-        return self.sync().global(() -> {
+        CompletableFuture<List<String>> names = Args.bool(p, "all", false)
+                ? self.bots().removeAll()
+                : self.bots().remove(Args.string(p, "name")).thenApply(List::of);
+        return names.thenApply(list -> {
             JsonArray removed = new JsonArray();
-            if (Args.bool(p, "all", false)) {
-                self.bots().removeAll().forEach(removed::add);
-            } else {
-                removed.add(self.bots().remove(Args.string(p, "name")).name());
-            }
+            list.forEach(removed::add);
             JsonObject r = new JsonObject();
             r.add("removed", removed);
-            return r;
+            return (JsonElement) r;
         });
     }
 

@@ -67,6 +67,11 @@ final class PaperServer {
         return new PaperServer(pb.start());
     }
 
+    /** Whether the server logged that Craftwire could not be enabled. */
+    boolean pluginFailed() {
+        return console.stream().anyMatch(l -> l.contains("Error occurred while enabling Craftwire"));
+    }
+
     String tail(int lines) {
         return String.join("\n", console.subList(Math.max(0, console.size() - lines), console.size()));
     }

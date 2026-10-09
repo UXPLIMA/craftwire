@@ -50,7 +50,7 @@ final class WorldEditHandler {
         Sync sync = plugin.sync();
         SnapshotStore snaps = plugin.snapshots();
         String action = Args.string(p, "action");
-        return switch (action) {
+        CompletableFuture<JsonElement> done = switch (action) {
             case "set_blocks" -> setBlocks(p, sync);
             case "fill" -> fill(p, sync, snaps, config);
             case "snapshot" -> snapshot(p, sync, snaps, config);
@@ -59,6 +59,8 @@ final class WorldEditHandler {
             case "paste_schematic" -> pasteSchematic(p, sync, snaps, plugin.structuresDir(), config);
             default -> throw Args.invalid("Unknown action: " + action);
         };
+        // A schematic is one structure: on Folia its box must lie in one region.
+        return done.exceptionallyCompose(t -> CompletableFuture.failedFuture(Sync.explainThread(t)));
     }
 
     private static void checkVolume(Box box, AgentConfig config) {
@@ -136,10 +138,24 @@ final class WorldEditHandler {
         }));
     }
 
-    /** Loads the box's chunks, then copies it on the region of its minimum corner. */
+    /** Copies the box chunk by chunk, each part on the thread that owns its chunk. */
     private static CompletableFuture<String> takeSnapshot(Sync sync, SnapshotStore snaps, World w, Box box) {
-        return ChunkWork.forEachChunk(sync, w, box, part -> 0)
-                .thenCompose(v -> sync.region(w, box.minX() >> 4, box.minZ() >> 4, () -> snaps.save(w, box)));
+        String id = snaps.newId();
+        return ChunkWork.forEachChunk(sync, w, box, part -> {
+            try {
+                snaps.savePart(id, w, part);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+            return 0;
+        }).thenApply(v -> {
+            try {
+                snaps.finish(id, w, box);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+            return id;
+        });
     }
 
     private static CompletableFuture<JsonElement> snapshot(JsonObject p, Sync sync, SnapshotStore snaps, AgentConfig config) {
@@ -159,13 +175,23 @@ final class WorldEditHandler {
         World w = Bukkit.getWorld(snap.world());
         if (w == null) throw new AgentError("WORLD_NOT_FOUND", "World " + snap.world() + " is not loaded", "Load that world, then retry.");
         Box box = snap.box();
-        return ChunkWork.forEachChunk(sync, w, box, part -> 0)
-                .thenCompose(v -> sync.region(w, box.minX() >> 4, box.minZ() >> 4, () -> {
-                    snaps.restore(snap, w);
-                    JsonObject r = box.toJson();
-                    r.addProperty("restored", snap.id());
-                    return (JsonElement) r;
-                }));
+        JsonObject r = box.toJson();
+        r.addProperty("restored", snap.id());
+        if (!snap.parts()) {
+            return ChunkWork.forEachChunk(sync, w, box, part -> 0)
+                    .thenCompose(v -> sync.region(w, box.minX() >> 4, box.minZ() >> 4, () -> {
+                        snaps.restoreWhole(snap, w);
+                        return (JsonElement) r;
+                    }));
+        }
+        return ChunkWork.forEachChunk(sync, w, box, part -> {
+            try {
+                snaps.restorePart(snap, w, part);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+            return 0;
+        }).thenApply(v -> (JsonElement) r);
     }
 
     private static CompletableFuture<JsonElement> saveSchematic(JsonObject p, Sync sync, Path dir, AgentConfig config) {

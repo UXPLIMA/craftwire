@@ -6,6 +6,7 @@ import com.google.gson.JsonObject;
 import com.uxplima.craftwire.core.AgentError;
 import com.uxplima.craftwire.paper.Args;
 import com.uxplima.craftwire.paper.CraftwirePlugin;
+import com.uxplima.craftwire.paper.Sync;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.concurrent.CompletableFuture;
@@ -55,6 +56,11 @@ final class PluginManageHandler {
         if (target == self) {
             throw new AgentError("CANNOT_DISABLE_SELF", "Craftwire cannot change its own state",
                     "To stop Craftwire, remove it from plugins/ and restart the server.");
+        }
+        if (Sync.folia()) {
+            // Folia's regions keep running a plugin's tasks and listeners on many threads: no safe point to stop it.
+            throw new AgentError("UNSUPPORTED", "Folia cannot enable or disable plugins while the server runs",
+                    "Use plugin_deploy (copies the jar and restarts the server), or restart the server yourself.");
         }
         boolean before = target.isEnabled();
         if (enable && !before) Bukkit.getPluginManager().enablePlugin(target);

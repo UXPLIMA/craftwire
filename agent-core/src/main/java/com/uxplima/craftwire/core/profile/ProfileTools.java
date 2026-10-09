@@ -9,6 +9,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Predicate;
 
 /** The profile.run and trace.run requests, the same on servers and clients; the platform supplies the details. */
 public final class ProfileTools implements AutoCloseable {
@@ -16,6 +17,11 @@ public final class ProfileTools implements AutoCloseable {
     public interface Platform {
         /** The thread whose time `profile` samples ("Server thread", "Render thread"). */
         String gameThread();
+
+        /** Which threads `profile` samples; by default the one named {@link #gameThread()}. */
+        default Predicate<String> gameThreads() {
+            return gameThread()::equals;
+        }
 
         /** Who owns which classes (built off the game thread; may read every plugin or mod jar). */
         OwnerIndex owners();
@@ -55,7 +61,7 @@ public final class ProfileTools implements AutoCloseable {
         int top = (int) clamp(p, "top", 15, 1, 50);
         return CompletableFuture.supplyAsync(() -> {
             OwnerIndex owners = platform.owners();
-            Profiler.Session session = Profiler.start(platform.gameThread(), intervalMs, owners, platform::eventOf);
+            Profiler.Session session = Profiler.start(platform.gameThread(), platform.gameThreads(), intervalMs, owners, platform::eventOf);
             AutoCloseable handle = session::cancel;
             running.add(handle);
             Feed feed = Feed.NONE;

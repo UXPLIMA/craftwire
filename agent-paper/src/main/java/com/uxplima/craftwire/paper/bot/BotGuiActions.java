@@ -37,23 +37,23 @@ final class BotGuiActions {
 
     static CompletableFuture<JsonElement> run(String action, JsonObject p, BotManager bots, Sync sync, String name) {
         return switch (action) {
-            case "gui_read" -> sync.global(() -> (JsonElement) BotJson.gui(bots.get(name), Args.bool(p, "inventory", false)));
+            case "gui_read" -> bots.on(name, b -> (JsonElement) BotJson.gui(b, Args.bool(p, "inventory", false)));
             case "gui_click" -> {
                 long settleMs = Math.clamp(Args.optLong(p, "settleMs").orElse(150L), 0L, 5000L);
                 String click = Args.optString(p, "click").orElse("left");
                 boolean inventory = Args.bool(p, "inventory", false);
-                yield sync.global(() -> click(bots.get(name), Args.integer(p, "slot"), click, inventory))
+                yield bots.on(name, b -> click(b, Args.integer(p, "slot"), click, inventory))
                         .thenCompose(v -> CompletableFuture.supplyAsync(() -> v, CompletableFuture.delayedExecutor(settleMs, TimeUnit.MILLISECONDS)))
-                        .thenCompose(v -> sync.global(() -> {
+                        .thenCompose(v -> bots.on(name, b -> {
                             JsonObject r = new JsonObject();
                             r.addProperty("clicked", v);
-                            r.add("gui", BotJson.gui(bots.get(name), inventory));
+                            r.add("gui", BotJson.gui(b, inventory));
                             return (JsonElement) r;
                         }));
             }
-            case "gui_close" -> sync.global(() -> close(bots.get(name)));
-            case "use" -> sync.global(() -> use(settled(bots.get(name)), p));
-            case "attack" -> sync.global(() -> attack(settled(bots.get(name)), p));
+            case "gui_close" -> bots.on(name, b -> close(b));
+            case "use" -> bots.on(name, b -> use(settled(b), p));
+            case "attack" -> bots.on(name, b -> attack(settled(b), p));
             default -> CompletableFuture.failedFuture(Args.invalid("Unknown bot action: " + action));
         };
     }

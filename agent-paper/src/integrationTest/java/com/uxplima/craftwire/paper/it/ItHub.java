@@ -43,7 +43,7 @@ final class ItHub extends WebSocketServer {
         long end = System.currentTimeMillis() + timeoutMs;
         while (System.currentTimeMillis() < end) {
             if (hello.isDone()) return hello.get();
-            if (!serverAlive.getAsBoolean()) throw new AssertionError("Paper exited before the agent connected");
+            if (!serverAlive.getAsBoolean()) throw new AssertionError("Paper exited, or Craftwire failed to enable, before the agent connected");
             Thread.sleep(200);
         }
         throw new AssertionError("agent did not connect within " + timeoutMs + " ms");

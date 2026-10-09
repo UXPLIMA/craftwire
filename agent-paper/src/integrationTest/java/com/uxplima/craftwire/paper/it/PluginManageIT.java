@@ -28,6 +28,12 @@ class PluginManageIT {
     @Test
     void disableThenEnableRoundTrip() throws Exception {
         ItHub hub = ItEnv.get().hub;
+        if (ItEnv.folia()) {
+            assertEquals("UNSUPPORTED", hub.error("plugin.manage", "{\"action\":\"disable\",\"name\":\"CraftwireFixture\"}").get("code").getAsString());
+            assertEquals("UNSUPPORTED", hub.error("plugin.manage", "{\"action\":\"enable\",\"name\":\"CraftwireFixture\"}").get("code").getAsString());
+            assertTrue(manage("{\"action\":\"info\",\"name\":\"CraftwireFixture\"}").get("enabled").getAsBoolean());
+            return;
+        }
         JsonObject off = manage("{\"action\":\"disable\",\"name\":\"CraftwireFixture\"}");
         assertFalse(off.get("enabled").getAsBoolean());
         assertTrue(off.get("changed").getAsBoolean());

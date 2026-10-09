@@ -5,16 +5,17 @@ import com.google.gson.JsonObject;
 import com.uxplima.craftwire.core.AgentError;
 import com.uxplima.craftwire.paper.Args;
 import com.uxplima.craftwire.paper.CraftwirePlugin;
+import com.uxplima.craftwire.paper.Sync;
 import com.uxplima.craftwire.paper.events.EventSnapshot;
 import com.uxplima.craftwire.paper.events.EventTap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
-import org.bukkit.Bukkit;
 
 /**
- * wait: blocks (without blocking any thread) until a server-side condition holds. Tick conditions are checked on the
- * server thread every tick, starting with the tick after the call; `event` listens for events fired after the call.
+ * wait: blocks (without blocking any thread) until a server-side condition holds. Tick conditions are checked every
+ * tick (each on the thread that owns its block or player), starting with the tick after the call; `event` listens for events fired after the call.
  * Resolves with {matched, condition, elapsedMs, value} or, on timeout, {matched:false, …, last}.
  */
 public final class WaitHandler {
@@ -35,19 +36,26 @@ public final class WaitHandler {
         return wait.result();
     }
 
+    /** Checks every tick from the global region; a check that runs on another thread is awaited before the next. */
     private static void tick(CraftwirePlugin plugin, Wait wait, Conditions.Probe probe) {
-        Bukkit.getGlobalRegionScheduler().runAtFixedRate(plugin, task -> {
+        AtomicBoolean checking = new AtomicBoolean();
+        plugin.sync().repeatGlobal(task -> {
             if (wait.done()) {
                 task.cancel();
                 return;
             }
+            if (!checking.compareAndSet(false, true)) return;
+            CompletableFuture<Conditions.Check> check;
             try {
-                Conditions.Check c = probe.check();
-                if (wait.observe(c.met(), c.value())) task.cancel();
+                check = probe.check(plugin.sync());
             } catch (RuntimeException e) {
-                wait.fail(e);
-                task.cancel();
+                check = CompletableFuture.failedFuture(e);
             }
+            check.whenComplete((c, err) -> {
+                checking.set(false);
+                if (err != null) wait.fail(Sync.explainThread(err));
+                else wait.observe(c.met(), c.value());
+            });
         }, 1, 1);
     }
 

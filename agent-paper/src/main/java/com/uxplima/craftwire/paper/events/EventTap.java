@@ -89,7 +89,7 @@ public final class EventTap implements Listener {
         attachAll();
         Bukkit.getPluginManager().registerEvents(this, plugin);
         // Lists created later (a class nothing initialised yet) are picked up within a second.
-        Bukkit.getScheduler().runTaskTimer(plugin, this::attachAll, 20, 20);
+        Bukkit.getGlobalRegionScheduler().runAtFixedRate(plugin, task -> attachAll(), 20, 20);
     }
 
     public void stop() {

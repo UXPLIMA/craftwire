@@ -103,7 +103,7 @@ class WaitIT {
     @Test
     void aBusyEventIsTappedOnlyWhileWaitedFor() throws Exception {
         assertFalse(hub.result("events", "{\"action\":\"listeners\",\"type\":\"BlockPhysicsEvent\"}").getAsJsonObject().get("recorded").getAsBoolean());
-        CompletableFuture<JsonObject> f = waitFor("{\"condition\":\"event\",\"type\":\"BlockPhysicsEvent\",\"timeoutMs\":10000}");
+        CompletableFuture<JsonObject> f = waitFor("{\"condition\":\"event\",\"type\":\"BlockPhysicsEvent\",\"pattern\":\"stone@24,-60,24\",\"timeoutMs\":10000}");
         assertTrue(hub.result("events", "{\"action\":\"listeners\",\"type\":\"BlockPhysicsEvent\"}").getAsJsonObject().get("recorded").getAsBoolean());
         command("minecraft:setblock 24 -60 24 minecraft:stone");
         assertTrue(result(f).get("matched").getAsBoolean());

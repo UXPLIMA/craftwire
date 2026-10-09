@@ -7,6 +7,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import java.util.ArrayList;
 import java.util.List;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 
 /** Tools other plugins add through the Craftwire API: announced to the hub, callable, removed with their plugin. */
@@ -56,6 +57,7 @@ class ExtensionsIT {
 
     @Test
     void aDisabledPluginsToolsAreRemovedAndComeBackWithIt() throws Exception {
+        Assumptions.assumeFalse(ItEnv.folia(), "Folia cannot disable plugins at runtime (plugin_manage refuses)");
         ItHub hub = ItEnv.get().hub;
         hub.result("plugin.manage", "{\"action\":\"disable\",\"name\":\"CraftwireFixture\"}");
         try {

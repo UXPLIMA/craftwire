@@ -6,12 +6,14 @@ import com.uxplima.craftwire.core.profile.Owner;
 import com.uxplima.craftwire.core.profile.OwnerIndex;
 import com.uxplima.craftwire.core.profile.ProfileTools;
 import com.uxplima.craftwire.core.profile.Profiler;
+import com.uxplima.craftwire.paper.Sync;
 import java.lang.reflect.Method;
 import java.nio.file.Path;
 import java.security.CodeSource;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Predicate;
 import org.bukkit.Bukkit;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Event;
@@ -20,7 +22,7 @@ import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
-/** profile and trace on a Paper server: the main thread, owners from plugin jars, tick times from Paper's events. */
+/** profile and trace on a Paper server: the main thread (Folia: every region thread), owners from plugin jars, tick times from Paper's events. */
 public final class PaperProfiling implements ProfileTools.Platform {
     private final Plugin self;
     private final Map<String, Plugin> plugins = new ConcurrentHashMap<>();
@@ -31,9 +33,17 @@ public final class PaperProfiling implements ProfileTools.Platform {
         this.self = self;
     }
 
+    /** Folia has no main thread: every region (and the global region) ticks on one of its scheduler threads. */
+    private static final String FOLIA_THREADS = "Folia Region Scheduler Thread";
+
     @Override
     public String gameThread() {
-        return "Server thread";
+        return Sync.folia() ? FOLIA_THREADS + " #*" : "Server thread";
+    }
+
+    @Override
+    public Predicate<String> gameThreads() {
+        return Sync.folia() ? name -> name.startsWith(FOLIA_THREADS) : "Server thread"::equals;
     }
 
     @Override

@@ -7,11 +7,14 @@ import com.google.gson.JsonPrimitive;
 import com.uxplima.craftwire.core.AgentError;
 import com.uxplima.craftwire.paper.Args;
 import com.uxplima.craftwire.paper.CraftwirePlugin;
+import com.uxplima.craftwire.paper.Sync;
 import com.uxplima.craftwire.paper.bot.Bot;
 import com.uxplima.craftwire.paper.bot.BotInbox;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 import org.bukkit.Bukkit;
@@ -22,7 +25,10 @@ import org.bukkit.block.data.BlockData;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
-/** The server-side wait_for conditions that are checked every tick. Built and checked on the server thread. */
+/**
+ * The server-side wait_for conditions that are checked every tick. Built on the global region; each check runs where
+ * its data lives: a block on its region, a player on the player's thread, the rest right away.
+ */
 final class Conditions {
     private Conditions() {}
 
@@ -31,7 +37,7 @@ final class Conditions {
 
     @FunctionalInterface
     interface Probe {
-        Check check();
+        CompletableFuture<Check> check(Sync sync);
     }
 
     static Probe probe(String condition, JsonObject p, CraftwirePlugin plugin, long startedAt) {
@@ -56,10 +62,10 @@ final class Conditions {
         if (is.isPresent() == isNot.isPresent()) throw Args.invalid("block needs exactly one of `is` or `isNot`");
         BlockData pattern = blockData(is.orElseGet(isNot::get));
         boolean want = is.isPresent();
-        return () -> {
+        return sync -> sync.loaded(world, x >> 4, z >> 4, () -> {
             BlockData actual = world.getBlockAt(x, y, z).getBlockData();
             return new Check(actual.matches(pattern) == want, new JsonPrimitive(actual.getAsString()));   // the argument's given properties are what must match
-        };
+        });
     }
 
     private static BlockData blockData(String s) {
@@ -75,9 +81,7 @@ final class Conditions {
         World world = Args.world(p);
         Location target = new Location(world, Args.number(p, "x"), Args.number(p, "y"), Args.number(p, "z"));
         double radius = p.has("radius") ? Args.number(p, "radius") : 1.5;
-        return () -> {
-            Player pl = Bukkit.getPlayerExact(name);
-            if (pl == null) return new Check(false, new JsonPrimitive("offline"));
+        return sync -> onPlayer(sync, name, pl -> {
             Location at = pl.getLocation();
             JsonObject v = new JsonObject();
             v.addProperty("x", round(at.getX()));
@@ -88,7 +92,7 @@ final class Conditions {
             double d = at.distance(target);
             v.addProperty("distance", round(d));
             return new Check(d <= radius, v);
-        };
+        });
     }
 
     /** `count`: at least that many (default 1); `atMost`: no more than that many (0 = none left). */
@@ -99,27 +103,37 @@ final class Conditions {
         if (material == null || !material.isItem()) throw new AgentError("INVALID_PARAMS", "Not an item: " + item, "Use an item id such as diamond.");
         Optional<Integer> atMost = Args.optInt(p, "atMost");
         int atLeast = Args.optInt(p, "count").orElse(1);
-        return () -> {
-            Player pl = Bukkit.getPlayerExact(name);
-            if (pl == null) return new Check(false, new JsonPrimitive("offline"));
+        return sync -> onPlayer(sync, name, pl -> {
             int n = 0;
             for (ItemStack s : pl.getInventory().getContents()) if (s != null && s.getType() == material) n += s.getAmount();
             boolean met = atMost.isPresent() ? n <= atMost.get() : n >= atLeast;
             return new Check(met, new JsonPrimitive(n));
-        };
+        });
     }
 
     /** A message a bot receives after the call (chat, system line or action bar) matching `pattern`. */
     private static Probe message(JsonObject p, CraftwirePlugin plugin, long startedAt) {
         Bot bot = plugin.bots().get(Args.string(p, "player"));
         Pattern pattern = regex(Args.string(p, "pattern"));
-        return () -> {
+        return sync -> CompletableFuture.completedFuture(inbox(bot, pattern, startedAt));
+    }
+
+    private static Check inbox(Bot bot, Pattern pattern, long startedAt) {
+        {
             List<BotInbox.Message> got = bot.inbox().since(startedAt, 100);
             for (BotInbox.Message m : got) {
                 if (pattern.matcher(m.text()).find()) return new Check(true, message(m));
             }
             return new Check(false, got.isEmpty() ? JsonNull.INSTANCE : message(got.getLast()));
-        };
+        }
+    }
+
+    /** Checks on the player's own thread; an offline player (or one leaving meanwhile) does not match. */
+    private static CompletableFuture<Check> onPlayer(Sync sync, String name, Function<Player, Check> check) {
+        Player pl = Bukkit.getPlayerExact(name);
+        Check offline = new Check(false, new JsonPrimitive("offline"));
+        if (pl == null) return CompletableFuture.completedFuture(offline);
+        return sync.entity(pl, () -> check.apply(pl)).exceptionally(t -> offline);
     }
 
     private static JsonObject message(BotInbox.Message m) {
@@ -134,9 +148,10 @@ final class Conditions {
     private static Probe expr(JsonObject p, CraftwirePlugin plugin) {
         plugin.agentConfig().require(plugin.agentConfig().allowEval(), "allow-eval");
         String js = Args.string(p, "js");
-        return () -> {
+        return sync -> {
+            // Called from the global region's tick: the script runs there, like a server_eval without `at`.
             JsonElement v = plugin.scripts().eval(js, 1000).get("result");
-            return new Check(truthy(v), v);
+            return CompletableFuture.completedFuture(new Check(truthy(v), v));
         };
     }
 

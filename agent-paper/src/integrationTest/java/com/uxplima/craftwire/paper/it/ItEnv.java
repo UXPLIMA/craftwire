@@ -55,20 +55,30 @@ final class ItEnv {
         ItHub hub = new ItHub(freePort());
         hub.startAndWait();
         Files.writeString(home.resolve("hub.json"), "{\"port\":" + hub.getPort() + ",\"token\":\"" + ItHub.TOKEN + "\"}");
-        Path paper = PaperDownload.ensure(work.resolve("cache"), System.getProperty("craftwire.mcVersion"),
+        Path paper = PaperDownload.ensure(work.resolve("cache"), project(), System.getProperty("craftwire.mcVersion"),
                 System.getProperty("craftwire.paperBuild"), System.getProperty("craftwire.paperSha256"));
         List<Path> plugins = Arrays.stream(System.getProperty("craftwire.pluginJars").split(File.pathSeparator)).map(Path::of).toList();
         PaperServer server = PaperServer.start(work.resolve("server"), paper, plugins, home, freePort());
         Runtime.getRuntime().addShutdownHook(new Thread(server::stop));
         try {
             // First run downloads the Mojang jar and GraalJS through Paper's library loader: allow minutes.
-            JsonObject hello = hub.awaitHello(300_000, server.process::isAlive);
+            // Stops waiting at once when the server died or Craftwire failed to enable.
+            JsonObject hello = hub.awaitHello(300_000, () -> server.process.isAlive() && !server.pluginFailed());
             hub.awaitLog(m -> m.startsWith("Done ("), 300_000);
             return new ItEnv(hub, server, hello);
         } catch (Throwable t) {
             server.stop();
             throw new AssertionError(t.getMessage() + "\n--- Paper console (tail) ---\n" + server.tail(80), t);
         }
+    }
+
+    /** "paper" or "folia" (-Pserver=folia). */
+    static String project() {
+        return System.getProperty("craftwire.serverProject", "paper");
+    }
+
+    static boolean folia() {
+        return project().equals("folia");
     }
 
     static int freePort() throws Exception {

@@ -1,5 +1,6 @@
 package com.uxplima.craftwire.core.profile;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadInfo;
@@ -7,18 +8,22 @@ import java.lang.management.ThreadMXBean;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.random.RandomGenerator;
 
 /**
- * Samples the stack of one thread every few milliseconds and sums the samples into a {@link ProfileReport}.
+ * Samples the stack of the game thread every few milliseconds and sums the samples into a {@link ProfileReport}.
+ * A server with several tick threads (Folia's region threads) has each of them sampled, summed into one report.
  *
- * <p>Only that thread is sampled (a handshake stops it for a few microseconds per sample). Flight Recorder's
+ * <p>Only those threads are sampled (a handshake stops it for a few microseconds per sample). Flight Recorder's
  * sampler is not used: it samples a few threads per period in rotation, so on a server with dozens of threads the
  * game thread would get a handful of samples per second.
  */
@@ -38,7 +43,13 @@ public final class Profiler {
      * `eventOf` names the event a listener method handles, for frames whose descriptor is unknown.
      */
     public static Session start(String thread, int intervalMs, OwnerIndex index, Function<Frame, String> eventOf) {
-        return new Session(thread, intervalMs, index, eventOf);
+        return start(thread, thread::equals, intervalMs, index, eventOf);
+    }
+
+    /** Samples every thread whose name `threads` accepts; `label` names them in the report. */
+    public static Session start(String label, Predicate<String> threads, int intervalMs, OwnerIndex index,
+            Function<Frame, String> eventOf) {
+        return new Session(label, threads, intervalMs, index, eventOf);
     }
 
     /**
@@ -51,17 +62,21 @@ public final class Profiler {
         return interval / 2 + random.nextLong(interval);
     }
 
-    private static long threadId(String name) {
+    private static Map<Long, String> threads(Predicate<String> names) {
+        Map<Long, String> out = new TreeMap<>();
         for (Thread t : Thread.getAllStackTraces().keySet()) {
-            if (t.getName().equals(name)) return t.threadId();
+            if (names.test(t.getName())) out.put(t.threadId(), t.getName());
         }
-        return -1;
+        return out;
     }
 
     public static final class Session {
         private final String thread;
         private final int intervalMs;
-        private final long threadId;
+        private final Map<Long, String> threadIds;
+        private final long[] ids;
+        /** Busy samples per thread name (reported when there are several threads). */
+        private final Map<String, Integer> busy = new TreeMap<>();
         private final ProfileReport report;
         private final long started = System.nanoTime();
         private final ScheduledExecutorService sampler = Executors.newSingleThreadScheduledExecutor(r -> {
@@ -71,12 +86,14 @@ public final class Profiler {
             return t;
         });
 
-        private Session(String thread, int intervalMs, OwnerIndex index, Function<Frame, String> eventOf) {
+        private Session(String thread, Predicate<String> names, int intervalMs, OwnerIndex index, Function<Frame, String> eventOf) {
             this.thread = thread;
             this.intervalMs = intervalMs;
-            this.threadId = threadId(thread);
+            this.threadIds = threads(names);
+            this.ids = threadIds.keySet().stream().mapToLong(Long::longValue).toArray();
             this.report = new ProfileReport(index, eventOf);
-            if (threadId >= 0) sampler.execute(this::sampleAndReschedule);
+            threadIds.values().forEach(n -> busy.put(n, 0));
+            if (ids.length > 0) sampler.execute(this::sampleAndReschedule);
         }
 
         private void sampleAndReschedule() {
@@ -93,20 +110,23 @@ public final class Profiler {
         }
 
         private void sample() {
-            ThreadInfo info = THREADS.getThreadInfo(threadId, Integer.MAX_VALUE);
-            if (info == null) return;   // the thread ended
+            ThreadInfo[] infos = THREADS.getThreadInfo(ids, Integer.MAX_VALUE);
             long now = now();
-            Thread.State state = info.getThreadState();
             synchronized (report) {
-                // Parked or sleeping between ticks/frames is idle time, not time spent; blocked on a lock is spent.
-                if (state == Thread.State.WAITING || state == Thread.State.TIMED_WAITING) {
-                    report.idle();
-                    return;
+                for (ThreadInfo info : infos) {
+                    if (info == null) continue;   // the thread ended
+                    Thread.State state = info.getThreadState();
+                    // Parked or sleeping between ticks/frames is idle time, not time spent; blocked on a lock is spent.
+                    if (state == Thread.State.WAITING || state == Thread.State.TIMED_WAITING) {
+                        report.idle();
+                        continue;
+                    }
+                    StackTraceElement[] trace = info.getStackTrace();
+                    List<Frame> frames = new ArrayList<>(trace.length);
+                    for (StackTraceElement e : trace) frames.add(new Frame(e.getClassName(), e.getMethodName(), "", e.getLineNumber()));
+                    report.add(frames, now);
+                    busy.merge(threadIds.get(info.getThreadId()), 1, Integer::sum);
                 }
-                StackTraceElement[] trace = info.getStackTrace();
-                List<Frame> frames = new ArrayList<>(trace.length);
-                for (StackTraceElement e : trace) frames.add(new Frame(e.getClassName(), e.getMethodName(), "", e.getLineNumber()));
-                report.add(frames, now);
             }
         }
 
@@ -132,6 +152,16 @@ public final class Profiler {
             o.addProperty("intervalMs", intervalMs);
             synchronized (report) {
                 report.json(top).entrySet().forEach(e -> o.add(e.getKey(), e.getValue()));
+                if (busy.size() > 1) {
+                    JsonArray threads = new JsonArray();
+                    busy.forEach((name, n) -> {
+                        JsonObject t = new JsonObject();
+                        t.addProperty("name", name);
+                        t.addProperty("samples", n);
+                        threads.add(t);
+                    });
+                    o.add("threads", threads);
+                }
             }
             return o;
         }

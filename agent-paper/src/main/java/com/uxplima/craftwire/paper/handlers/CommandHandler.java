@@ -27,7 +27,11 @@ final class CommandHandler {
         long collectMs = Math.clamp(Args.optLong(p, "collectMs").orElse(250L), 0L, 5000L);
         Optional<String> asPlayer = Args.optString(p, "asPlayer");
         List<String> output = new CopyOnWriteArrayList<>();
-        CompletableFuture<JsonObject> dispatched = sync.global(() -> dispatch(command, asPlayer, output));
+        // A player's command runs on that player's thread (Folia: its region), the console's on the global region.
+        CompletableFuture<JsonObject> dispatched = asPlayer.isPresent()
+                ? sync.entity(online(asPlayer.get()), () -> dispatch(command, asPlayer, output))
+                : sync.global(() -> dispatch(command, asPlayer, output));
+        dispatched = dispatched.exceptionallyCompose(t -> CompletableFuture.failedFuture(Sync.explainThread(t)));
         long wait = asPlayer.isPresent() ? 0 : collectMs;
         return dispatched
                 .thenCompose(r -> CompletableFuture.supplyAsync(() -> r, CompletableFuture.delayedExecutor(wait, TimeUnit.MILLISECONDS)))
@@ -39,15 +43,19 @@ final class CommandHandler {
                 });
     }
 
+    static Player online(String name) {
+        Player player = Bukkit.getPlayerExact(name);
+        if (player == null) {
+            throw new AgentError("PLAYER_NOT_FOUND", "No online player named " + name,
+                    "Use world_query {action:'players'} to see who is online.");
+        }
+        return player;
+    }
+
     private static JsonObject dispatch(String command, Optional<String> asPlayer, List<String> output) {
         CommandSender sender;
         if (asPlayer.isPresent()) {
-            Player player = Bukkit.getPlayerExact(asPlayer.get());
-            if (player == null) {
-                throw new AgentError("PLAYER_NOT_FOUND", "No online player named " + asPlayer.get(),
-                        "Use world_query {action:'players'} to see who is online.");
-            }
-            sender = player;
+            sender = online(asPlayer.get());
         } else {
             sender = Bukkit.createCommandSender(c -> output.add(PlainTextComponentSerializer.plainText().serialize(c)));
         }

@@ -5,6 +5,8 @@ import com.google.gson.JsonObject;
 import com.uxplima.craftwire.paper.AgentConfig;
 import com.uxplima.craftwire.paper.Args;
 import com.uxplima.craftwire.paper.CraftwirePlugin;
+import com.uxplima.craftwire.paper.Sync;
+import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import org.bukkit.World;
@@ -36,11 +38,18 @@ public final class EvalHandler {
             if (reset) plugin.scripts().resetSession();
             return plugin.scripts().eval(code, timeoutMs);
         };
-        if (!p.has("at") || !p.get("at").isJsonObject()) return plugin.sync().global(run);
+        return where(p, plugin.sync(), run).exceptionallyCompose(t -> CompletableFuture.failedFuture(Sync.explainThread(t)));
+    }
+
+    /** `asPlayer`: that player's thread; `at`: the thread of that spot (its chunk loaded first); else the global region. */
+    private static CompletableFuture<JsonElement> where(JsonObject p, Sync sync, Callable<JsonElement> run) {
+        Optional<String> asPlayer = Args.optString(p, "asPlayer");
+        if (asPlayer.isPresent()) return sync.entity(CommandHandler.online(asPlayer.get()), run);
+        if (!p.has("at") || !p.get("at").isJsonObject()) return sync.global(run);
         JsonObject at = p.getAsJsonObject("at");
         World world = Args.world(at);
         int x = (int) Math.floor(Args.number(at, "x"));
         int z = (int) Math.floor(Args.number(at, "z"));
-        return plugin.sync().region(world, x >> 4, z >> 4, run);
+        return sync.loaded(world, x >> 4, z >> 4, run);
     }
 }

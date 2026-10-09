@@ -26,22 +26,22 @@ public final class BotActions {
         String action = Args.string(p, "action");
         String name = Args.string(p, "bot");
         return switch (action) {
-            case "chat" -> sync.global(() -> {
-                bots.get(name).bukkit().chat(Args.string(p, "text"));
+            case "chat" -> bots.on(name, b -> {
+                b.bukkit().chat(Args.string(p, "text"));
                 JsonObject r = new JsonObject();
                 r.addProperty("sent", true);
                 return (JsonElement) r;
             });
             case "command" -> command(p, bots, sync, name);
-            case "messages" -> sync.global(() -> {
+            case "messages" -> bots.on(name, b -> {
                 long since = Args.optLong(p, "since").orElse(0L);
                 int limit = Math.clamp(Args.optInt(p, "limit").orElse(50), 1, 200);
                 JsonObject r = new JsonObject();
-                r.add("messages", BotJson.messages(bots.get(name).inbox().since(since, limit)));
+                r.add("messages", BotJson.messages(b.inbox().since(since, limit)));
                 return (JsonElement) r;
             });
-            case "look" -> sync.global(() -> look(bots.get(name), p));
-            case "move_to" -> sync.global(() -> bots.get(name).moveTo(
+            case "look" -> bots.on(name, b -> look(b, p));
+            case "move_to" -> bots.on(name, b -> b.moveTo(
                             Args.number(p, "x"), Args.number(p, "y"), Args.number(p, "z"),
                             p.has("tolerance") ? Args.number(p, "tolerance") : 0.5,
                             Args.bool(p, "sprint", false),
@@ -51,15 +51,14 @@ public final class BotActions {
                                     Args.bool(p, "openDoors", true), 40_000),
                             Args.bool(p, "partial", false)))
                     .thenCompose(f -> f).thenApply(r -> (JsonElement) r);
-            case "break_block" -> sync.global(() -> {
+            case "break_block" -> bots.on(name, b -> {
                         JsonObject at = Args.object(p, "block");
                         Direction face = Args.optString(p, "face").map(f -> Direction.byName(f.toLowerCase(Locale.ROOT))).orElse(null);
-                        return bots.get(name).breakBlock(bots.plugin(), new BlockPos(Args.integer(at, "x"), Args.integer(at, "y"), Args.integer(at, "z")),
+                        return b.breakBlock(bots.plugin(), new BlockPos(Args.integer(at, "x"), Args.integer(at, "y"), Args.integer(at, "z")),
                                 face, Math.clamp(Args.optLong(p, "timeoutMs").orElse(30_000L), 500L, 120_000L));
                     })
                     .thenCompose(f -> f).thenApply(r -> (JsonElement) r);
-            case "jump" -> sync.global(() -> {
-                Bot b = bots.get(name);
+            case "jump" -> bots.on(name, b -> {
                 boolean grounded = b.player().onGround();
                 b.jump();
                 JsonObject r = new JsonObject();
@@ -67,8 +66,7 @@ public final class BotActions {
                 if (!grounded) r.addProperty("reason", "not on the ground");
                 return (JsonElement) r;
             });
-            case "sneak", "sprint" -> sync.global(() -> {
-                Bot b = bots.get(name);
+            case "sneak", "sprint" -> bots.on(name, b -> {
                 boolean on = Args.bool(p, "on", true);
                 if (action.equals("sneak")) b.sneak(on);
                 else b.sprint(on);
@@ -77,8 +75,7 @@ public final class BotActions {
                 r.addProperty("sprinting", b.bukkit().isSprinting());
                 return (JsonElement) r;
             });
-            case "drop" -> sync.global(() -> {
-                Bot b = bots.get(name);
+            case "drop" -> bots.on(name, b -> {
                 ItemStack before = b.bukkit().getInventory().getItemInMainHand().clone();
                 if (before.getType().isAir()) {
                     throw new AgentError("NOTHING_HELD", b.name() + " holds nothing", "give the bot an item, or select_hotbar a slot that has one.");
@@ -94,8 +91,7 @@ public final class BotActions {
                 if (!after.getType().isAir()) r.add("held", BotJson.item(after));
                 return (JsonElement) r;
             });
-            case "swap_hands" -> sync.global(() -> {
-                Bot b = bots.get(name);
+            case "swap_hands" -> bots.on(name, b -> {
                 b.swapHands();
                 JsonObject r = new JsonObject();
                 ItemStack main = b.bukkit().getInventory().getItemInMainHand();
@@ -104,10 +100,10 @@ public final class BotActions {
                 if (!off.getType().isAir()) r.add("offHand", BotJson.item(off));
                 return (JsonElement) r;
             });
-            case "state" -> sync.global(() -> (JsonElement) BotJson.state(bots.get(name)));
-            case "hud_read" -> sync.global(() -> (JsonElement) bots.get(name).hud());
-            case "give" -> sync.global(() -> give(bots.get(name), p));
-            case "select_hotbar" -> sync.global(() -> selectHotbar(bots.get(name), Args.integer(p, "slot")));
+            case "state" -> bots.on(name, b -> (JsonElement) BotJson.state(b));
+            case "hud_read" -> bots.on(name, b -> (JsonElement) b.hud());
+            case "give" -> bots.on(name, b -> give(b, p));
+            case "select_hotbar" -> bots.on(name, b -> selectHotbar(b, Args.integer(p, "slot")));
             default -> BotGuiActions.run(action, p, bots, sync, name);
         };
     }
@@ -123,8 +119,7 @@ public final class BotActions {
         String command = raw.startsWith("/") ? raw.substring(1) : raw;
         long collectMs = Math.clamp(Args.optLong(p, "collectMs").orElse(300L), 0L, 5000L);
         long started = System.currentTimeMillis();
-        return sync.global(() -> {
-                    Bot b = bots.get(name);
+        return bots.on(name, b -> {
                     String label = command.split(" ", 2)[0].toLowerCase(Locale.ROOT);
                     boolean known = Bukkit.getCommandMap().getCommand(label) != null;
                     CommandWatch watch = CommandWatch.start(bots.plugin(), b.uuid());
@@ -132,7 +127,7 @@ public final class BotActions {
                     return new Ran(b, known, watch);
                 })
                 .thenCompose(r -> CompletableFuture.supplyAsync(() -> r, CompletableFuture.delayedExecutor(Math.max(collectMs, 50L), TimeUnit.MILLISECONDS)))
-                .thenCompose(r -> sync.global(() -> {
+                .thenCompose(r -> bots.on(name, b -> {
                     r.watch().stop();
                     Boolean cancelled = r.watch().cancelled();
                     JsonObject o = new JsonObject();
@@ -144,7 +139,7 @@ public final class BotActions {
                     if (finalText != null && !finalText.equals("/" + command)) o.addProperty("rewrittenTo", finalText);
                     o.add("messages", BotJson.messages(r.bot().inbox().since(started, 200)));
                     return (JsonElement) o;
-                }));
+                }).whenComplete((o, t) -> r.watch().stop()));
     }
 
     private static JsonElement look(Bot b, JsonObject p) {

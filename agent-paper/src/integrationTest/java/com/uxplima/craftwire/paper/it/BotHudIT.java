@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,6 +38,14 @@ class BotHudIT {
     void readsAPluginScoreboardLikeTheClientDrawsIt() throws Exception {
         hub.result("bot.action", "{\"bot\":\"Hud\",\"action\":\"command\",\"command\":\"/cwfixture hud\",\"collectMs\":200}");
         JsonObject hud = hud();
+        if (ItEnv.folia()) {
+            // Folia has no scoreboards: the rest of the HUD still reaches the bot.
+            assertTrue(hud.get("sidebar").isJsonNull(), hud.toString());
+            assertEquals("Welcome", hud.get("title").getAsString(), hud.toString());
+            assertEquals("Mana 10", hud.get("actionbar").getAsString(), hud.toString());
+            assertEquals("Event", hud.getAsJsonArray("bossbars").get(0).getAsJsonObject().get("name").getAsString(), hud.toString());
+            return;
+        }
 
         JsonObject sidebar = hud.getAsJsonObject("sidebar");
         assertEquals("My Lobby", sidebar.get("title").getAsString(), hud.toString());
@@ -65,6 +74,7 @@ class BotHudIT {
 
     @Test
     void aFreshBotSeesTheMainScoreboardAndNoTitle() throws Exception {
+        Assumptions.assumeFalse(ItEnv.folia(), "Folia has no scoreboards (no /scoreboard command)");
         hub.result("server.command", "{\"command\":\"scoreboard objectives add cwmain dummy \\\"Main\\\"\"}");
         hub.result("server.command", "{\"command\":\"scoreboard objectives setdisplay sidebar cwmain\"}");
         hub.result("server.command", "{\"command\":\"scoreboard players set Alpha cwmain 9\"}");

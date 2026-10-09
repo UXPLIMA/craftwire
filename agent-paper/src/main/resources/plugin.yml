@@ -5,7 +5,7 @@ api-version: '26.2'
 description: Lets AI agents drive this server through the Craftwire MCP hub. Development servers only.
 author: UXPLIMA
 website: https://github.com/uxplima/craftwire
-folia-supported: false
+folia-supported: true
 libraries:
   - org.graalvm.polyglot:polyglot:${graalVersion}
   - org.graalvm.js:js-language:${graalVersion}

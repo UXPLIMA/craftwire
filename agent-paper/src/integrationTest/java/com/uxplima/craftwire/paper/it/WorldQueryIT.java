@@ -20,7 +20,7 @@ class WorldQueryIT {
                 + " for (let x = 1000; x <= 1002; x++) for (let z = 1000; z <= 1002; z++) W.getBlockAt(x, -50, z).setType(M.GOLD_BLOCK);"
                 + " W.getBlockAt(1007, -50, 1007).setType(M.GOLD_BLOCK);"
                 + " W.getBlockAt(1008, -50, 1008).setType(M.GOLD_BLOCK);"
-                + " W.spawnEntity(loc(1001.5, -49, 1001.5), Java.type('org.bukkit.entity.EntityType').ARMOR_STAND); 'ok'\",\"timeoutMs\":60000}");
+                + " W.spawnEntity(loc(1001.5, -49, 1001.5), Java.type('org.bukkit.entity.EntityType').ARMOR_STAND); 'ok'\",\"at\":{\"x\":1001,\"z\":1001},\"timeoutMs\":60000}");
     }
 
     static JsonObject query(String paramsJson) throws Exception {

@@ -88,7 +88,7 @@ test {
 }
 
 tasks.register('integrationTest', Test) {
-    description = 'Runs the plugin inside a real Paper server.'
+    description = 'Runs the plugin inside a real Paper (or, with -Pserver=folia, Folia) server.'
     group = 'verification'
     testClassesDirs = sourceSets.integrationTest.output.classesDirs
     classpath = sourceSets.integrationTest.runtimeClasspath
@@ -96,11 +96,16 @@ tasks.register('integrationTest', Test) {
     dependsOn tasks.named('jar'), ':test-fixtures:jar'
     def pluginJar = tasks.named('jar').flatMap { it.archiveFile }
     def fixtureJar = project(':test-fixtures').tasks.named('jar').flatMap { it.archiveFile }
-    def itDir = layout.buildDirectory.dir("it/${itProps.minecraft_version}")
+    // -Pserver=folia runs the same tests on Folia (only versions with folia_build in versions/<mc>.properties).
+    def flavor = (project.findProperty('server') ?: 'paper').toString()
+    if (!(flavor in ['paper', 'folia'])) throw new GradleException("-Pserver must be paper or folia, not ${flavor}")
+    if (flavor == 'folia' && !itProps.folia_build) throw new GradleException("No Folia build for Minecraft ${itProps.minecraft_version} (versions/${itProps.minecraft_version}.properties has no folia_build)")
+    def itDir = layout.buildDirectory.dir(flavor == 'paper' ? "it/${itProps.minecraft_version}" : "it/${flavor}-${itProps.minecraft_version}")
     inputs.files(pluginJar, fixtureJar)
     systemProperty 'craftwire.mcVersion', itProps.minecraft_version
-    systemProperty 'craftwire.paperBuild', itProps.paper_build
-    systemProperty 'craftwire.paperSha256', itProps.paper_sha256
+    systemProperty 'craftwire.serverProject', flavor
+    systemProperty 'craftwire.paperBuild', flavor == 'folia' ? itProps.folia_build : itProps.paper_build
+    systemProperty 'craftwire.paperSha256', flavor == 'folia' ? itProps.folia_sha256 : itProps.paper_sha256
     systemProperty 'craftwire.version', project.version.toString()
     doFirst {
         systemProperty 'craftwire.pluginJars', [pluginJar.get().asFile, fixtureJar.get().asFile]*.absolutePath.join(File.pathSeparator)

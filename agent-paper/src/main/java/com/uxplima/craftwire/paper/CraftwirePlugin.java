@@ -46,8 +46,7 @@ public final class CraftwirePlugin extends JavaPlugin {
         getLogger().warning("Craftwire is active — do not run on production servers");
         scripts = new ScriptEngine(getClass().getClassLoader(), EvalHandler.PRELUDE);
         snapshots = new SnapshotStore(getDataFolder().toPath().resolve("snapshots"));
-        bots = new BotManager(this);
-        bots.start();
+        bots = new BotManager(this, sync);
         extensions = new PaperExtensions(this, this::sendTools);
         extensions.start();
         profiling = new ProfileTools(new PaperProfiling(this));

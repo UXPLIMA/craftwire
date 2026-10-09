@@ -2,6 +2,7 @@ package com.uxplima.craftwire.paper.bot;
 
 import com.google.gson.JsonObject;
 import com.mojang.authlib.GameProfile;
+import com.uxplima.craftwire.paper.Sync;
 import com.uxplima.craftwire.paper.compat.ServerCompat;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -12,6 +13,7 @@ import com.uxplima.craftwire.paper.bot.path.Pathfinder;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import net.minecraft.network.Connection;
+import net.minecraft.network.DisconnectionDetails;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.protocol.game.ServerboundClientCommandPacket;
@@ -33,7 +35,7 @@ import org.bukkit.craftbukkit.CraftWorld;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
-/** One fake player. Every method runs on the server thread. */
+/** One fake player. Every method runs on the thread that owns the player (its entity scheduler). */
 public final class Bot {
     private static final int RESPAWN_TICKS = 20;
 
@@ -49,6 +51,10 @@ public final class Bot {
     private Walk move;
     private Dig dig;
     private boolean jumpNext;
+    private boolean leaving;
+
+    /** What one tick found. */
+    enum Tick { ALIVE, LEAVING, GONE }
 
     private Bot(String name, UUID uuid, Connection connection, ServerGamePacketListenerImpl listener, BotInbox inbox,
             BotHud hud, AtomicInteger pendingTeleport) {
@@ -61,7 +67,10 @@ public final class Bot {
         this.pendingTeleport = pendingTeleport;
     }
 
-    /** Joins the server like a client would (join event, tab list, player data), then moves to `at`. */
+    /**
+     * Joins the server at `at` like a client would (join event, tab list, player data). Runs on the thread that owns
+     * `at`, with its chunk loaded.
+     */
     static Bot join(String name, Location at) {
         MinecraftServer server = MinecraftServer.getServer();
         ServerLevel level = ((CraftWorld) at.getWorld()).getHandle();
@@ -73,9 +82,15 @@ public final class Bot {
         AtomicInteger pendingTeleport = new AtomicInteger(-1);
         Connection connection = FakeConnection.create(inbox, hud, pendingTeleport);
         ServerPlayer player = new ServerPlayer(server, level, profile, ClientInformation.createDefault());
+        // Placed where it should stand before joining: Folia allows no synchronous teleport afterwards.
+        player.snapTo(at.getX(), at.getY(), at.getZ(), at.getYaw(), at.getPitch());
+        player.setYHeadRot(at.getYaw());
         server.getPlayerList().placeNewPlayer(connection, player, CommonListenerCookie.createInitial(profile, false));
+        FoliaConnections.detach(player, connection);
         Bot bot = new Bot(name, uuid, connection, player.connection, inbox, hud, pendingTeleport);
-        bot.bukkit().teleport(at);
+        // Paper: a teleport after joining, as before Folia support (26.3 leaves a player that only joined in the
+        // air until it moves); Folia allows no synchronous teleport, its bot starts where it was placed.
+        if (!Sync.folia()) bot.bukkit().teleport(at);
         bot.settle();
         return bot;
     }
@@ -93,13 +108,14 @@ public final class Bot {
     public boolean moving() { return move != null; }
     public boolean digging() { return dig != null; }
 
-    /** One server tick. Returns false once the bot is gone (kicked, banned, disconnected). */
-    boolean tick(long now) {
-        if (!connection.isConnected()) {
-            leave();
-            return false;
-        }
+    /** One server tick: GONE once the bot left (kicked, banned, disconnected), LEAVING while the server removes it. */
+    Tick tick(long now) {
+        if (leaving) return Tick.LEAVING;
+        DisconnectionDetails kick = FoliaConnections.pollDisconnect(connection);
+        if (kick != null) listener.disconnect(kick);
+        if (!connection.isConnected()) return leave();
         ServerPlayer p = player();
+        FoliaConnections.detach(p, connection);
         if (p.isDeadOrDying()) {
             if (move != null) finish("died");
             if (dig != null) finishDig("died");
@@ -107,7 +123,7 @@ public final class Bot {
                 deadTicks = 0;
                 listener.handleClientCommand(new ServerboundClientCommandPacket(ServerboundClientCommandPacket.Action.PERFORM_RESPAWN));
             }
-            return true;
+            return Tick.ALIVE;
         }
         deadTicks = 0;
         settle();
@@ -127,7 +143,7 @@ public final class Bot {
         }
         // A real client's movement packets make the server tick the player; a bot has none, so tick it here.
         p.doTick();
-        return true;
+        return Tick.ALIVE;
     }
 
     /**
@@ -141,8 +157,13 @@ public final class Bot {
         if (!listener.hasClientLoaded()) listener.handleAcceptPlayerLoad(new ServerboundPlayerLoadedPacket());
     }
 
-    /** Leaves the server now (quit event, player data saved). */
+    /**
+     * Leaves the server now (quit event, player data saved). Does nothing when the bot is already leaving (a kick in
+     * the same tick): removing the player twice breaks the server (Folia stops the region).
+     */
     void remove() {
+        if (leaving) return;
+        leaving = true;
         if (move != null) finish("removed");
         if (dig != null) finishDig("removed");
         MinecraftServer.getServer().getPlayerList().remove(player());
@@ -150,18 +171,36 @@ public final class Bot {
         forgetPlayerFiles();
     }
 
-    /** Something else closed the connection (a kick): run the normal disconnect path once. */
-    private void leave() {
+    /**
+     * Something else closed the connection (a kick): run the normal disconnect path once. On Folia the region does
+     * that once the connection is back on its list; the player's scheduler then retires and {@link #retired} ends
+     * the bot.
+     */
+    private Tick leave() {
+        leaving = true;
         if (move != null) finish("removed");
         if (dig != null) finishDig("removed");
+        if (Sync.folia()) {
+            FoliaConnections.attach(player(), connection);
+            return Tick.LEAVING;
+        }
         connection.handleDisconnection();
         var list = MinecraftServer.getServer().getPlayerList();
         if (list.getPlayer(uuid) != null) list.remove(player());
         forgetPlayerFiles();
+        return Tick.GONE;
+    }
+
+    /** The player entity was removed from the server (its scheduler retired): end what the bot was doing. */
+    void retired() {
+        leaving = true;
+        if (move != null) finish("removed");
+        if (dig != null) finishDig("removed");
+        forgetPlayerFiles();
     }
 
     /** Bots are throwaway players: drop the data, stats and advancements the server saved for them on leaving. */
-    private void forgetPlayerFiles() {
+    void forgetPlayerFiles() {
         MinecraftServer server = MinecraftServer.getServer();
         for (LevelResource dir : new LevelResource[] {LevelResource.PLAYER_DATA_DIR, LevelResource.PLAYER_OLD_DATA_DIR,
                 LevelResource.PLAYER_STATS_DIR, LevelResource.PLAYER_ADVANCEMENTS_DIR}) {

@@ -20,11 +20,16 @@ import org.bukkit.block.structure.StructureRotation;
 import org.bukkit.structure.Structure;
 import org.bukkit.util.BlockVector;
 
-/** Saves areas as vanilla structure files so they can be put back exactly; keeps the newest {@link #KEEP}. */
+/**
+ * Saves areas as vanilla structure files so they can be put back exactly; keeps the newest {@link #KEEP}. A snapshot
+ * is one file per chunk the box touches, each saved and restored on the thread that owns that chunk (on Folia the
+ * chunks of a large box can belong to different regions). Snapshots from before 0.9 are one file for the whole box.
+ */
 public final class SnapshotStore {
     static final int KEEP = 20;
 
-    public record Snapshot(String id, String world, Box box) {}
+    /** `parts`: one file per chunk; otherwise a single file for the whole box (before 0.9). */
+    public record Snapshot(String id, String world, Box box, boolean parts) {}
 
     private final Path dir;
     private final AtomicLong counter = new AtomicLong();
@@ -33,16 +38,24 @@ public final class SnapshotStore {
         this.dir = dir;
     }
 
-    /** Run on the thread that owns the box, with its chunks loaded. */
-    public String save(World world, Box box) throws IOException {
+    /** A fresh snapshot id; save its parts with {@link #savePart}, then {@link #finish} it. */
+    public String newId() {
+        return "snap-" + System.currentTimeMillis() + "-" + counter.incrementAndGet();
+    }
+
+    /** Saves the part of a snapshot inside one chunk. Run on the thread that owns that chunk, with it loaded. */
+    public void savePart(String id, World world, Box part) throws IOException {
         Files.createDirectories(dir);
-        String id = "snap-" + System.currentTimeMillis() + "-" + counter.incrementAndGet();
-        Bukkit.getStructureManager().saveStructure(dir.resolve(id + ".nbt").toFile(), capture(world, box, false));
+        Bukkit.getStructureManager().saveStructure(partFile(id, part).toFile(), capture(world, part, false));
+    }
+
+    /** Records the snapshot once every part is saved; until then {@link #find} does not know it. */
+    public void finish(String id, World world, Box box) throws IOException {
         JsonObject meta = box.toJson();
         meta.addProperty("world", world.getName());
+        meta.addProperty("parts", true);
         Files.writeString(dir.resolve(id + ".json"), meta.toString());
         prune();
-        return id;
     }
 
     public Snapshot find(String id) {
@@ -53,17 +66,29 @@ public final class SnapshotStore {
         }
         try {
             JsonObject o = JsonParser.parseString(Files.readString(meta)).getAsJsonObject();
-            return new Snapshot(id, o.get("world").getAsString(), Box.from(o));
+            return new Snapshot(id, o.get("world").getAsString(), Box.from(o), o.has("parts") && o.get("parts").getAsBoolean());
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
     }
 
-    /** Run on the thread that owns the box, with its chunks loaded. */
-    public void restore(Snapshot snap, World world) throws IOException {
-        Structure s = Bukkit.getStructureManager().loadStructure(dir.resolve(snap.id() + ".nbt").toFile());
-        Box b = snap.box();
+    /** Puts one chunk's part back. Run on the thread that owns that chunk, with it loaded. */
+    public void restorePart(Snapshot snap, World world, Box part) throws IOException {
+        place(partFile(snap.id(), part), world, part);
+    }
+
+    /** Puts a whole-box snapshot (before 0.9) back. Run on the thread that owns the box, with its chunks loaded. */
+    public void restoreWhole(Snapshot snap, World world) throws IOException {
+        place(dir.resolve(snap.id() + ".nbt"), world, snap.box());
+    }
+
+    private static void place(Path file, World world, Box b) throws IOException {
+        Structure s = Bukkit.getStructureManager().loadStructure(file.toFile());
         s.place(new Location(world, b.minX(), b.minY(), b.minZ()), false, StructureRotation.NONE, Mirror.NONE, 0, 1f, new Random());
+    }
+
+    private Path partFile(String id, Box part) {
+        return dir.resolve(id + "." + Math.floorDiv(part.minX(), 16) + "." + Math.floorDiv(part.minZ(), 16) + ".nbt");
     }
 
     /** A structure of every block in the box (air included, so placing it back clears what was added). */
@@ -83,7 +108,9 @@ public final class SnapshotStore {
         for (int i = 0; i < metas.size() - KEEP; i++) {
             String base = metas.get(i).getFileName().toString().replace(".json", "");
             Files.deleteIfExists(metas.get(i));
-            Files.deleteIfExists(dir.resolve(base + ".nbt"));
+            try (Stream<Path> files = Files.list(dir)) {
+                for (Path f : files.filter(f -> f.getFileName().toString().startsWith(base + ".")).toList()) Files.deleteIfExists(f);
+            }
         }
     }
 
