@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { loadOrCreateHttpToken } from "../config.js";
 import { runningHub, startHub } from "../hub.js";
 import { createCraftwireServer } from "../server.js";
-import { parseToolGroups, ToolPolicy } from "../tool-policy.js";
+import { parseToolGroups, profile, ToolPolicy } from "../tool-policy.js";
 import { HUB_VERSION } from "../version.js";
 import { isLoopback, isWildcard } from "./gate.js";
 import { startHttpServer } from "./serve.js";
@@ -17,7 +17,8 @@ export const SERVE_USAGE = `Usage: craftwire serve [--port 7777] [--host 127.0.0
   --tls-cert <file>     serve HTTPS with this certificate (PEM) …
   --tls-key <file>      … and its private key
   --read-only           offer only tools that change nothing
-  --tools <groups>      offer only these groups: hub, client, server, dev, bots, extensions
+  --tools <groups>      offer only these groups: hub, client, server, build, dev, bots, debug, extensions
+  --profile <name>      a preset of groups and tools: build
   --allow-host <name>   another Host name this machine is reached by (repeatable)
   --allow-origin <url>  a web page origin to accept (repeatable; none by default)
   --rate-limit <n>      requests per minute (default 120)
@@ -32,6 +33,8 @@ export interface ServeOptions {
   tlsKey?: string;
   readOnly: boolean;
   tools?: Set<string>;
+  /** Single tools a --profile adds on top of its groups. */
+  extraTools?: Set<string>;
   allowHosts: string[];
   allowOrigins: string[];
   rateLimit: number;
@@ -60,7 +63,13 @@ export function parseServeArgs(argv: string[]): ServeOptions {
       case "--tls-cert": o.tlsCert = value(); break;
       case "--tls-key": o.tlsKey = value(); break;
       case "--read-only": o.readOnly = true; break;
-      case "--tools": o.tools = parseToolGroups(value()); break;
+      case "--tools": o.tools = new Set([...(o.tools ?? []), ...parseToolGroups(value())]); break;
+      case "--profile": {
+        const p = profile(value());
+        o.tools = new Set([...(o.tools ?? []), ...p.groups]);
+        o.extraTools = new Set([...(o.extraTools ?? []), ...p.tools]);
+        break;
+      }
       case "--allow-host": o.allowHosts.push(value()); break;
       case "--allow-origin": o.allowOrigins.push(value()); break;
       case "--rate-limit": o.rateLimit = number(a, value(), 1, 100_000); break;
@@ -119,7 +128,7 @@ export async function startServe(o: ServeOptions, home: string, log: (msg: strin
   const tls = o.tlsCert !== undefined && o.tlsKey !== undefined ? { cert: readFileSync(o.tlsCert), key: readFileSync(o.tlsKey) } : undefined;
   const { token, file, created } = loadOrCreateHttpToken(home, o.rotateToken);
   const hub = await startHub(home, log);
-  const policy = o.readOnly || o.tools ? new ToolPolicy({ readOnly: o.readOnly, ...(o.tools ? { groups: o.tools } : {}) }) : undefined;
+  const policy = o.readOnly || o.tools ? new ToolPolicy({ readOnly: o.readOnly, ...(o.tools ? { groups: o.tools } : {}), ...(o.extraTools ? { extraTools: o.extraTools } : {}) }) : undefined;
   const ctx = policy ? { ...hub.ctx, policy } : hub.ctx;
   let http;
   try {

@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { applySetup, CLIENTS, detectClients, planSetup, type SetupEnv } from "../src/setup.js";
+import { applySetup, CLIENTS, detectClients, planSetup, setupCommand, type SetupEnv } from "../src/setup.js";
 import { HUB_VERSION } from "../src/version.js";
 
 /** Every test gets its own fake home and AppData: nothing here may touch the real client configs. */
@@ -234,3 +234,26 @@ describe("craftwire setup: dry run and detection", () => {
     expect(CLIENTS.map((c) => c.id)).toEqual(["antigravity", "codex", "gemini", "cursor", "windsurf", "vscode", "claude-desktop"]);
   });
 });
+
+describe("craftwire setup --profile", () => {
+  it("adds the profile to the hub's arguments", () => {
+    const env = fakeEnv();
+    const plan = planSetup("claude-desktop", env, { profile: "build" });
+    expect(plan.after).toContain(`"${PKG}"`);
+    expect(JSON.stringify(json2(plan.after))).toContain('"--profile","build"');
+  });
+
+  it("the profile may come before or after the client name", () => {
+    const env = fakeEnv();
+    expect(setupCommand(["--profile", "build", "cursor", "--dry-run"], env)).toContain("--profile");
+    expect(setupCommand(["cursor", "--profile", "build", "--dry-run"], env)).toContain("--profile");
+  });
+
+  it("an unknown profile is refused", () => {
+    expect(() => setupCommand(["cursor", "--profile", "nope"], fakeEnv())).toThrow(/profiles: build/);
+  });
+});
+
+function json2(text: string): unknown {
+  return JSON.parse(text);
+}

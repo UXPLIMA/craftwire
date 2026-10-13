@@ -12,14 +12,23 @@ import { parseServeArgs, serve, SERVE_USAGE } from "./http/serve-command.js";
 import { CraftwireError } from "./errors.js";
 import { createCraftwireServer } from "./server.js";
 import { setupCommand, setupEnvFromProcess } from "./setup.js";
+import { parseHubArgs } from "./tool-policy.js";
 import { HUB_VERSION } from "./version.js";
 
 const log = (msg: string) => process.stderr.write(`[craftwire] ${msg}\n`);
 
 async function main(): Promise<void> {
+  let policy;
+  try {
+    policy = parseHubArgs(process.argv.slice(2)).policy;
+  } catch (e) {
+    process.stderr.write(`craftwire: ${(e as Error).message}
+`);
+    process.exit(2);
+  }
   const home = craftwireHome();
   const hub = await startHub(home, log);
-  const server = createCraftwireServer(hub.ctx);
+  const server = createCraftwireServer(policy ? { ...hub.ctx, policy } : hub.ctx);
   const transport = new StdioServerTransport();
   let stopping = false;
   const shutdown = () => {

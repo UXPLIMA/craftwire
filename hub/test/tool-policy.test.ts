@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { parseToolGroups, ToolPolicy } from "../src/tool-policy.js";
+import { parseHubArgs, parseToolGroups, ToolPolicy } from "../src/tool-policy.js";
 import { connectFakeAgent } from "./helpers/fakeAgent.js";
 import { json, startHub, TOKEN } from "./helpers/hub.js";
 
@@ -64,5 +64,33 @@ describe("a hub with a policy", () => {
     agent.emit("tools", { tools: [{ name: "myshop_coins", namespace: "myshop", description: "d", inputSchema: { type: "object" } }] });
     await new Promise((r) => setTimeout(r, 200));
     expect((await hub.client.listTools()).tools.map((t) => t.name)).not.toContain("myshop_coins");
+  });
+});
+
+describe("profiles", () => {
+  it("build profile offers hub, build and the five viewing/editing tools", () => {
+    const p = parseHubArgs(["--profile", "build"]).policy!;
+    for (const t of ["list_instances", "build", "build_manage", "world_query", "world_render", "server_command", "screenshot", "camera"]) expect(p.lists(t), t).toBe(true);
+    for (const t of ["bot_action", "record", "server_eval", "client_process"]) expect(p.lists(t), t).toBe(false);
+  });
+
+  it("--tools and --profile combine", () => {
+    const p = parseHubArgs(["--profile", "build", "--tools", "bots"]).policy!;
+    expect(p.lists("bot_spawn")).toBe(true);
+    expect(p.lists("build")).toBe(true);
+  });
+
+  it("read-only still applies to a profile's extra tools", () => {
+    const p = parseHubArgs(["--profile", "build", "--read-only"]).policy!;
+    expect(p.lists("world_render")).toBe(true);
+    expect(p.lists("server_command")).toBe(false);
+  });
+
+  it("no flags means no policy", () => {
+    expect(parseHubArgs([]).policy).toBeUndefined();
+  });
+
+  it("an unknown profile is an error naming the profiles", () => {
+    expect(() => parseHubArgs(["--profile", "nope"])).toThrow(/profiles: build/);
   });
 });

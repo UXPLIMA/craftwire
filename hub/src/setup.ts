@@ -1,6 +1,7 @@
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
+import { profile } from "./tool-policy.js";
 import { HUB_VERSION } from "./version.js";
 
 /** Where `craftwire setup` looks. Tests point every field at a temp dir; the CLI fills it from the process. */
@@ -93,8 +94,8 @@ export interface SetupPlan {
 }
 
 /** How the client starts the hub. Windows clients often cannot start npx.cmd without a shell. */
-export function launchCommand(platform: NodeJS.Platform): { command: string; args: string[] } {
-  const npx = ["-y", `craftwire@${HUB_VERSION}`];
+export function launchCommand(platform: NodeJS.Platform, hubArgs: string[] = []): { command: string; args: string[] } {
+  const npx = ["-y", `craftwire@${HUB_VERSION}`, ...hubArgs];
   return platform === "win32" ? { command: "cmd", args: ["/c", "npx", ...npx] } : { command: "npx", args: npx };
 }
 
@@ -109,11 +110,12 @@ export function detectClients(env: SetupEnv): string[] {
 }
 
 /** Works out what setup would change, without writing anything (`--dry-run` prints this). */
-export function planSetup(id: string, env: SetupEnv): SetupPlan {
+export function planSetup(id: string, env: SetupEnv, o: { profile?: string } = {}): SetupPlan {
   const client = findClient(id);
   const configPath = client.config(env);
   const before = existsSync(configPath) ? readFileSync(configPath, "utf8") : undefined;
-  const launch = launchCommand(env.platform);
+  if (o.profile !== undefined) profile(o.profile);   // unknown names fail here, not when the client starts the hub
+  const launch = launchCommand(env.platform, o.profile !== undefined ? ["--profile", o.profile] : []);
   const after = client.format === "codex" ? codexConfig(before ?? "", launch) : jsonConfig(configPath, before, client.format, launch);
   const change = before === undefined ? "create" : before === after ? "none" : "update";
   const plan: SetupPlan = { client, configPath, change, after, skills: [], skipped: [] };
@@ -219,14 +221,19 @@ export function setupEnvFromProcess(skillsDir: string | undefined): SetupEnv {
 const CLAUDE_CODE = ["claude", "claude-code"];
 
 /** `craftwire setup [client] [--dry-run]`: returns what to print. */
-export function setupCommand(args: string[], env: SetupEnv): string {
+export function setupCommand(argv: string[], env: SetupEnv): string {
+  const at = argv.indexOf("--profile");
+  const profileName = at >= 0 ? argv[at + 1] : undefined;
+  if (at >= 0 && (profileName === undefined || profileName.startsWith("--"))) throw new Error("--profile needs a name");
+  if (profileName !== undefined) profile(profileName);
+  const args = at >= 0 ? [...argv.slice(0, at), ...argv.slice(at + 2)] : argv;
   const dryRun = args.includes("--dry-run");
   const id = args.find((a) => !a.startsWith("--"));
   const lines: string[] = [];
   if (!id) {
     const found = detectClients(env);
     lines.push(`Found on this computer: ${found.length ? found.join(", ") : "none of the clients below"}`, "");
-    lines.push("Usage: npx craftwire setup <client> [--dry-run]", "");
+    lines.push("Usage: npx craftwire setup <client> [--profile build] [--dry-run]", "");
     for (const c of CLIENTS) lines.push(`  ${c.id.padEnd(15)} ${c.name}${c.skills ? " (+ skills)" : ""}`);
     lines.push(`  ${"claude-code".padEnd(15)} Claude Code: use the plugin instead`);
     return lines.join("\n") + "\n";
@@ -238,7 +245,7 @@ export function setupCommand(args: string[], env: SetupEnv): string {
       "  /plugin install craftwire@uxplima",
     ].join("\n") + "\n";
   }
-  const plan = planSetup(id, env);
+  const plan = planSetup(id, env, profileName !== undefined ? { profile: profileName } : {});
   const name = plan.client.name;
   if (dryRun) {
     if (plan.change === "none") lines.push(`${plan.configPath} is already set up.`);
