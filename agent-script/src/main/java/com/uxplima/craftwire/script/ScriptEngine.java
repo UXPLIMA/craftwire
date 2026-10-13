@@ -127,7 +127,7 @@ public final class ScriptEngine implements ScriptRunner {
         return context;
     }
 
-    static String describe(PolyglotException e) {
+    public static String describe(PolyglotException e) {
         StringBuilder b = new StringBuilder(String.valueOf(e.getMessage()));
         SourceSection at = e.getSourceLocation();
         if (at != null) b.append(" (line ").append(at.getStartLine()).append(", column ").append(at.getStartColumn()).append(')');

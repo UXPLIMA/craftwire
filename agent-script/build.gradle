@@ -10,10 +10,13 @@ repositories {
 // from Paper's library loader (plugin.yml) or, on clients, from the agent's own download (GraalRuntime).
 dependencies {
     compileOnly project(':agent-core')
+    compileOnly project(':build-core')
     compileOnly 'com.google.code.gson:gson:2.13.2'
     compileOnly "org.graalvm.polyglot:polyglot:${graal_version}"
 
     testImplementation project(':agent-core')
+    testImplementation project(':build-core')
+    testImplementation testFixtures(project(':build-core'))
     testImplementation 'com.google.code.gson:gson:2.13.2'
     testImplementation "org.graalvm.polyglot:polyglot:${graal_version}"
     testImplementation "org.graalvm.js:js-language:${graal_version}"
