@@ -92,7 +92,7 @@ export function registerClientTools(server: McpServer, ctx: ToolContext): void {
       ...targetArgs,
       hud: z.boolean().default(true),
       chat: z.boolean().default(true),
-      maxSize: z.number().int().min(256).max(4096).default(1600),
+      maxSize: z.number().int().min(256).max(4096).default(1024),
       savePath: z.string().optional(),
       format: z.enum(["auto", "png", "jpeg"]).default("auto"),
       camera: z.object({ ...vec3, yaw: z.number(), pitch: z.number(), fov: z.number().int().min(30).max(110).optional() }).optional(),

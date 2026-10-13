@@ -65,7 +65,7 @@ describe("client tools", () => {
     const res = await hub.call("screenshot", { hud: false, chat: false, savePath: "shots/a.png" });
     expect(res.content[0]).toEqual({ type: "image", data: "iVBORw0KGgo=", mimeType: "image/png" });
     expect(JSON.parse((res.content[1] as { text: string }).text)).toMatchObject({ width: 2, fullWidth: 4, savedPath: resolve("shots/a.png") });
-    expect(seen).toMatchObject({ hud: false, chat: false, maxSize: 1600, savePath: resolve("shots/a.png") });
+    expect(seen).toMatchObject({ hud: false, chat: false, maxSize: 1024, savePath: resolve("shots/a.png") });
   });
 
   it("camera path and orbit forward the motion", async () => {
