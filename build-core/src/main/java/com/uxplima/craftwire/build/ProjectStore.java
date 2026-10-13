@@ -15,10 +15,10 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
+import java.util.zip.Deflater;
 import java.util.zip.DeflaterOutputStream;
 import java.util.zip.InflaterInputStream;
 
@@ -173,14 +173,19 @@ public final class ProjectStore {
     }
 
     private void writeMap(Path file, LongIntMap map) throws IOException {
-        Map<Integer, Integer> index = new HashMap<>();
+        LongIntMap index = new LongIntMap();
         List<String> names = new ArrayList<>();
-        map.forEach((pos, s) -> index.computeIfAbsent(s, k -> {
-            names.add(palette.name(k));
-            return names.size() - 1;
-        }));
+        map.forEach((pos, s) -> {
+            if (index.get(s) == LongIntMap.NONE) {
+                index.put(s, names.size());
+                names.add(palette.name(s));
+            }
+        });
         Path tmp = file.resolveSibling(file.getFileName() + ".tmp");
-        try (DataOutputStream out = new DataOutputStream(new BufferedOutputStream(new DeflaterOutputStream(Files.newOutputStream(tmp))))) {
+        // A 1M-block part is ~12 MB raw: the fastest deflate level and large buffers keep saving it well under a second.
+        Deflater deflater = new Deflater(Deflater.BEST_SPEED);
+        try (DataOutputStream out = new DataOutputStream(new BufferedOutputStream(
+                new DeflaterOutputStream(Files.newOutputStream(tmp), deflater, 1 << 16), 1 << 16))) {
             out.writeInt(MAGIC);
             out.writeInt(names.size());
             for (String n : names) out.writeUTF(n);
@@ -197,6 +202,8 @@ public final class ProjectStore {
             } catch (UncheckedIOException e) {
                 throw e.getCause();
             }
+        } finally {
+            deflater.end();
         }
         Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
     }
