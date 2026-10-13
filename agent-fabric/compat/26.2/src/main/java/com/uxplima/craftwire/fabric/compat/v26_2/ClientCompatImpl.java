@@ -42,4 +42,16 @@ public final class ClientCompatImpl implements ClientCompat {
     public void releaseReadBuffers() {
         frames.release();
     }
+
+    private final GuiCanvas gui = new GuiCanvas();
+
+    @Override
+    public RenderTarget guiCanvas(int width, int height, int index) {
+        return gui.canvas(width, height, index);
+    }
+
+    @Override
+    public Drawn drawGui(com.uxplima.craftwire.fabric.capture.GuiLayer layer, RenderTarget canvas, int clearArgb) {
+        return gui.draw(layer, canvas, clearArgb);
+    }
 }

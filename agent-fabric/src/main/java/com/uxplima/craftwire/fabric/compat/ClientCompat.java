@@ -2,6 +2,7 @@ package com.uxplima.craftwire.fabric.compat;
 
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.platform.Window;
+import com.uxplima.craftwire.fabric.capture.GuiLayer;
 import java.nio.ByteBuffer;
 import java.util.function.Consumer;
 
@@ -33,6 +34,21 @@ public interface ClientCompat {
 
     /** Frees the pooled read buffers (end of a recording). Render thread. */
     void releaseReadBuffers();
+
+    /** What {@link #drawGui} found: an open screen, and a tooltip shown on it. */
+    record Drawn(boolean screen, boolean tooltip) {}
+
+    /**
+     * A reusable offscreen target (colour + depth) of this size; {@code index} 0 or 1 picks one of two targets (a
+     * split capture draws two layers whose reads complete later). Recreated when the size changes. Render thread.
+     */
+    RenderTarget guiCanvas(int width, int height, int index);
+
+    /**
+     * Clears {@code canvas} to {@code clearArgb} and draws the open screen's {@code layer} into it: no world, no HUD,
+     * no menu background or blur. The main render target is not touched. Render thread.
+     */
+    Drawn drawGui(GuiLayer layer, RenderTarget canvas, int clearArgb);
 
     static ClientCompat get() {
         return Holder.INSTANCE;
