@@ -5,6 +5,7 @@ import { registerDebugTools } from "./tools/debug-tools.js";
 import { registerPrompts } from "./prompts.js";
 import { registerResources } from "./resources.js";
 import { registerBotTools } from "./tools/bot-tools.js";
+import { registerBuildTools } from "./tools/build-tools.js";
 import { registerClientProcessTools } from "./tools/client-process-tools.js";
 import { registerClientTools } from "./tools/client-tools.js";
 import { registerDevTools } from "./tools/dev-tools.js";
@@ -34,6 +35,7 @@ export function createCraftwireServer(ctx: ToolContext): McpServer {
   registerHubTools(server, ctx);
   registerClientTools(server, ctx);
   registerServerTools(server, ctx);
+  registerBuildTools(server, ctx);
   registerLogTools(server, ctx);
   registerDevTools(server, ctx);
   registerBotTools(server, ctx);

@@ -29,4 +29,9 @@ describe("stdio hub with --profile build", () => {
     expect(names).toContain("world_render");
     expect(names).not.toContain("bot_action");
   });
+
+  it("the build profile stays under 10,500 chars", async () => {
+    const size = (await toolsWith(["--profile", "build"])).reduce((n, t) => n + t.size, 0);
+    expect(size).toBeLessThanOrEqual(10_500);
+  });
 });

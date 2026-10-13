@@ -21,6 +21,8 @@ export interface ToolContext {
   extensions: ExtensionRegistry;
   /** Limits the tools offered and the calls allowed (craftwire serve --read-only / --tools). */
   policy?: ToolPolicy;
+  /** build files: over HTTP (craftwire serve) they are read only from --build-dir. */
+  build?: { dir?: string; http: boolean };
 }
 
 export const targetArgs = {

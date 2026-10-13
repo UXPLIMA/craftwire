@@ -19,6 +19,7 @@ export const SERVE_USAGE = `Usage: craftwire serve [--port 7777] [--host 127.0.0
   --read-only           offer only tools that change nothing
   --tools <groups>      offer only these groups: hub, client, server, build, dev, bots, debug, extensions
   --profile <name>      a preset of groups and tools: build
+  --build-dir <dir>     build may read script files from this folder (otherwise build takes only code)
   --allow-host <name>   another Host name this machine is reached by (repeatable)
   --allow-origin <url>  a web page origin to accept (repeatable; none by default)
   --rate-limit <n>      requests per minute (default 120)
@@ -33,6 +34,8 @@ export interface ServeOptions {
   tlsKey?: string;
   readOnly: boolean;
   tools?: Set<string>;
+  /** build may read script files only from here (otherwise build takes only code over HTTP). */
+  buildDir?: string;
   /** Single tools a --profile adds on top of its groups. */
   extraTools?: Set<string>;
   allowHosts: string[];
@@ -70,6 +73,7 @@ export function parseServeArgs(argv: string[]): ServeOptions {
         o.extraTools = new Set([...(o.extraTools ?? []), ...p.tools]);
         break;
       }
+      case "--build-dir": o.buildDir = value(); break;
       case "--allow-host": o.allowHosts.push(value()); break;
       case "--allow-origin": o.allowOrigins.push(value()); break;
       case "--rate-limit": o.rateLimit = number(a, value(), 1, 100_000); break;
@@ -129,7 +133,7 @@ export async function startServe(o: ServeOptions, home: string, log: (msg: strin
   const { token, file, created } = loadOrCreateHttpToken(home, o.rotateToken);
   const hub = await startHub(home, log);
   const policy = o.readOnly || o.tools ? new ToolPolicy({ readOnly: o.readOnly, ...(o.tools ? { groups: o.tools } : {}), ...(o.extraTools ? { extraTools: o.extraTools } : {}) }) : undefined;
-  const ctx = policy ? { ...hub.ctx, policy } : hub.ctx;
+  const ctx = { ...hub.ctx, ...(policy ? { policy } : {}), build: { http: true, ...(o.buildDir !== undefined ? { dir: o.buildDir } : {}) } };
   let http;
   try {
     http = await startHttpServer({

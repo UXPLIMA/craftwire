@@ -77,7 +77,7 @@ export function registerServerTools(server: McpServer, ctx: ToolContext): void {
     });
 
   defineTool(server, ctx, "world_edit",
-    "Change blocks: set_blocks [{x,y,z,block}] (max 10000), fill {min,max,block,replace?}, snapshot/restore {id}, save_schematic/paste_schematic {name,at}. Over 32768 blocks a snapshot is taken first.",
+    "Change blocks: set_blocks [{x,y,z,block}] (max 10000), fill {min,max,block,replace?}, snapshot/restore {id}, save_schematic/paste_schematic {name,at}. Over 32768 blocks a snapshot is taken first. For more than a few hundred blocks use build.",
     {
       ...targetArgs,
       action: z.enum(["set_blocks", "fill", "snapshot", "restore", "save_schematic", "paste_schematic"]),
