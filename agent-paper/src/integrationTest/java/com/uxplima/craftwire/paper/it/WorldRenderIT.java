@@ -115,4 +115,13 @@ class WorldRenderIT {
         assertEquals("INVALID_PARAMS", hub.error("world.render", "{\"view\":\"slice\",\"x1\":0,\"z1\":0,\"x2\":10,\"z2\":10}").get("code").getAsString());
         assertEquals("INVALID_PARAMS", hub.error("world.render", "{\"view\":\"side\",\"facing\":\"up\",\"x1\":0,\"z1\":0,\"x2\":10,\"z2\":10}").get("code").getAsString());
     }
+
+    @Test
+    void isoFourViewsIsOneSquareImage() throws Exception {
+        hub.result("world.edit", "{\"action\":\"fill\",\"min\":{\"x\":5100,\"y\":-50,\"z\":5100},\"max\":{\"x\":5104,\"y\":-46,\"z\":5104},\"block\":\"stone_bricks\"}");
+        JsonObject r = hub.result("world.render", "{\"x1\":5098,\"z1\":5098,\"x2\":5106,\"z2\":5106,\"view\":\"iso4\",\"y1\":-51,\"y2\":-44}").getAsJsonObject();
+        java.awt.image.BufferedImage img = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(java.util.Base64.getDecoder().decode(r.get("data").getAsString())));
+        assertEquals(img.getWidth(), img.getHeight());
+        assertEquals("map", r.get("colors").getAsString());
+    }
 }

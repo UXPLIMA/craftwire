@@ -51,6 +51,20 @@ public final class SnapshotSource implements BlockSource {
         });
     }
 
+    @Override public int topColor(int x, int y, int z) {
+        BlockData b = at(x, z).getBlockData(x & 15, y, z & 15);
+        if (b.getMaterial().isAir()) return 0;
+        int c = BlockColors.top(b.getMaterial().getKey().toString());
+        return c >= 0 ? c : color(x, y, z);
+    }
+
+    @Override public int sideColor(int x, int y, int z) {
+        BlockData b = at(x, z).getBlockData(x & 15, y, z & 15);
+        if (b.getMaterial().isAir()) return 0;
+        int c = BlockColors.side(b.getMaterial().getKey().toString());
+        return c >= 0 ? c : color(x, y, z);
+    }
+
     @Override public boolean water(int x, int y, int z) {
         BlockData b = at(x, z).getBlockData(x & 15, y, z & 15);
         return ALWAYS_IN_WATER.contains(b.getMaterial()) || b instanceof Waterlogged w && w.isWaterlogged();

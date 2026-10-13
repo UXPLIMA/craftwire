@@ -48,12 +48,14 @@ export function registerServerTools(server: McpServer, ctx: ToolContext): void {
     }, call("world.query", 30_000));
 
   defineTool(server, ctx, "world_render",
-    "Draw a region of a Paper world as an image, no client needed: top (map view), slice {y} (floor plan), side {facing} (front view). Up to 512x512 blocks; scale px/block; grid N labels coordinates; savePath writes the PNG.",
+    "Draw a region of a Paper world as an image, no client needed: top (map), slice {y} (floor plan), side {facing}, iso {corner} or iso4 (3D views, size px). Up to 512x512 blocks; scale px/block; grid N labels coordinates; savePath writes the PNG.",
     {
       ...targetArgs,
       world,
       x1: z.number().int(), z1: z.number().int(), x2: z.number().int(), z2: z.number().int(),
-      view: z.enum(["top", "slice", "side"]).default("top"),
+      view: z.enum(["top", "slice", "side", "iso", "iso4"]).default("top"),
+      corner: z.enum(["ne", "nw", "se", "sw"]).optional(),
+      size: z.number().int().min(256).max(2048).optional(),
       y: z.number().int().optional().describe("slice: the height."),
       facing: z.enum(["north", "south", "east", "west"]).optional().describe("side: the direction you look."),
       y1: z.number().int().optional(), y2: z.number().int().optional(),

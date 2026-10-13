@@ -17,4 +17,14 @@ public interface BlockSource {
     int minY();
 
     int maxY();
+
+    /** Colour of the block's top face; the map colour unless real texture colours are known. */
+    default int topColor(int x, int y, int z) {
+        return color(x, y, z);
+    }
+
+    /** Colour of the block's sides. */
+    default int sideColor(int x, int y, int z) {
+        return color(x, y, z);
+    }
 }

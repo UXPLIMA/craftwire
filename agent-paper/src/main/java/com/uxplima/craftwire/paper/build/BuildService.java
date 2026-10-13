@@ -42,6 +42,8 @@ public final class BuildService {
     private final BuildScriptRunner runner;
     private final Map<String, Project> projects = new ConcurrentHashMap<>();
     private final Map<String, CompletableFuture<?>> tails = new ConcurrentHashMap<>();
+    /** The blocks of each project's last dry run (merged across its parts), for its preview. */
+    private final Map<String, LongIntMap> dryRuns = new ConcurrentHashMap<>();
     private final ExecutorService workers;
 
     public BuildService(CraftwirePlugin plugin) {
@@ -66,6 +68,11 @@ public final class BuildService {
             plugin.getLogger().warning("Could not load build projects: " + e);
         }
         store.warnings().forEach(w -> plugin.getLogger().warning(w));
+    }
+
+    /** The last dry run's blocks of a project, once. */
+    public LongIntMap takeDryRun(String project) {
+        return dryRuns.remove(project);
     }
 
     public void close() {
@@ -143,6 +150,8 @@ public final class BuildService {
             boolean dry = Args.bool(p, "dryRun", false);
             JsonObject out = new JsonObject();
             out.addProperty("project", name);
+            out.addProperty("world", pr.world());
+            dryRuns.remove(name);
             JsonArray parts = new JsonArray();
             List<String> warnings = new ArrayList<>();
             int[] totals = new int[3];   // changed, removed, blocks
@@ -156,6 +165,8 @@ public final class BuildService {
                     totals[2] += part.buffer().size();
                     if (part.buffer().outOfRange() > 0) warnings.add(part.buffer().outOfRange() + " blocks of " + part.name() + " were outside the world and dropped");
                     if (dry) {
+                        LongIntMap merged = dryRuns.computeIfAbsent(name, k -> new LongIntMap());
+                        part.buffer().blocks().forEach(merged::put);
                         pj.addProperty("wouldChange", changes.size());
                         parts.add(pj);
                         return CompletableFuture.completedFuture(null);

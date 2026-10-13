@@ -157,4 +157,10 @@ class BuildIT {
         JsonObject copy = hub.result("world.query", "{\"action\":\"region\",\"encoding\":\"layers\",\"min\":{\"x\":4250,\"y\":-50,\"z\":4000},\"max\":{\"x\":4253,\"y\":-48,\"z\":4003}}").getAsJsonObject();
         assertEquals(q.get("layers"), copy.get("layers"));
     }
+
+    @Test
+    void previewComesBackAsAnImage() throws Exception {
+        JsonObject r = build("{\"project\":\"b18\",\"origin\":{\"x\":4260,\"y\":-50,\"z\":4000},\"code\":\"hollow(0,0,0,6,5,6,'bricks'); roof({x1:-1,z1:-1,x2:7,z2:7,y:6,type:'hip',stairs:'spruce_stairs'}); fill(0,0,3,0,1,3,'air'); set(3,2,0,'glass')\",\"preview\":\"iso4\",\"previewSize\":512}");
+        assertEquals("image/png", r.getAsJsonObject("preview").get("mime").getAsString());
+    }
 }
