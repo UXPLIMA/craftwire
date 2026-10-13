@@ -8,6 +8,9 @@ import com.uxplima.craftwire.fabric.CaptureOptions;
 import com.uxplima.craftwire.fabric.ClientScheduler;
 import com.uxplima.craftwire.fabric.CraftwireAgent;
 import com.uxplima.craftwire.fabric.Params;
+import com.uxplima.craftwire.fabric.capture.AlphaFrame;
+import com.uxplima.craftwire.fabric.capture.GuiCapture;
+import com.uxplima.craftwire.fabric.capture.GuiScale;
 import com.uxplima.craftwire.fabric.camera.CameraOverride;
 import com.uxplima.craftwire.fabric.mixin.HudAccessor;
 import java.awt.Graphics2D;
@@ -20,6 +23,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Base64;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
@@ -35,10 +39,10 @@ import net.minecraft.client.Screenshot;
 final class ScreenshotHandler {
     private ScreenshotHandler() {}
 
-    private record Saved(boolean hudHidden, CameraOverride.Pose pose, int fov, boolean chatHidden) {
+    private record Saved(boolean hudHidden, CameraOverride.Pose pose, int fov, boolean chatHidden, int guiScale) {
         static Saved of(Minecraft mc) {
             return new Saved(((HudAccessor) mc.gui.hud).craftwire$isHidden(), CameraOverride.INSTANCE.get(), mc.options.fov().get(),
-                    CaptureOptions.hideChat);
+                    CaptureOptions.hideChat, mc.options.guiScale().get());
         }
 
         void restore(Minecraft mc) {
@@ -47,6 +51,7 @@ final class ScreenshotHandler {
             else CameraOverride.INSTANCE.set(pose);
             if (mc.options.fov().get() != fov) mc.options.fov().set(fov);
             CaptureOptions.hideChat = chatHidden;
+            GuiScale.apply(mc, guiScale);
         }
     }
 
@@ -58,6 +63,8 @@ final class ScreenshotHandler {
         String format = Params.optString(p, "format").orElse("auto");
         JsonObject camera = p.has("camera") && p.get("camera").isJsonObject() ? p.getAsJsonObject("camera") : null;
         ClientScheduler s = agent.scheduler();
+        GuiCapture.Options gui = GuiCapture.Options.parse(p, savePath);
+        if (gui != null && camera != null) throw Params.invalid("camera does not apply to a transparent layer (there is no world in it)");
 
         // Validate everything before touching game state, so a bad request never leaves the HUD hidden.
         CameraOverride.Pose pose = null;
@@ -81,24 +88,33 @@ final class ScreenshotHandler {
             if (!chat) CaptureOptions.hideChat = true;
             if (capturePose != null) CameraOverride.INSTANCE.set(capturePose);
             if (captureFov != null) mc.options.fov().set(captureFov);
+            if (gui != null && gui.guiScale() != null) GuiScale.apply(mc, gui.guiScale());
             return saved;
         });
 
-        return prepared.thenCompose(saved -> s.delay(3)
+        if (gui != null) {
+            // The canvas draws only the screen: no terrain to wait for, just a frame for a changed GUI scale to settle.
+            return prepared.thenCompose(saved -> restoring(s, agent, saved, s.delay(2).thenCompose(v -> GuiCapture.grab(s, gui))))
+                    .thenApplyAsync(images -> encodeLayers(images, maxSize, savePath, gui));
+        }
+
+        return prepared.thenCompose(saved -> restoring(s, agent, saved, s.delay(3)
                         .thenCompose(v -> sectionsBuilt(s, System.currentTimeMillis() + SETTLE_MILLIS))
                         .thenCompose(v -> s.delay(2))   // the frame after the last section was built draws it
-                        .thenCompose(v -> grab(s))
-                        // Always restore (success or failure) and only then complete, so callers observe restored state.
-                        .handle((file, err) -> s.call(() -> {
-                            saved.restore(Minecraft.getInstance());
-                            agent.setCaptureInProgress(false);
-                            return Boolean.TRUE;
-                        }).thenApply(done -> {
-                            if (err != null) throw new CompletionException(err instanceof CompletionException && err.getCause() != null ? err.getCause() : err);
-                            return file;
-                        }))
-                        .thenCompose(f -> f))
+                        .thenCompose(v -> grab(s))))
                 .thenApplyAsync(file -> encode(file, maxSize, savePath, format));
+    }
+
+    /** Always restores (success or failure) and only then completes, so callers observe restored state. */
+    private static <T> CompletableFuture<T> restoring(ClientScheduler s, CraftwireAgent agent, Saved saved, CompletableFuture<T> work) {
+        return work.handle((result, err) -> s.call(() -> {
+            saved.restore(Minecraft.getInstance());
+            agent.setCaptureInProgress(false);
+            return Boolean.TRUE;
+        }).thenApply(done -> {
+            if (err != null) throw new CompletionException(err instanceof CompletionException && err.getCause() != null ? err.getCause() : err);
+            return result;
+        })).thenCompose(f -> f);
     }
 
     /** Longest wait for terrain to finish building before a capture. */
@@ -214,6 +230,46 @@ final class ScreenshotHandler {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+
+    private static JsonElement encodeLayers(List<BufferedImage> images, int maxSize, String savePath, GuiCapture.Options o) {
+        List<BufferedImage> out = images.stream().map(i -> o.trim() ? AlphaFrame.trim(i, 8) : i).toList();
+        JsonObject r = new JsonObject();
+        if (savePath != null) {
+            Path target = Path.of(savePath).toAbsolutePath();
+            List<Path> paths = o.split() ? List.of(GuiCapture.splitPath(target, "gui"), GuiCapture.splitPath(target, "tooltip")) : List.of(target);
+            com.google.gson.JsonArray saved = new com.google.gson.JsonArray();
+            for (int i = 0; i < out.size(); i++) {
+                try {
+                    if (paths.get(i).getParent() != null) Files.createDirectories(paths.get(i).getParent());
+                    ImageIO.write(out.get(i), "png", paths.get(i).toFile());
+                } catch (IOException e) {
+                    throw new AgentError("SAVE_FAILED", "Could not write " + paths.get(i) + ": " + e.getMessage(), "Pass a writable savePath.");
+                }
+                saved.add(paths.get(i).toString());
+            }
+            r.addProperty("savedPath", saved.get(0).getAsString());
+            if (o.split()) r.add("savedPaths", saved);
+        }
+        BufferedImage first = out.get(0);
+        double scale = Math.min(1.0, maxSize / (double) Math.max(first.getWidth(), first.getHeight()));
+        int w = Math.max(1, (int) Math.round(first.getWidth() * scale)), h = Math.max(1, (int) Math.round(first.getHeight() * scale));
+        BufferedImage small = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = small.createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+        g.drawImage(first, 0, 0, w, h, null);
+        g.dispose();
+        r.addProperty("mime", "image/png");
+        try {
+            r.addProperty("data", Base64.getEncoder().encodeToString(png(small)));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        r.addProperty("width", w);
+        r.addProperty("height", h);
+        r.addProperty("fullWidth", first.getWidth());
+        r.addProperty("fullHeight", first.getHeight());
+        return r;
     }
 
     private static byte[] png(BufferedImage img) throws IOException {

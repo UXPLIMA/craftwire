@@ -122,7 +122,23 @@ final class GuiLayerChecks {
         ctx.waitTicks(3);
         enchantedItemIsOpaque(ctx);
         tooltipIsTranslucent(ctx);
+        java.nio.file.Path dir = java.nio.file.Files.createTempDirectory("craftwire-gui");
+        String save = dir.resolve("panel.png").toString().replace("\\", "\\\\");
+        int scaleBefore = ctx.computeOnClient(mc -> mc.options.guiScale().get());
+        // A scale other than the current one: the menu is laid out again and the hovered item must stay hovered.
+        int current = ctx.computeOnClient(mc -> mc.getWindow().getGuiScale()), other = current > 1 ? current - 1 : 2;   // a smaller scale always fits the window
+        var shot = Calls.call(ctx, "screenshot", "{\"layer\":\"gui+tooltip\",\"split\":true,\"guiScale\":" + other + ",\"savePath\":\"" + save + "\"}").getAsJsonObject();
+        check(shot.getAsJsonArray("savedPaths").size() == 2, "split writes two files: " + shot);
+        var guiPng = javax.imageio.ImageIO.read(dir.resolve("panel.gui.png").toFile());
+        var tipPng = javax.imageio.ImageIO.read(dir.resolve("panel.tooltip.png").toFile());
+        check(guiPng.getColorModel().hasAlpha() && tipPng.getColorModel().hasAlpha(), "PNG keeps alpha");
+        check(guiPng.getRGB(0, 0) >>> 24 == 0, "trimmed image keeps a transparent margin");
+        check(tipPng.getWidth() < guiPng.getWidth(), "the tooltip file holds only the tooltip");
+        guiScaleIsRestoredEvenWhenClamped(ctx, scaleBefore);
+        canvasFollowsWindowSize(ctx);
+        check(Calls.error(ctx, "screenshot", "{\"layer\":\"gui\",\"savePath\":\"x.jpg\"}").code().equals("INVALID_PARAMS"), "jpg refused");
         Calls.call(ctx, "gui.action", "{\"action\":\"close\"}");
+        check("NO_SCREEN".equals(Calls.error(ctx, "screenshot", "{\"layer\":\"gui\"}").code()), "no screen open");
         sp.getServer().runCommand("setblock ~ ~1 ~2 minecraft:air");
     }
 
@@ -159,5 +175,24 @@ final class GuiLayerChecks {
         check(visible < guiVisible, "tooltip layer must not contain the inventory (" + visible + " vs " + guiVisible + ")");
         Shot both = draw(ctx, GuiLayer.GUI_TOOLTIP, 0);
         check(both.drawn().tooltip() && both.drawn().screen(), "gui+tooltip draws both");
+    }
+
+    /** Review Focus #3. */
+    static void guiScaleIsRestoredEvenWhenClamped(ClientGameTestContext ctx, int before) throws Exception {
+        Calls.call(ctx, "screenshot", "{\"layer\":\"gui\",\"guiScale\":8}");
+        check(ctx.computeOnClient(mc -> mc.options.guiScale().get()) == before, "guiScale restored");
+    }
+
+    /** Review Focus #5: the canvas follows a window resize. */
+    static void canvasFollowsWindowSize(ClientGameTestContext ctx) throws Exception {
+        var a = Calls.call(ctx, "screenshot", "{\"layer\":\"gui\",\"trim\":false}").getAsJsonObject();
+        int w = ctx.computeOnClient(mc -> mc.getWindow().getWidth()), h = ctx.computeOnClient(mc -> mc.getWindow().getHeight());
+        ctx.runOnClient(mc -> mc.getWindow().setWindowed(w - 100, h - 60));
+        ctx.waitTicks(5);
+        var b = Calls.call(ctx, "screenshot", "{\"layer\":\"gui\",\"trim\":false}").getAsJsonObject();
+        int bw = ctx.computeOnClient(mc -> mc.gameRenderer.mainRenderTarget().width);
+        check(b.get("fullWidth").getAsInt() == bw && b.get("fullWidth").getAsInt() != a.get("fullWidth").getAsInt(), "canvas follows the window: " + a + " -> " + b);
+        ctx.runOnClient(mc -> mc.getWindow().setWindowed(w, h));
+        ctx.waitTicks(5);
     }
 }
