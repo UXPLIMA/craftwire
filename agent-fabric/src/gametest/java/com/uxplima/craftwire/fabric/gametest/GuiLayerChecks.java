@@ -115,7 +115,49 @@ final class GuiLayerChecks {
         BufferedImage frame = rawImage(main.get(10, TimeUnit.SECONDS), ms[0], ms[1]);
         check(frame.getRGB(2, 2) >>> 24 == 255 && (frame.getRGB(2, 2) & 0xFFFFFF) != 0, "the player's frame is untouched");
 
+        // An enchanted book in the first hotbar slot, hovered: a tooltip with a translucent background.
+        sp.getServer().runCommand("item replace entity @p hotbar.0 with minecraft:enchanted_book[minecraft:stored_enchantments={\"minecraft:sharpness\":5},minecraft:lore=['\"Craftwire lore line\"']]");
+        ctx.waitTicks(3);
+        Calls.call(ctx, "gui.action", "{\"action\":\"hover\",\"slot\":36}");
+        ctx.waitTicks(3);
+        enchantedItemIsOpaque(ctx);
+        tooltipIsTranslucent(ctx);
         Calls.call(ctx, "gui.action", "{\"action\":\"close\"}");
         sp.getServer().runCommand("setblock ~ ~1 ~2 minecraft:air");
+    }
+
+    /** Review Focus #1: an item with glint is drawn opaque on the canvas. */
+    static void enchantedItemIsOpaque(ClientGameTestContext ctx) throws Exception {
+        int[] slot = ctx.computeOnClient(mc -> {
+            var s = (net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<?>) mc.gui.screen();
+            var sl = s.getMenu().slots.get(36);
+            int scale = mc.getWindow().getGuiScale();
+            return new int[] {(((com.uxplima.craftwire.fabric.mixin.AbstractContainerScreenAccessor) s).craftwire$getLeftPos() + sl.x + 8) * scale,
+                    (((com.uxplima.craftwire.fabric.mixin.AbstractContainerScreenAccessor) s).craftwire$getTopPos() + sl.y + 8) * scale};
+        });
+        BufferedImage img = draw(ctx, GuiLayer.GUI, 0).image();
+        check(img.getRGB(slot[0], slot[1]) >>> 24 == 255, "the book's centre must be opaque: " + Integer.toHexString(img.getRGB(slot[0], slot[1])));
+    }
+
+    static void tooltipIsTranslucent(ClientGameTestContext ctx) throws Exception {
+        Shot t = draw(ctx, GuiLayer.TOOLTIP, 0);
+        check(t.drawn().tooltip(), "a tooltip was shown");
+        BufferedImage img = t.image();
+        int translucent = 0, opaque = 0, visible = 0;
+        for (int y = 0; y < img.getHeight(); y += 2) for (int x = 0; x < img.getWidth(); x += 2) {
+            int a = img.getRGB(x, y) >>> 24;
+            if (a > 0) visible++;
+            if (a > 0 && a < 255) translucent++;
+            if (a == 255) opaque++;
+        }
+        check(translucent > 50, "tooltip background must be translucent (" + translucent + " px)");
+        check(opaque > 10, "tooltip text must be opaque (" + opaque + " px)");
+        // Only the tooltip: far fewer visible pixels than the GUI layer.
+        Shot gui = draw(ctx, GuiLayer.GUI, 0);
+        int guiVisible = 0;
+        for (int y = 0; y < gui.image().getHeight(); y += 2) for (int x = 0; x < gui.image().getWidth(); x += 2) if (gui.image().getRGB(x, y) >>> 24 > 0) guiVisible++;
+        check(visible < guiVisible, "tooltip layer must not contain the inventory (" + visible + " vs " + guiVisible + ")");
+        Shot both = draw(ctx, GuiLayer.GUI_TOOLTIP, 0);
+        check(both.drawn().tooltip() && both.drawn().screen(), "gui+tooltip draws both");
     }
 }
