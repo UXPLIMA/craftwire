@@ -100,7 +100,8 @@ so M11's Fabric adapter is the only new piece for singleplayer.
   only paths inside that directory are read.
 - Storage: journal and layer stack in `plugins/Craftwire/builds/<project>/` (compressed, survives restarts).
   Config `max-build-volume` (default 5,000,000 positions per project), `allow-build` (default true),
-  `build-journal-limit-mb` (default 512; when exceeded, the oldest committed projects are dropped first).
+  `build-journal-limit-mb` (default 512; when exceeded, the oldest undo history entries are dropped first; current
+  parts and recorded originals are never dropped, so `remove` and `clear` always work).
 
 ### Tools (two new, nothing removed)
 
