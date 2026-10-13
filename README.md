@@ -28,6 +28,16 @@ part("shell", () => cylinder(0, 0, 0, 4, 20, mix({stone_bricks: 6, cracked_stone
 part("roof", () => cone(0, 21, 0, 5, 8, "deepslate_tiles"));
 ```
 
+<img src="docs/images/m10-tower.png" alt="A stone keep with corner turrets, built in five calls, seen from all four corners in one preview" width="100%">
+
+| | before (0.9.0) | 0.10.0 |
+|---|---:|---:|
+| Tool definitions sent with every request | 55,046 chars | 27,141 chars (10,476 with `--profile build`) |
+| The keep above: 25 x 25, ~16,000 blocks | ~274,000 tokens with `set_blocks` | ~9,950 tokens in 5 calls |
+| 1,000,000 blocks | | 4-8 s at 20 TPS |
+
+How these were measured: [docs/acceptance/m10-build.md](docs/acceptance/m10-build.md).
+
 ### See the game from any angle
 
 `screenshot` captures what the player sees, or renders from any camera pose without moving the player. Terrain behind the player is rendered too, with or without Sodium. Use it to check a build from above, frame a scene for a promo shot, or watch a test from the side.
