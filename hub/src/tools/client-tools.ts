@@ -78,7 +78,7 @@ export function registerClientTools(server: McpServer, ctx: ToolContext): void {
     }, fwd("input"));
 
   defineTool(server, ctx, "camera",
-    "Move the render camera, not the player: set, look_at {target}, frame_area {area}, frame_entity {entity}, freecam_on/off, reset; path {keyframes} and orbit {center,radius} play over time. Details: craftwire://docs/video.",
+    "Move the render camera, not the player: set, look_at {target}, frame_area {area}, frame_entity {entity}, freecam_on/off, reset; path {keyframes}/orbit {center,radius} play over time. Details: craftwire://docs/video.",
     {
       ...targetArgs,
       action: z.enum(["set", "look_at", "frame_area", "frame_entity", "freecam_on", "freecam_off", "reset", "path", "orbit"]),
@@ -106,8 +106,18 @@ export function registerClientTools(server: McpServer, ctx: ToolContext): void {
       windowSize: z.object({ width: z.number().int().min(320), height: z.number().int().min(240) }).optional(),
     }, fwd("client.settings"));
 
+  const guiLayer = z.enum(["world", "gui", "tooltip", "gui+tooltip"]).optional();
+  /** Transparent layers: the file type, split and camera rules, checked before anything reaches the game. */
+  const checkLayer = (a: { layer?: string; split?: boolean; camera?: unknown }, badFile: string | undefined) => {
+    const transparent = a.layer !== undefined && a.layer !== "world";
+    if (a.split && a.layer !== "gui+tooltip") throw new CraftwireError("INVALID_PARAMS", "split needs layer 'gui+tooltip'.", "Pass layer:'gui+tooltip' with split:true.");
+    if (!transparent) return;
+    if (badFile) throw new CraftwireError("INVALID_PARAMS", badFile, "Change the savePath extension.");
+    if (a.camera !== undefined) throw new CraftwireError("INVALID_PARAMS", "camera does not apply to a transparent layer (there is no world in it).", "Leave camera out.");
+  };
+
   defineTool(server, ctx, "screenshot",
-    "Capture the game frame as an image. hud:false hides the HUD, chat:false hides chat lines. maxSize is the long edge. savePath also writes full resolution (.png, or .jpg). camera applies to this capture only.",
+    "Capture the game frame. hud/chat:false hide them; maxSize: long edge; savePath writes full size (.png/.jpg); camera: this shot only. layer gui|tooltip|gui+tooltip: transparent PNG of the open menu (craftwire://docs/gui-capture).",
     {
       ...targetArgs,
       hud: z.boolean().default(true),
@@ -116,18 +126,23 @@ export function registerClientTools(server: McpServer, ctx: ToolContext): void {
       savePath: z.string().optional(),
       format: z.enum(["auto", "png", "jpeg"]).default("auto"),
       camera: z.object({ ...vec3, yaw: z.number(), pitch: z.number(), fov: z.number().int().min(30).max(110).optional() }).optional(),
+      layer: guiLayer,
+      split: z.boolean().optional(),
+      trim: z.boolean().optional(),
+      guiScale: z.number().int().min(1).max(8).optional(),
     },
     async (args, c): Promise<CallToolResult> => {
+      checkLayer(args, args.savePath && /\.jpe?g$/i.test(args.savePath) ? "A transparent layer needs a .png savePath (JPEG has no transparency)." : undefined);
       const withAbsPath = args.savePath ? { ...args, savePath: resolvePath(args.savePath) } : args;
       const r = (await forward(c, "client", "screenshot", withAbsPath, 20_000)) as {
-        mime: string; data: string; width: number; height: number; fullWidth: number; fullHeight: number; savedPath?: string;
+        mime: string; data: string; width: number; height: number; fullWidth: number; fullHeight: number; savedPath?: string; savedPaths?: string[];
       };
-      const meta = { width: r.width, height: r.height, fullWidth: r.fullWidth, fullHeight: r.fullHeight, savedPath: r.savedPath };
+      const meta = { width: r.width, height: r.height, fullWidth: r.fullWidth, fullHeight: r.fullHeight, savedPath: r.savedPath, savedPaths: r.savedPaths };
       return { content: [{ type: "image", data: r.data, mimeType: r.mime }, { type: "text", text: JSON.stringify(meta) }] };
     });
 
   defineTool(server, ctx, "record",
-    "Record an MP4 with sound through the user's ffmpeg. start {savePath, preset max|high|balanced|light, durationMs?, camera? (a camera tool path/orbit motion), wait?}; stop; status. Details: craftwire://docs/video.",
+    "Record a video with sound through the user's ffmpeg. start {savePath, preset max|high|balanced|light, durationMs?, camera? (a camera tool path/orbit motion), wait?}; stop; status. layer gui|tooltip|gui+tooltip: transparent .mov/.webm. Details: craftwire://docs/video.",
     {
       ...targetArgs,
       action: z.enum(["start", "stop", "status"]),
@@ -147,8 +162,14 @@ export function registerClientTools(server: McpServer, ctx: ToolContext): void {
       camera: z.record(z.string(), z.unknown()).optional(),
       waitForTerrain: z.boolean().optional(),
       wait: z.boolean().optional(),
+      layer: guiLayer,
+      split: z.boolean().optional(),
+      guiScale: z.number().int().min(1).max(8).optional(),
     },
     async (args, c) => {
+      if (args.action === "start") {
+        checkLayer(args, args.savePath && !/\.(mov|webm)$/i.test(args.savePath) ? "A transparent layer needs .mov (ProRes 4444) or .webm (VP9); MP4 has no transparency." : undefined);
+      }
       const camera = args.camera === undefined ? undefined : checkMotion(args.camera);
       const params = { ...args, ...(camera ? { camera } : {}), ...(args.savePath ? { savePath: resolvePath(args.savePath) } : {}) };
       // A waiting start lasts as long as the video plus the encoding; the rest answer quickly.

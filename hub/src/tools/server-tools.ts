@@ -35,7 +35,7 @@ export function registerServerTools(server: McpServer, ctx: ToolContext): void {
     async (args, c) => ok(await forward(c, "server", "server.eval", args, args.timeoutMs + 5000)));
 
   defineTool(server, ctx, "world_query",
-    "Read the world: block {x,y,z}; region {min,max}: palette + runs (max 32768), encoding 'indices', or 'layers' (a letter per block, max 65536; pastes back with build's layers()); entities {min,max,type?}; players; find_block {block,min,max}.",
+    "Read the world: block {x,y,z}; region {min,max}: palette + runs (max 32768), encoding 'indices', or 'layers' (a letter per block, max 65536, for build's layers()); entities {min,max,type?}; players; find_block {block,min,max}.",
     {
       ...targetArgs,
       action: z.enum(["block", "region", "entities", "players", "find_block"]),
@@ -49,7 +49,7 @@ export function registerServerTools(server: McpServer, ctx: ToolContext): void {
     }, call("world.query", 30_000));
 
   defineTool(server, ctx, "world_render",
-    "Draw a region of a Paper world as an image, no client needed: top (map), slice {y} (floor plan), side {facing}, iso {corner} or iso4 (3D views, size px). Up to 512x512 blocks; scale px/block; grid N labels coordinates; savePath writes the PNG.",
+    "Draw a region of a Paper world, no client needed: top (map), slice {y} (floor plan), side {facing}, iso {corner}/iso4 (3D, size px). Up to 512x512 blocks; scale px/block; grid N labels coordinates; savePath writes the PNG.",
     {
       ...targetArgs,
       world,

@@ -44,7 +44,7 @@ export function registerHubTools(server: McpServer, ctx: ToolContext): void {
     async ({ operationId }, c) => ok(c.ops.status(operationId)));
 
   defineTool(server, ctx, "wait_for",
-    "Wait until something happens; only what happens after the call counts. Events: chat_match, hud_match, screen_open, screen_closed, log_match, player_join {pattern}. Server, checked every tick: block, player_near, inventory, event, message, expr {js}. Returns what held and its value. Details: craftwire://docs/tools.",
+    "Wait until something happens (after the call). Events: chat_match, hud_match, screen_open, screen_closed, log_match, player_join {pattern}. Server, every tick: block, player_near, inventory, event, message, expr {js}. Returns what held and its value. Details: craftwire://docs/tools.",
     {
       condition: z.enum(["chat_match", "hud_match", "screen_open", "screen_closed", "log_match", "player_join", ...SERVER_CONDITIONS]),
       pattern: z.string().optional(),

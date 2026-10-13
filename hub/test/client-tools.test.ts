@@ -107,6 +107,36 @@ describe("client tools", () => {
     }
   });
 
+  it("screenshot forwards a transparent layer and refuses jpg and a lone split", async () => {
+    const { hub, agent } = await withAgent();
+    let seen: Record<string, unknown> = {};
+    agent.onRequest("screenshot", (p) => {
+      seen = p;
+      return { mime: "image/png", data: "iVBORw0KGgo=", width: 1, height: 1, fullWidth: 1, fullHeight: 1, savedPath: "a.gui.png", savedPaths: ["a.gui.png", "a.tooltip.png"] };
+    });
+    const res = await hub.call("screenshot", { layer: "gui+tooltip", split: true, guiScale: 4, savePath: "a.png" });
+    expect(seen).toMatchObject({ layer: "gui+tooltip", split: true, guiScale: 4 });
+    expect((res.content[1] as { text: string }).text).toContain("a.tooltip.png");
+    const text = (r: { content: unknown[] }) => JSON.stringify(r.content);
+    const jpg = await hub.call("screenshot", { layer: "gui", savePath: "a.jpg" });
+    expect(jpg.isError).toBe(true);
+    expect(text(jpg)).toMatch(/png/);
+    const lone = await hub.call("screenshot", { layer: "gui", split: true });
+    expect(lone.isError).toBe(true);
+    expect(text(lone)).toMatch(/gui\+tooltip/);
+  });
+
+  it("record refuses mp4 and camera motions for a transparent layer", async () => {
+    const { hub } = await withAgent();
+    const text = (r: { content: unknown[] }) => JSON.stringify(r.content);
+    const mp4 = await hub.call("record", { action: "start", layer: "gui", savePath: "a.mp4" });
+    expect(mp4.isError).toBe(true);
+    expect(text(mp4)).toMatch(/\.mov|\.webm/);
+    const cam = await hub.call("record", { action: "start", layer: "gui", savePath: "a.mov", camera: { action: "orbit", center: { x: 0, y: 64, z: 0 }, radius: 5, durationMs: 1000 } });
+    expect(cam.isError).toBe(true);
+    expect(text(cam)).toMatch(/camera/);
+  });
+
   it("chat send and command forward to chat.send", async () => {
     const { hub, agent } = await withAgent();
     const got: unknown[] = [];

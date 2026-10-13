@@ -12,7 +12,7 @@ const rotation = z.union([z.literal(0), z.literal(90), z.literal(180), z.literal
 
 export function registerBuildTools(server: McpServer, ctx: ToolContext): void {
   defineTool(server, ctx, "build",
-    "Build from a script file of part(name, () => {...}) blocks (fill, hollow, walls, sphere, cylinder, roof, layers, mix, rotate, mirror...): build {project, file}. After editing the file call it again: only changed blocks are written; a re-run part replaces its old blocks. A new project needs origin. preview 'iso4': four corner views in one image. Guide: craftwire://docs/building.",
+    "Build from a script file of part(name, () => {...}) blocks (fill, hollow, walls, sphere, cylinder, roof, layers, mix, rotate, mirror...): build {project, file}. After editing the file call it again: only changed blocks are written. A new project needs origin. preview 'iso4': four corner views in one image. Guide: craftwire://docs/building.",
     {
       ...targetArgs,
       project: name,
@@ -41,7 +41,7 @@ export function registerBuildTools(server: McpServer, ctx: ToolContext): void {
     });
 
   defineTool(server, ctx, "build_manage",
-    "Manage build projects: list; undo {project, steps} (last runs); remove {project, part} (what was under it comes back); clear {project} (world as before the project); move {project, origin?, rotation?, mirror?}; commit {project} (keep the blocks, forget the undo history).",
+    "Manage build projects: list; undo {project, steps} (last runs); remove {project, part} (what was under returns); clear {project} (world as before the project); move {project, origin?, rotation?, mirror?}; commit {project} (keep blocks, drop undo history).",
     {
       ...targetArgs,
       action: z.enum(["list", "undo", "remove", "clear", "move", "commit"]),

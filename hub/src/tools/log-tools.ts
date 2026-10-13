@@ -63,7 +63,7 @@ export function registerLogTools(server: McpServer, ctx: ToolContext): void {
     });
 
   defineTool(server, ctx, "exceptions",
-    "Exceptions the server and clients logged, grouped into bugs, newest first: type, message, count, origin (where to look), plugin; Folia thread-violation hints. id returns one bug's full stack; since filters.",
+    "Exceptions the server and clients logged, grouped into bugs, newest first: type, message, count, origin, plugin; Folia thread hints. id: one bug's full stack; since filters.",
     {
       id: z.string().regex(/^[0-9a-f]{8}$/).optional().describe("A bug id: returns its full stack."),
       since: z.number().optional(),
