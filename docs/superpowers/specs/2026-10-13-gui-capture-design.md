@@ -28,7 +28,7 @@ into an editor.
 
 PNG with alpha. Transparent borders are trimmed to the drawn content plus 8 px (`trim: false` keeps the full frame).
 The image returned to the AI client is the same picture, scaled to `maxSize` as today. `.jpg` is refused for a
-transparent layer (`BAD_ARGUMENT`, hint: use `.png`).
+transparent layer (`INVALID_PARAMS`, hint: use `.png`).
 
 ### Videos
 
@@ -38,7 +38,7 @@ The `savePath` extension picks the format:
 |---|---|---|
 | `.mov` | ProRes 4444 with alpha (`prores_ks`, `yuva444p10le`) | Premiere, DaVinci Resolve, After Effects, Final Cut |
 | `.webm` | VP9 with alpha (`libvpx-vp9`, `yuva420p`) | web pages, OBS, small files |
-| `.mp4` | refused for a transparent layer (`BAD_ARGUMENT`, hint: `.mov` or `.webm`) | — |
+| `.mp4` | refused for a transparent layer (`INVALID_PARAMS`, hint: `.mov` or `.webm`) | — |
 
 Video frames keep the full window size (no trim): the tooltip follows the mouse, and a fixed crop would cut it off.
 Sound is recorded and muxed as for world recordings (`aac` in `.mov`, `opus` in `.webm`). Presets keep their frame
@@ -88,7 +88,7 @@ over, other descriptions are shortened in the same change.
 |---|---|
 | `NO_SCREEN` | `layer` is `gui` or `gui+tooltip` and no screen is open (hint: open one with `server_command`/`gui_action`, or the plugin's command). |
 | `NO_TOOLTIP` | `layer` is `tooltip` (or `split`) and no tooltip is shown (hint: `gui_action {action:"hover", slot}` first). For a recording this is checked only at the start when `layer` is `tooltip`; a tooltip that comes and goes during a recording is simply drawn when it is there. |
-| `BAD_ARGUMENT` | `.jpg`/`.mp4` with a transparent layer, `split` without `gui+tooltip`, `camera` motion with a transparent layer, `guiScale` outside 1-8. |
+| `INVALID_PARAMS` | `.jpg`/`.mp4` with a transparent layer, `split` without `gui+tooltip`, `camera` motion with a transparent layer, `guiScale` outside 1-8. |
 | `FFMPEG_FAILED` | the user's ffmpeg lacks `prores_ks` or `libvpx-vp9` (message names the encoder; hint: the other format, or a full ffmpeg build). |
 
 ## Docs and skill
@@ -112,7 +112,7 @@ over, other descriptions are shortened in the same change.
   - `split` writes two files; `trim` crops to content plus 8 px; `guiScale` is restored afterwards.
 - Video: a short `.mov` and `.webm` recording of the `gui` layer; `ffprobe` reports `yuva444p10le` / alpha for VP9, and
   a decoded frame has alpha 0 in a corner and 255 on a slot border. `.mp4` with a transparent layer fails with
-  `BAD_ARGUMENT`.
+  `INVALID_PARAMS`.
 - Hub: schema validation and error mapping; the tool budget tests.
 - Acceptance: on a throwaway server with a plugin menu (the test fixture's menu, with lore), capture `gui+tooltip`
   with `split`, record 5 s of hovering across items to `.mov` and `.webm`, open the results over a checkerboard and in
