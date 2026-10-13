@@ -11,7 +11,7 @@ const rotation = z.union([z.literal(0), z.literal(90), z.literal(180), z.literal
 
 export function registerBuildTools(server: McpServer, ctx: ToolContext): void {
   defineTool(server, ctx, "build",
-    "Build with a script. Write it to a file once (part(name, () => {...}) blocks using fill, hollow, walls, sphere, cylinder, roof, layers, mix, rotate, mirror...), then call build {project, file}; after editing the file call it again: only changed blocks are written and a re-run part replaces its old blocks. origin is required on a project's first call. preview 'iso4' adds four corner views in one image. Guide and API: craftwire://docs/building.",
+    "Build from a script file of part(name, () => {...}) blocks (fill, hollow, walls, sphere, cylinder, roof, layers, mix, rotate, mirror...): build {project, file}. After editing the file call it again: only changed blocks are written; a re-run part replaces its old blocks. A new project needs origin. preview 'iso4': four corner views in one image. Guide: craftwire://docs/building.",
     {
       ...targetArgs,
       project: name,
