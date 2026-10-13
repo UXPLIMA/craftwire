@@ -2,13 +2,13 @@ import { writeFileSync } from "node:fs";
 import { crc32, deflateRawSync } from "node:zlib";
 
 /** Writes a minimal zip with stored (default) or deflated entries, for jar-reading tests. */
-export function makeZip(file: string, entries: Record<string, string>, opts: { deflate?: boolean } = {}): string {
+export function makeZip(file: string, entries: Record<string, string | Buffer>, opts: { deflate?: boolean } = {}): string {
   const locals: Buffer[] = [];
   const centrals: Buffer[] = [];
   let offset = 0;
   const method = opts.deflate ? 8 : 0;
   for (const [name, text] of Object.entries(entries)) {
-    const raw = Buffer.from(text, "utf8");
+    const raw = typeof text === "string" ? Buffer.from(text, "utf8") : text;
     const data = opts.deflate ? deflateRawSync(raw) : raw;
     const nameBuf = Buffer.from(name, "utf8");
     const crc = crc32(raw);

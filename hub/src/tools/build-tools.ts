@@ -3,6 +3,7 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { readBuildFile } from "../build-files.js";
 import { CraftwireError } from "../errors.js";
+import { withColors } from "./colors-arg.js";
 import { defineTool, forward, ok, targetArgs, type ToolContext } from "./registry.js";
 
 const name = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/);
@@ -32,7 +33,7 @@ export function registerBuildTools(server: McpServer, ctx: ToolContext): void {
       const { file, code, ...rest } = args;
       if ((file === undefined) === (code === undefined)) throw new CraftwireError("BAD_ARGUMENT", "Pass exactly one of file or code", "file is cheaper: edit the file and call build again.");
       const script = file !== undefined ? readBuildFile(file, c.build ?? { http: false }) : { code: code!, file: undefined };
-      const params = { ...rest, code: script.code, ...(script.file ? { file: script.file } : {}) };
+      const params = await withColors(c, { ...rest, code: script.code, ...(script.file ? { file: script.file } : {}) }, rest.preview);
       const r = (await forward(c, "server", "build.run", params, args.timeoutMs + 180_000)) as Record<string, unknown> & { preview?: { mime: string; data: string } };
       const { preview, ...meta } = r;
       if (preview === undefined) return ok(meta);

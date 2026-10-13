@@ -23,6 +23,9 @@ export interface ToolContext {
   policy?: ToolPolicy;
   /** build files: over HTTP (craftwire serve) they are read only from --build-dir. */
   build?: { dir?: string; http: boolean };
+  /** CRAFTWIRE_HOME, for caches such as the block colour tables; unset in tests that must not download. */
+  home?: string;
+  log?: (msg: string) => void;
 }
 
 export const targetArgs = {

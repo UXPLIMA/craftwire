@@ -35,7 +35,7 @@ export async function startHub(home: string, log: (msg: string) => void): Promis
   const clients = new ClientManager({ agents, home, servers, prepare: (p) => prepareClient(p) });
   const ctx: ToolContext = {
     agents, servers, clients, ops: new OperationTracker(), audit: new AuditLog(join(home, "logs")), exceptions: trackExceptions(agents),
-    extensions: new ExtensionRegistry(agents),
+    extensions: new ExtensionRegistry(agents), home, log,
   };
   let closing: Promise<void> | undefined;
   return {

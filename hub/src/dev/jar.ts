@@ -4,6 +4,12 @@ import { inflateRawSync } from "node:zlib";
 
 /** One entry of a zip/jar, or undefined when absent. Stored and deflated entries; no zip64 (plugin jars are small). */
 export function readZipEntry(file: string, entryName: string): Buffer | undefined {
+  return readZipEntries(file, (n) => n === entryName).get(entryName);
+}
+
+/** Every entry whose name passes `want`, reading the file and its central directory once. */
+export function readZipEntries(file: string, want: (name: string) => boolean): Map<string, Buffer> {
+  const out = new Map<string, Buffer>();
   const buf = readFileSync(file);
   const eocd = findEndOfCentralDirectory(buf);
   if (eocd < 0) throw new Error(`${file} is not a zip file`);
@@ -17,17 +23,18 @@ export function readZipEntry(file: string, entryName: string): Buffer | undefine
     const extraLen = buf.readUInt16LE(p + 30);
     const commentLen = buf.readUInt16LE(p + 32);
     const local = buf.readUInt32LE(p + 42);
-    if (buf.toString("utf8", p + 46, p + 46 + nameLen) === entryName) {
+    const name = buf.toString("utf8", p + 46, p + 46 + nameLen);
+    if (want(name)) {
       // Sizes come from the central directory: jars written with data descriptors leave them 0 in the local header.
       const start = local + 30 + buf.readUInt16LE(local + 26) + buf.readUInt16LE(local + 28);
       const data = buf.subarray(start, start + size);
-      if (method === 0) return Buffer.from(data);
-      if (method === 8) return inflateRawSync(data);
-      throw new Error(`${file}: unsupported compression ${method} for ${entryName}`);
+      if (method === 0) out.set(name, Buffer.from(data));
+      else if (method === 8) out.set(name, inflateRawSync(data));
+      else throw new Error(`${file}: unsupported compression ${method} for ${name}`);
     }
     p += 46 + nameLen + extraLen + commentLen;
   }
-  return undefined;
+  return out;
 }
 
 function findEndOfCentralDirectory(buf: Buffer): number {

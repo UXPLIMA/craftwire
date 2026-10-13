@@ -3,6 +3,7 @@ import { dirname, resolve as resolvePath } from "node:path";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
+import { withColors } from "./colors-arg.js";
 import { defineTool, forward, ok, targetArgs, type ToolContext } from "./registry.js";
 
 const pos = z.object({ x: z.number().int(), y: z.number().int(), z: z.number().int() });
@@ -66,7 +67,8 @@ export function registerServerTools(server: McpServer, ctx: ToolContext): void {
       savePath: z.string().optional(),
     },
     async (args, c): Promise<CallToolResult> => {
-      const { savePath, ...params } = args;
+      const { savePath, ...rest } = args;
+      const params = await withColors(c, rest, rest.view);
       const r = (await forward(c, "server", "world.render", params, 60_000)) as { mime: string; data: string } & Record<string, unknown>;
       const { data, mime, ...meta } = r;
       if (savePath !== undefined) {
