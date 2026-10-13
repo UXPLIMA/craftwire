@@ -83,6 +83,24 @@ class BuildScriptRunnerTest {
     }
 
     @Test
+    void scriptsCannotReachJavaThroughTheHostObject() {
+        // allow-build without allow-eval must not give a way to run arbitrary Java.
+        for (String escape : new String[] {
+                "__cw.getClass().forName('java.lang.Runtime')",
+                "__cw.getClass().getClassLoader()",
+        }) {
+            assertThrows(BuildError.class, () -> run(escape + "; set(0,0,0,'stone')", null), escape);
+        }
+    }
+
+    @Test
+    void numberAndStringArraysStillCrossIntoTheApi() {
+        // The narrowed host access must keep converting JS arrays for polygon (int[]) and gradient (String[]).
+        BuildScriptRunner.Result r = run("polygon([[0,0],[4,0],[0,4]], 0, 1, 'stone'); fill(0,1,0,0,5,0, gradient('y', 1, 5, ['stone','dirt']))", null);
+        assertTrue(r.parts().get(0).buffer().size() > 5);
+    }
+
+    @Test
     void tooManyBlocksIsTooLarge() {
         BuildContext small = new BuildContext(pal, air, Transform.IDENTITY, 10, 1);
         BuildError e = assertThrows(BuildError.class, () -> runner.run("fill(0,0,0,9,9,9,'stone')", "t.build.js", null, "main", small, 5_000));

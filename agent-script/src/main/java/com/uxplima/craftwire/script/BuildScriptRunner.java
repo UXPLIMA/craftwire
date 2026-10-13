@@ -7,6 +7,8 @@ import com.uxplima.craftwire.build.EditBuffer;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -34,6 +36,19 @@ public final class BuildScriptRunner implements AutoCloseable {
     public record Result(List<Part> parts, String output) {}
 
     private static final Pattern NAME = Pattern.compile("[A-Za-z0-9_-]{1,64}");
+    /**
+     * Scripts may call BuildApi's own methods and nothing else: with HostAccess.ALL, __cw.getClass().getClassLoader()
+     * reached reflection, which would let a build script run any Java on a server that turned server_eval off.
+     */
+    private static final HostAccess ACCESS = access();
+
+    private static HostAccess access() {
+        HostAccess.Builder b = HostAccess.newBuilder(HostAccess.EXPLICIT).allowArrayAccess(true).allowListAccess(true);
+        for (Method m : BuildApi.class.getDeclaredMethods()) {
+            if (Modifier.isPublic(m.getModifiers())) b.allowAccess(m);
+        }
+        return b.build();
+    }
 
     private final ClassLoader loader;
     private final String prelude;
@@ -64,7 +79,7 @@ public final class BuildScriptRunner implements AutoCloseable {
         ClassLoader previous = thread.getContextClassLoader();
         thread.setContextClassLoader(loader);
         AtomicBoolean timedOut = new AtomicBoolean();
-        try (Context js = Context.newBuilder("js").engine(engine()).allowHostAccess(HostAccess.ALL)
+        try (Context js = Context.newBuilder("js").engine(engine()).allowHostAccess(ACCESS)
                 .allowHostClassLookup(name -> false).allowIO(IOAccess.NONE).allowCreateThread(false)
                 .out(OutputStreamSink.INSTANCE).err(OutputStreamSink.INSTANCE).build()) {
             ScheduledFuture<?> kill = watchdog.schedule(() -> {
