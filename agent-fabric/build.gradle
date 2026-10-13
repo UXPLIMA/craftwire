@@ -44,6 +44,9 @@ dependencies {
 
     implementation project(':agent-core')
     include project(':agent-core')
+    // Build states (mc-shared BuildStates) implement build-core's palette; singleplayer building uses it (M11).
+    implementation project(':build-core')
+    include project(':build-core')
     // ClientEval's tests compile against the engine; the agent itself only loads it at runtime (GraalRuntime).
     testImplementation project(':agent-script')
     // The extension API mods compile against; shipped inside the agent so they find it at runtime.
