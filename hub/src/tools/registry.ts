@@ -24,8 +24,9 @@ export interface ToolContext {
 }
 
 export const targetArgs = {
-  instance: z.string().optional().describe("Instance id or name from list_instances. Optional when exactly one matching instance is connected."),
-  operationId: z.string().optional().describe("Idempotency key. Retrying with the same id returns the first result instead of executing again."),
+  // Explained once in the server instructions, not in every tool.
+  instance: z.string().optional(),
+  operationId: z.string().optional(),
 };
 
 export function ok(data: unknown): CallToolResult {

@@ -26,7 +26,7 @@ function matches(condition: Condition, pattern: RegExp | undefined, ev: AgentEve
 
 export function registerHubTools(server: McpServer, ctx: ToolContext): void {
   defineTool(server, ctx, "list_instances",
-    "List connected Minecraft clients and servers (id, name, versions, and `tools` that plugins or mods added through the Craftwire API). Call this first; other tools take `instance` from here.",
+    "List connected Minecraft clients and servers (id, name, versions, tools added by plugins or mods). Call this first.",
     {},
     async (_args, c) => {
       const instances = c.agents.instances().map((i) => {
@@ -39,22 +39,16 @@ export function registerHubTools(server: McpServer, ctx: ToolContext): void {
     });
 
   defineTool(server, ctx, "get_request_status",
-    "Status of a request sent with an operationId: unknown, running, done (with result) or failed (with error). Results are kept for 5 minutes.",
+    "Status of a request sent with an operationId: unknown, running, done (with result) or failed (with error). Kept 5 minutes.",
     { operationId: z.string() },
     async ({ operationId }, c) => ok(c.ops.status(operationId)));
 
   defineTool(server, ctx, "wait_for",
-    "Block until something happens or the timeout expires; only what happens after the call counts. " +
-    "Events from any instance: chat_match, hud_match (actionbar), screen_open, screen_closed, log_match, player_join (`pattern` is a case-insensitive regex on the event text). " +
-    "Checked on the Paper server every tick: block {x,y,z,world?, is|isNot: id or state like oak_door[open=true]; properties left out match anything}, " +
-    "player_near {player, x,y,z, radius=1.5} (bots too), inventory {player, item, count=1 (at least) | atMost}, " +
-    "event {type: Bukkit event (also a plugin's own), player?, pattern?: regex on the event's JSON e.g. \"cancelled\":true}, " +
-    "message {player: bot, pattern} (chat, system line or action bar the bot receives), expr {js: server_eval script that must become truthy}. " +
-    "Returns which condition held, the value that met it and elapsedMs; a server condition's TIMEOUT carries the last value seen.",
+    "Wait until something happens; only what happens after the call counts. Events: chat_match, hud_match, screen_open, screen_closed, log_match, player_join (pattern: regex). Checked on the server every tick: block {x,y,z, is|isNot}, player_near {player,x,y,z,radius}, inventory {player,item,count|atMost}, event {type,player?,pattern?}, message {player,pattern}, expr {js}. Returns what held and its value. Details: craftwire://docs/tools.",
     {
       condition: z.enum(["chat_match", "hud_match", "screen_open", "screen_closed", "log_match", "player_join", ...SERVER_CONDITIONS]),
       pattern: z.string().optional(),
-      instance: z.string().optional().describe("Only accept events from this instance (id or name); for server conditions, the server to check."),
+      instance: z.string().optional(),
       timeoutMs: z.number().int().min(10).max(300_000).default(30_000),
       x: z.number().optional(), y: z.number().optional(), z: z.number().optional(),
       world: z.string().optional(),

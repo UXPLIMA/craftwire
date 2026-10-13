@@ -42,9 +42,9 @@ export function groupLogs(events: AgentEvent[]): LogLine[] {
 
 export function registerLogTools(server: McpServer, ctx: ToolContext): void {
   defineTool(server, ctx, "logs",
-    "Recent log lines from a Paper server (the default when one is connected) or a client, oldest first. Stack-trace lines printed separately are folded into the line above (`stack`). Filter by minimum `level`, `contains` (case-insensitive, also searches stacks) and `since` (epoch ms). Up to 1000 lines logged before the agent connected are replayed.",
+    "Recent log lines of a server (default) or client, oldest first, stack traces folded in. Filter: level, contains, since.",
     {
-      instance: z.string().optional().describe("Instance id or name. Defaults to the only server, else the only instance."),
+      instance: z.string().optional(),
       level: z.enum(LEVELS).default("INFO"),
       contains: z.string().optional(),
       since: z.number().optional(),
@@ -63,11 +63,11 @@ export function registerLogTools(server: McpServer, ctx: ToolContext): void {
     });
 
   defineTool(server, ctx, "exceptions",
-    "Exceptions the connected server and clients logged, grouped into distinct bugs (same root cause and own stack frames), newest first: type, message, count, firstSeen/lastSeen, origin (first frame outside Minecraft/Paper/Fabric — where to look), plugin when Paper names one, instances, and on Folia `folia` {owner, touched, fix} when the bug is a thread violation (plugin code touching a block, entity or player off its region's thread, or the Bukkit scheduler Folia lacks). Counted since the hub started, beyond the log buffer. Pass id for one bug's full stack trace and the distinct messages it had. Use after a test step to check nothing broke (since: the step's start time).",
+    "Exceptions the server and clients logged, grouped into bugs, newest first: type, message, count, origin (where to look), plugin; Folia thread-violation hints. id returns one bug's full stack; since filters.",
     {
-      id: z.string().regex(/^[0-9a-f]{8}$/).optional().describe("One bug's id from the list: returns its full stack."),
-      since: z.number().optional().describe("Only bugs seen at or after this time (epoch ms)."),
-      instance: z.string().optional().describe("Only bugs logged by this instance name."),
+      id: z.string().regex(/^[0-9a-f]{8}$/).optional().describe("A bug id: returns its full stack."),
+      since: z.number().optional(),
+      instance: z.string().optional(),
       limit: z.number().int().min(1).max(200).default(50),
     },
     async (args, c) => {

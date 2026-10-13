@@ -3,8 +3,8 @@ import { z } from "zod";
 import { defineTool, forward, ok, targetArgs, type ToolContext } from "./registry.js";
 
 const instanceArg = {
-  instance: z.string().optional().describe("Instance id or name. Defaults to the only server, else the only instance."),
-  operationId: z.string().optional().describe("Idempotency key. Retrying with the same id returns the first result instead of executing again."),
+  instance: z.string().optional(),
+  operationId: z.string().optional(),
 };
 
 /** Sends a request to any instance (server or client) and puts the instance id first in the result. */
@@ -17,34 +17,34 @@ async function forwardAny(c: ToolContext, method: string, args: Record<string, u
 
 export function registerDebugTools(server: McpServer, ctx: ToolContext): void {
   defineTool(server, ctx, "profile",
-    "Find what uses a server's tick or a client's frame time, and whose code it is. Samples the game thread (Paper: Server thread; client: Render thread) every intervalMs for durationMs, then returns: busyPercent (how much of the time the thread was working rather than waiting for the next tick/frame); owners — who the time belongs to: a plugin or mod by name (its own code and what it called, e.g. a listener's world lookups), or minecraft / server (Paper, CraftBukkit) / fabric-loader / craftwire / java / library; entryPoints — where the server or game called into each plugin or mod (event: the event a listener handles, task: a scheduler task, calledFrom: the caller), so you know which listener or task to look at; hotMethods — the methods the thread was executing (self time). On a server also ticks: count, msptAvg, p50, p95, max, over50ms and the slowest ticks with their owners; on a client fps {avg, min}. Mixin handlers count for the mod that injected them. Run it while the slow thing happens (start the scenario or bot action first, or ask the user to reproduce it), then trace a hot method for exact call counts and times.",
+    "Sample a server tick or client frame for durationMs and show who uses the time: owners (plugin or mod), entryPoints (listener, task), hotMethods; server tick stats or client fps. Run it while the slow thing happens, then trace.",
     {
       ...instanceArg,
-      durationMs: z.number().int().min(1000).max(60_000).default(10_000).describe("How long to sample."),
-      intervalMs: z.number().int().min(5).max(50).optional().describe("Sampling interval (default 10)."),
-      top: z.number().int().min(1).max(50).optional().describe("Entries per list (default 15)."),
+      durationMs: z.number().int().min(1000).max(60_000).default(10_000),
+      intervalMs: z.number().int().min(5).max(50).optional(),
+      top: z.number().int().min(1).max(50).optional(),
     },
     async (args, c) => ok(await forwardAny(c, "profile.run", args, args.durationMs + 15_000)));
 
   defineTool(server, ctx, "trace",
-    "Time every call of specific methods on a server or client for durationMs, without changing any code: the JVM instruments the named methods (Flight Recorder method tracing) only while tracing. method: com.example.Shop::buy (one method), com.example.Shop (every method of the class), @com.example.Timed (methods with that annotation); nested classes as Outer$Inner; several separated by ';'. Returns methods (invocations, avgMs, maxMs, totalMs per method), slowest (the slowest calls with thread and stack, each frame with its owner), callers (who called them, with counts) and calls. minMs keeps only calls at least that slow. A trace stops early after 100000 calls (truncated: true). One trace at a time per game (ALREADY_RUNNING otherwise; trace several methods at once with ';'). Make the method run while tracing (a command, a bot action). Typical use: profile → a hot method or a plugin's entry point → trace it.",
+    "Time every call of methods for durationMs without changing code: method = Class::method, Class or @Annotation (';' for several). Returns counts, avg/max ms, slowest calls with stacks, callers.",
     {
       ...instanceArg,
       method: z.string().min(1).max(1000),
       durationMs: z.number().int().min(1000).max(60_000).default(10_000),
-      minMs: z.number().min(0).max(60_000).optional().describe("Only report calls at least this slow (counts still include every call)."),
-      stackDepth: z.number().int().min(1).max(32).optional().describe("Frames per slow call (default 8)."),
-      limit: z.number().int().min(1).max(200).optional().describe("Slowest calls to return (default 50)."),
+      minMs: z.number().min(0).max(60_000).optional(),
+      stackDepth: z.number().int().min(1).max(32).optional(),
+      limit: z.number().int().min(1).max(200).optional(),
     },
     async (args, c) => ok(await forwardAny(c, "trace.run", args, args.durationMs + 15_000)));
 
   defineTool(server, ctx, "client_eval",
-    "Run JavaScript (GraalJS) on a Minecraft client's render thread, like server_eval on a server: for debugging a mod or checking client state no other tool shows. Globals: mc (the Minecraft instance), player (the local player, or null), level (the client world, or null), screen() (the open screen, or null), print(...); Java.type('…') reaches any class, the mods' own included (Minecraft 26.x names are Mojang's, unobfuscated). Returns {result, output}; Java objects come back as {class, toString}. Globals persist between calls until reset:true or a new hub session. Keep scripts short: the game does not render while one runs (timeoutMs cancels it). The first call downloads GraalJS (about 60 MB, checked against the agent's sha256 list) into ~/.craftwire/lib and can take a minute; later calls start at once. The user can turn it off (-Dcraftwire.allowEval=false).",
+    "Run JavaScript on a client's render thread: mc, player, level, screen(), print, Java.type. The first call downloads GraalJS (~60 MB). Keep scripts short: the game does not render meanwhile.",
     {
       ...targetArgs,
       code: z.string().min(1).max(100_000),
       timeoutMs: z.number().int().min(100).max(60_000).default(5000),
-      reset: z.boolean().default(false).describe("Drop the globals of earlier calls first."),
+      reset: z.boolean().default(false),
     },
     // The first call downloads GraalJS: allow for that on top of the script's own time.
     async (args, c) => ok(await forward(c, "client", "client.eval", args, args.timeoutMs + 300_000)));

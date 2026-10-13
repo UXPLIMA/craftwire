@@ -12,7 +12,7 @@ const LOG_LINES = 200;
 const CHAT_LINES = 100;
 /** A subscribed resource is announced at most this often (a busy log would flood the client otherwise). */
 const NOTIFY_EVERY_MS = 1000;
-export const DOC_TOPICS = ["scenarios", "extensions", "http", "video", "folia"] as const;
+export const DOC_TOPICS = ["tools", "building", "scenarios", "extensions", "http", "video", "folia"] as const;
 
 /** docs/ next to the hub in a repo checkout, or in the npm package. */
 function docsDir(): string | undefined {

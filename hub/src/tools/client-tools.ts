@@ -10,37 +10,53 @@ const vec3 = { x: z.number(), y: z.number(), z: z.number() };
 // Camera moves over time: `camera` path/orbit, and record start's `camera`.
 const keyframe = z.object({ t: z.number().min(0), ...vec3, yaw: z.number().optional(), pitch: z.number().min(-90).max(90).optional() });
 const motionShape = {
-  keyframes: z.array(keyframe).min(2).max(64).optional().describe("path: timed keyframes; t in ms from the start"),
-  interpolation: z.enum(["smooth", "linear"]).optional().describe("path: smooth curves (default) or straight lines"),
-  ease: z.enum(["inOut", "none"]).optional().describe("start and stop gently (path default) or keep a constant speed (orbit default)"),
-  lookAt: z.object(vec3).optional().describe("path: keep aiming at this point; keyframe yaw/pitch are then optional"),
-  center: z.object(vec3).optional().describe("orbit: the point to circle and face"),
+  keyframes: z.array(keyframe).min(2).max(64).optional(),
+  interpolation: z.enum(["smooth", "linear"]).optional(),
+  ease: z.enum(["inOut", "none"]).optional(),
+  lookAt: z.object(vec3).optional(),
+  center: z.object(vec3).optional(),
   radius: z.number().positive().optional(),
-  height: z.number().optional().describe("orbit: camera height above the center (default radius / 2)"),
-  startAngle: z.number().optional().describe("orbit: degrees, 0 = south of the center (default: where the camera is now)"),
-  degrees: z.number().optional().describe("orbit: how far to turn (default 360; negative turns the other way)"),
+  height: z.number().optional(),
+  startAngle: z.number().optional(),
+  degrees: z.number().optional(),
   durationMs: z.number().int().positive().max(600_000).optional(),
 };
 const cameraMotion = z.object({ action: z.enum(["path", "orbit"]), ...motionShape });
+const point = z.record(z.string(), z.number());
+// What the tool list shows for a motion: loose types (cheap in tokens); checkMotion applies motionShape in full.
+const looseMotion = {
+  keyframes: z.array(point).optional(), interpolation: z.enum(["smooth", "linear"]).optional(), ease: z.enum(["inOut", "none"]).optional(),
+  lookAt: point.optional(), center: point.optional(), radius: z.number().optional(), height: z.number().optional(),
+  startAngle: z.number().optional(), degrees: z.number().optional(), durationMs: z.number().optional(),
+};
+
+function checkMotion(motion: unknown): z.infer<typeof cameraMotion> {
+  const r = cameraMotion.safeParse(motion);
+  if (!r.success) {
+    throw new CraftwireError("INVALID_PARAMS", `Bad camera motion: ${r.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`,
+      "path needs keyframes [{t,x,y,z,yaw?,pitch?}] (at least 2); orbit needs center {x,y,z} and radius. See craftwire://docs/video.");
+  }
+  return r.data;
+}
 
 const fwd = (method: string, timeoutMs?: number) => async (args: Record<string, unknown>, c: ToolContext) =>
   ok(await forward(c, "client", method, args, timeoutMs));
 
 export function registerClientTools(server: McpServer, ctx: ToolContext): void {
   defineTool(server, ctx, "player_state",
-    "Local player snapshot: position, rotation, health, game mode, dimension, selected hotbar slot, inventory, and the block/entity under the crosshair.",
+    "Local player: position, rotation, health, game mode, dimension, hotbar slot, inventory, crosshair target.",
     { ...targetArgs }, fwd("player.state"));
 
   defineTool(server, ctx, "hud_read",
-    "Read HUD state as plain text: bossbars (name, progress, color), actionbar, title/subtitle; sidebar {title, entries:[{name, value, shown}]} with lines as drawn (team prefix + name + suffix, game order, hidden # holders left out; shown is the number text or null when hidden); tab {header, footer, players:[{name, display, ping, gameMode, score?}]}; belowName {title, entries}; tabList (display names).",
+    "Read the HUD as text: bossbars, actionbar, title, sidebar (lines as drawn), tab list (header, footer, players), belowName.",
     { ...targetArgs }, fwd("hud.read"));
 
   defineTool(server, ctx, "gui_read",
-    "Describe the open screen: title, type, slots (slot, item id, count, name, lore, enchanted, container), hovered slot tooltip, and widgets (buttons/text fields with index and text). Returns {open:false} when no screen is open.",
+    "Describe the open screen: title, slots (item, count, name, lore), hovered tooltip, widgets. {open:false} when none is open.",
     { ...targetArgs }, fwd("gui.read"));
 
   defineTool(server, ctx, "gui_action",
-    "Interact with the open screen. hover/click/right_click/shift_click take `slot` (from gui_read). drag moves `slot` → `toSlot`. click_widget takes `widget` (index or visible text). type sends `text` to the focused field (or `widget`). close closes the screen. Returns the fresh gui_read state.",
+    "Act on the open screen: hover/click/right_click/shift_click {slot}, drag {slot,toSlot}, click_widget {widget}, type {text}, close. Returns the new gui_read.",
     {
       ...targetArgs,
       action: z.enum(["hover", "click", "right_click", "shift_click", "drag", "click_widget", "type", "close"]),
@@ -51,7 +67,7 @@ export function registerClientTools(server: McpServer, ctx: ToolContext): void {
     }, fwd("gui.action"));
 
   defineTool(server, ctx, "input",
-    "Simulate gameplay input (no screen open). keys: forward, back, left, right, jump, sneak, sprint, attack, use, pick, drop, inventory, swap_hands, chat, command, player_list, perspective, hide_gui, screenshot. mode press (default, optional durationMs) | hold | release. look adds yaw/pitch degrees. hotbar selects slot 1-9.",
+    "Gameplay input with no screen open: keys (forward, back, left, right, jump, sneak, sprint, attack, use, pick, drop, inventory, swap_hands, chat, command, ...) with mode press|hold|release; look adds yaw/pitch; hotbar 1-9.",
     {
       ...targetArgs,
       keys: z.array(z.string()).optional(),
@@ -62,7 +78,7 @@ export function registerClientTools(server: McpServer, ctx: ToolContext): void {
     }, fwd("input"));
 
   defineTool(server, ctx, "camera",
-    "Control the render camera without moving the player (client-side only). set: x,y,z,yaw,pitch. look_at: aim at `target`. frame_area: fit `area` (min/max corners) in view. frame_entity: fit `entity` (UUID or name). freecam_on/freecam_off. reset returns to the player's eyes. Moves that play over time (for videos, see record): path flies through `keyframes` [{t ms, x,y,z, yaw,pitch}] (interpolation smooth|linear, ease inOut|none, optional `lookAt` point instead of yaw/pitch); orbit circles `center` at `radius` (height above it, startAngle, degrees, durationMs, ease), always facing it. A move holds its last pose when it ends; set/reset stop it. Keep the camera within render distance of the player.",
+    "Move the render camera, not the player: set, look_at {target}, frame_area {area}, frame_entity {entity}, freecam_on/off, reset; path {keyframes} and orbit {center,radius} play over time. Details: craftwire://docs/video.",
     {
       ...targetArgs,
       action: z.enum(["set", "look_at", "frame_area", "frame_entity", "freecam_on", "freecam_off", "reset", "path", "orbit"]),
@@ -72,11 +88,15 @@ export function registerClientTools(server: McpServer, ctx: ToolContext): void {
       area: z.object({ min: z.object(vec3), max: z.object(vec3) }).optional(),
       entity: z.string().optional(),
       distanceScale: z.number().min(0.2).max(5).default(1),
-      ...motionShape,
-    }, fwd("camera"));
+      ...looseMotion,
+    },
+    async (args, c) => {
+      if (args.action === "path" || args.action === "orbit") checkMotion(args);
+      return ok(await forward(c, "client", "camera", args));
+    });
 
   defineTool(server, ctx, "client_settings",
-    "Adjust rendering settings and return the current values: guiScale (0=auto..8), fov (30-110), renderDistance (2-32), hideHud, windowSize {width,height}. Call with no arguments to just read them.",
+    "Read or set guiScale, fov, renderDistance, hideHud, windowSize; no arguments only reads.",
     {
       ...targetArgs,
       guiScale: z.number().int().min(0).max(8).optional(),
@@ -87,7 +107,7 @@ export function registerClientTools(server: McpServer, ctx: ToolContext): void {
     }, fwd("client.settings"));
 
   defineTool(server, ctx, "screenshot",
-    "Capture the game frame and return it as an image. hud:false hides the HUD (F1); chat:false keeps the HUD but leaves chat lines (e.g. command feedback) out. maxSize is the long edge of the returned image. savePath (relative to the current directory) also writes the full-resolution image: PNG, or JPEG when it ends in .jpg/.jpeg (a tenth of the size). camera {x,y,z,yaw,pitch,fov} applies only for this capture.",
+    "Capture the game frame as an image. hud:false hides the HUD, chat:false hides chat lines. maxSize is the long edge. savePath also writes full resolution (.png, or .jpg). camera applies to this capture only.",
     {
       ...targetArgs,
       hud: z.boolean().default(true),
@@ -107,7 +127,7 @@ export function registerClientTools(server: McpServer, ctx: ToolContext): void {
     });
 
   defineTool(server, ctx, "record",
-    "Record a video (MP4, H.264/H.265) of the game frame with its sound, in real time, encoded by the user's ffmpeg (FFMPEG_NOT_FOUND says how to install it). start: savePath (.mp4, relative to the current directory); preset max (best, CPU-heavy, 60 fps) | high (default) | balanced (fast, small; good for 60 fps on weaker PCs) | light (720p, small files for Discord); fps, resolution (source/2160p/1440p/1080p/720p/480p, only scales down), codec h264|h265, crf (0-51, lower = better), speed (x264 preset ultrafast..veryslow) and audioBitrate override the preset. audio:false records without sound (with sound, the game is silent on the speakers while it records). hud:false (default) hides the HUD like F1, open menus stay visible; chat:false hides chat lines. durationMs stops by itself; camera {action:'path'|'orbit', ...camera tool fields} starts with the first frame and sets the length; wait:true returns the finished video. maxSeconds (default 120, max 600) is the safety stop. stop finishes the file and returns {savedPath, durationMs, frames, duplicatedFrames, droppedFrames, sizeBytes, ...}; status shows progress or the last result.",
+    "Record an MP4 with sound through the user's ffmpeg. start {savePath, preset max|high|balanced|light, durationMs?, camera? (a camera tool path/orbit motion), wait?}; stop; status. Details: craftwire://docs/video.",
     {
       ...targetArgs,
       action: z.enum(["start", "stop", "status"]),
@@ -124,20 +144,21 @@ export function registerClientTools(server: McpServer, ctx: ToolContext): void {
       chat: z.boolean().optional(),
       durationMs: z.number().int().min(100).max(600_000).optional(),
       maxSeconds: z.number().int().min(1).max(600).optional(),
-      camera: cameraMotion.optional(),
+      camera: z.record(z.string(), z.unknown()).optional(),
       waitForTerrain: z.boolean().optional(),
       wait: z.boolean().optional(),
     },
     async (args, c) => {
-      const params = args.savePath ? { ...args, savePath: resolvePath(args.savePath) } : args;
+      const camera = args.camera === undefined ? undefined : checkMotion(args.camera);
+      const params = { ...args, ...(camera ? { camera } : {}), ...(args.savePath ? { savePath: resolvePath(args.savePath) } : {}) };
       // A waiting start lasts as long as the video plus the encoding; the rest answer quickly.
-      const length = args.durationMs ?? args.camera?.durationMs ?? motionLength(args.camera?.keyframes) ?? (args.maxSeconds ?? 120) * 1000;
+      const length = args.durationMs ?? camera?.durationMs ?? motionLength(camera?.keyframes) ?? (args.maxSeconds ?? 120) * 1000;
       const timeoutMs = args.action === "start" && args.wait ? length + 120_000 : args.action === "stop" ? 150_000 : 30_000;
       return ok(await forward(c, "client", "record", params, timeoutMs));
     });
 
   defineTool(server, ctx, "chat",
-    "send: say `text` in chat. command: run `text` as a command (leading / optional). read: recent chat and actionbar messages from the hub buffer, optionally filtered by `contains` (case-insensitive) and `since` (epoch ms).",
+    "send {text}; command {text}; read recent chat and actionbar lines (contains?, since?).",
     {
       ...targetArgs,
       action: z.enum(["send", "command", "read"]),

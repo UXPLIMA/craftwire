@@ -133,3 +133,32 @@ describe("client tools", () => {
     expect(json(await hub.call("chat", { action: "send" })).code).toBe("INVALID_PARAMS");
   });
 });
+
+describe("camera motions are still checked in full", () => {
+  it("camera path with one keyframe is refused before reaching the client", async () => {
+    const { hub, agent } = await withAgent();
+    let called = false;
+    agent.onRequest("camera", () => { called = true; return {}; });
+    const res = await hub.call("camera", { action: "path", keyframes: [{ t: 0, x: 0, y: 70, z: 0 }] });
+    expect(res.isError).toBe(true);
+    expect(JSON.stringify(res.content)).toContain("keyframes");
+    expect(called).toBe(false);
+  });
+
+  it("record's camera is checked the same way", async () => {
+    const { hub } = await withAgent();
+    const res = await hub.call("record", { action: "start", savePath: "v.mp4", camera: { action: "path", keyframes: [{ t: 0, x: 0, y: 70, z: 0 }] } });
+    expect(res.isError).toBe(true);
+    expect(JSON.stringify(res.content)).toContain("INVALID_PARAMS");
+  });
+});
+
+describe("tool list", () => {
+  it("leaves validation-only keywords out but still validates", async () => {
+    const { hub } = await withAgent();
+    const shot = (await hub.client.listTools()).tools.find((t) => t.name === "screenshot")!;
+    expect(JSON.stringify(shot.inputSchema)).not.toMatch(/"maximum"|"\$schema"/);
+    const res = await hub.call("screenshot", { maxSize: 99_999 });
+    expect(res.isError).toBe(true);
+  });
+});

@@ -1,4 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { compactToolList } from "./compact-schema.js";
 import { bindExtensionTools } from "./extensions.js";
 import { registerDebugTools } from "./tools/debug-tools.js";
 import { registerPrompts } from "./prompts.js";
@@ -23,9 +24,9 @@ const INSTRUCTIONS = [
   "No game open? client_process starts a hidden client the hub runs itself (offline mode, for dev servers); then use the client tools on it.",
   "Bots: bot_spawn puts fake players on a Paper server; bot_action drives them (chat, command, move_to with pathfinding, break_block, gui_read/gui_click, use, attack, …) so you can test plugins without a real client; bot_remove when done.",
   "Lag and slow code: profile samples a server's tick or a client's frame and names the plugin or mod, listener and method that use the time; trace times every call of a named method. client_eval runs JavaScript on a client (mods, client state).",
-  "Resources: craftwire://instances, craftwire://exceptions, craftwire://instances/{name}/log (and /chat, /screenshot on clients), craftwire://docs/{scenarios,extensions,http}. Prompts: test_plugin, debug_lag, write_scenario, setup.",
+  "Resources: craftwire://instances, craftwire://exceptions, craftwire://instances/{name}/log (and /chat, /screenshot on clients), craftwire://docs/{tools,building,scenarios,video,extensions,http,folia}. Prompts: test_plugin, debug_lag, write_scenario, setup.",
   "After an action that opens a menu (e.g. chat {action:'command'}), call wait_for {condition:'screen_open'} before gui_read. wait_for also waits on the server (a block, a player arriving, items, an event, a bot's message) instead of sleeping and polling.",
-  "Errors carry a `hint` with the next step. Pass operationId on actions you might retry.",
+  "Every tool takes optional instance (id or name from list_instances; needed only when several match) and operationId (an idempotency key: a retry with the same id returns the first result). Errors carry a `hint` with the next step.",
 ].join(" ");
 
 export function createCraftwireServer(ctx: ToolContext): McpServer {
@@ -43,5 +44,6 @@ export function createCraftwireServer(ctx: ToolContext): McpServer {
   registerClientProcessTools(server, ctx);
   registerResources(server, ctx);
   registerPrompts(server, ctx);
+  compactToolList(server);
   return server;
 }

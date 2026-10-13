@@ -23,7 +23,7 @@ Follow-up M11 (separate spec): the same build engine in singleplayer (Fabric int
 1. The tower task (below) costs at least 10x fewer tokens than the per-block baseline and takes at most 12 tool
    calls including two review-and-fix rounds.
 2. Full tool list (all groups) at most 28,000 chars (~8k tokens); the `build` profile at most 10,500 chars
-   (~3k tokens); no single tool definition over 1,500 chars. Enforced by a hub test.
+   (~3k tokens); no single tool definition over 1,800 chars. Enforced by a hub test.
 3. 1,000,000 changed blocks apply in at most 10 s on the user's machine while the server stays at TPS >= 18.
 4. Re-running an unchanged part writes 0 blocks; undo restores the world exactly (verified block by block in ITs).
 

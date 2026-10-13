@@ -18,8 +18,7 @@ export const SCENARIO_HELP =
 /** scenario_run: runs scenarios in this hub; `makeServer` builds the private MCP server their steps call. */
 export function registerScenarioTools(server: McpServer, ctx: ToolContext, makeServer: () => McpServer): void {
   defineTool(server, ctx, "scenario_run",
-    "Run test scenarios: steps (tool calls and checks) the hub runs in order, stopping at the first failure and reporting what was expected, what was found, and the context at that moment (bots' messages and HUD, events, new exceptions, warnings). Cleanup always runs. " +
-    "Pass `scenario` (inline) or `files` (*.cwtest.json files or folders, relative to the hub's working directory). " + SCENARIO_HELP,
+    "Run test scenarios (scenario inline, or files *.cwtest.json): setup, steps (tool calls, bot actions, commands, waits) with expect checks, cleanup. Stops at the first failure and reports the context. Format: craftwire://docs/scenarios.",
     {
       scenario: z.record(z.string(), z.unknown()).optional(),
       files: z.array(z.string()).optional(),
