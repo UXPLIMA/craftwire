@@ -9,8 +9,13 @@ type Json = Record<string, unknown>;
 const BIOME_TINT: Record<string, number> = {
   grass_block: 0x91bd59, short_grass: 0x91bd59, tall_grass: 0x91bd59, fern: 0x91bd59, large_fern: 0x91bd59, sugar_cane: 0x91bd59,
   oak_leaves: 0x77ab2f, jungle_leaves: 0x77ab2f, acacia_leaves: 0x77ab2f, dark_oak_leaves: 0x77ab2f, mangrove_leaves: 0x77ab2f, vine: 0x77ab2f,
-  birch_leaves: 0x80a755, spruce_leaves: 0x619961, lily_pad: 0x208030, water: 0x3f76e4,
+  birch_leaves: 0x80a755, spruce_leaves: 0x619961, lily_pad: 0x208030, water: 0x3f76e4, bush: 0x91bd59,
+  leaf_litter: 0xa0784a,   // dry foliage
+  melon_stem: 0x9bbd52, pumpkin_stem: 0x9bbd52, attached_melon_stem: 0xe0c71c, attached_pumpkin_stem: 0xe0c71c,
 };
+
+/** Bumped whenever the extraction changes, so tables cached by an older hub are built again. */
+export const COLOR_TABLE_VERSION = 2;
 
 const tex = (ref: string) => `assets/minecraft/textures/${ref.replace("minecraft:", "")}.png`;
 const model = (ref: string) => `assets/minecraft/models/${ref.replace("minecraft:", "")}.json`;
@@ -97,7 +102,7 @@ export function blockColorsFor(home: string, mc: string, log: (m: string) => voi
   if (!p) {
     p = (async () => {
       const dir = join(home, "block-colors");
-      const cache = join(dir, `${mc}.json`);
+      const cache = join(dir, `${mc}-v${COLOR_TABLE_VERSION}.json`);
       if (existsSync(cache)) return JSON.parse(readFileSync(cache, "utf8")) as Record<string, [number, number]>;
       try {
         let jar = join(home, "client", "versions", mc, `${mc}.jar`);

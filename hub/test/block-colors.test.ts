@@ -2,7 +2,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { extractBlockColors } from "../src/blocks/colors.js";
+import { COLOR_TABLE_VERSION, extractBlockColors } from "../src/blocks/colors.js";
 import { encodePng } from "./helpers/png.js";
 import { makeZip } from "./helpers/zip.js";
 
@@ -31,6 +31,24 @@ describe("extractBlockColors", () => {
     expect(colors["minecraft:oak_log"]).toEqual([0xA08250, 0x645032]);
     expect(colors["minecraft:glowstone"]).toEqual([0xC8A050, 0xC8A050]);   // 26.x textures can be {sprite, ...}
   });
+
+  it("tints the grey textures the game colours by biome: bushes like grass, leaf litter like dry foliage", () => {
+    const jar = join(mkdtempSync(join(tmpdir(), "cw-col-")), "client.jar");
+    const block = (id: string) => ({
+      [`assets/minecraft/blockstates/${id}.json`]: JSON.stringify({ variants: { "": { model: `minecraft:block/${id}` } } }),
+      [`assets/minecraft/models/block/${id}.json`]: JSON.stringify({ textures: { all: `minecraft:block/${id}` } }),
+      [`assets/minecraft/textures/block/${id}.png`]: solid(200, 200, 200),
+    });
+    makeZip(jar, { ...block("bush"), ...block("leaf_litter") });
+    const colors = extractBlockColors(jar);
+    const rgb = (c: number) => [c >> 16 & 255, c >> 8 & 255, c & 255];
+    const [br, bg, bb] = rgb(colors["minecraft:bush"]![0]);
+    expect(bg).toBeGreaterThan(br);   // green, not grey
+    expect(bg).toBeGreaterThan(bb);
+    const [lr, lg, lb] = rgb(colors["minecraft:leaf_litter"]![0]);
+    expect(lr).toBeGreaterThan(lg);   // brown, not grey
+    expect(lg).toBeGreaterThan(lb);
+  });
 });
 
 describe("iso views carry the colour table", () => {
@@ -41,7 +59,9 @@ describe("iso views carry the colour table", () => {
     const hub = await startHub();
     try {
       mkdirSync(join(hub.home, "block-colors"), { recursive: true });
-      writeFileSync(join(hub.home, "block-colors", "26.2.json"), JSON.stringify({ "minecraft:stone": [1, 2] }));
+      // An old table (before a fix to the extraction) is ignored: the cache file is named after the table's version.
+      writeFileSync(join(hub.home, "block-colors", "26.2.json"), JSON.stringify({ "minecraft:stone": [9, 9] }));
+      writeFileSync(join(hub.home, "block-colors", `26.2-v${COLOR_TABLE_VERSION}.json`), JSON.stringify({ "minecraft:stone": [1, 2] }));
       (hub.ctx as { home?: string }).home = hub.home;
       const agent = await connectFakeAgent(hub.port, { token: TOKEN, kind: "server" });
       let seen: Record<string, unknown> = {};

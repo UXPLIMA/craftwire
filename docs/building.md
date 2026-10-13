@@ -31,9 +31,10 @@ conversation twice. The preview (`preview:"iso4"`) shows all four corners in one
 | `timeoutMs` | Script time limit, 1000-300000 (default 60000). |
 
 The result: `{project, world, parts:[{part, changed, removed, blocks}], changed, removed, blocks, bbox:{min,max},
-palette, warnings, ms, output?}` and, with a preview, the image. With `dryRun` each part reports `wouldChange`
-instead. The iso views use block colours averaged from the game's own textures (taken once from the client jar and
-cached under the hub's home folder), or map colours when the jar cannot be had.
+palette, warnings, ms, output?}` and, with a preview, the image plus `colors`. With `dryRun` each part reports
+`wouldChange` instead. The iso views use block colours averaged from the game's own textures, taken once from the
+client jar and cached under the hub's home folder (`colors:"textures"`), or map colours when the jar cannot be had
+(`colors:"map"`).
 
 A file declares parts with `part(name, () => { ... })`. Without parts the whole script is one part named `main`.
 Parts are layers: a part run later covers an earlier one where they overlap; removing a part brings back what was
