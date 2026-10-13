@@ -47,6 +47,10 @@ Move the hover with `gui_action` while it records and the tooltip follows. The `
 | `.webm` | VP9 with alpha | web pages, OBS, small files |
 | `.mp4` | refused: MP4 has no transparency | — |
 
+Windows' Media Player and Films & TV cannot play ProRes 4444 or show alpha, so a `.mov` looks empty there; it is
+not. To check one without an editor, lay it over a picture with ffmpeg:
+`ffmpeg -loop 1 -i bg.png -i kit.mov -filter_complex "[0:v]scale=1920:1080[bg];[bg][1:v]overlay=shortest=1" -map 1:a? -c:v libx264 -pix_fmt yuv420p check.mp4`.
+
 Videos keep the full window size (the tooltip moves with the mouse, so a fixed crop would cut it off). Sound is
 recorded as for normal videos (AAC in `.mov`, Opus in `.webm`); pass `audio:false` for a silent panel. Camera motions
 do not apply: there is no world in a GUI layer. If your ffmpeg lacks the encoder (`prores_ks` or `libvpx-vp9`), the
