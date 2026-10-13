@@ -163,4 +163,18 @@ class BuildIT {
         JsonObject r = build("{\"project\":\"b18\",\"origin\":{\"x\":4260,\"y\":-50,\"z\":4000},\"code\":\"hollow(0,0,0,6,5,6,'bricks'); roof({x1:-1,z1:-1,x2:7,z2:7,y:6,type:'hip',stairs:'spruce_stairs'}); fill(0,0,3,0,1,3,'air'); set(3,2,0,'glass')\",\"preview\":\"iso4\",\"previewSize\":512}");
         assertEquals("image/png", r.getAsJsonObject("preview").get("mime").getAsString());
     }
+
+    /** The skill's example files must build cleanly: no script errors, no blocks left without support. */
+    @Test
+    void skillExamplesBuildCleanly() throws Exception {
+        java.nio.file.Path dir = java.nio.file.Path.of("..", "claude-plugin", "skills", "minecraft-building", "examples");
+        int x = 4300;
+        for (String file : new String[] {"house.build.js", "tower.build.js"}) {
+            String code = java.nio.file.Files.readString(dir.resolve(file));
+            JsonObject r = build("{\"project\":\"ex-" + file.replace(".build.js", "") + "\",\"origin\":{\"x\":" + x + ",\"y\":-60,\"z\":4000},\"code\":" + quote(code) + ",\"file\":\"" + file + "\",\"preview\":\"iso4\",\"previewSize\":768}");
+            assertTrue(r.get("changed").getAsInt() > 100, file + ": " + r);
+            assertFalse(r.get("warnings").toString().contains("support"), file + ": " + r.get("warnings"));
+            x += 40;
+        }
+    }
 }

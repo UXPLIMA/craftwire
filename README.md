@@ -18,6 +18,16 @@ Every picture on this page was taken by Craftwire itself, through the tools belo
 
 ## What it can do
 
+### Build with code, not block by block
+
+`build` runs a build script on the server: `fill`, `hollow`, `sphere`, `cylinder`, `roof`, hand-drawn `layers`, weighted block `mix`es, `rotate` and `mirror`. The agent keeps the script in a file and edits it in place; each run writes only the blocks that changed, the hub reads the file itself so the script never passes through the conversation twice, and one `iso4` preview shows the build from all four corners. Every run can be undone, a part can be taken away with what was under it coming back, and `build_manage clear` puts the world back as it was. The `minecraft-building` skill teaches the workflow, and `--profile build` trims the tool list for building sessions. See [docs/building.md](docs/building.md).
+
+```js
+// builds/tower.build.js -> build {project:"tower", file:"builds/tower.build.js", origin:{x:120, y:64, z:-40}, preview:"iso4"}
+part("shell", () => cylinder(0, 0, 0, 4, 20, mix({stone_bricks: 6, cracked_stone_bricks: 2, mossy_stone_bricks: 1}), {hollow: true}));
+part("roof", () => cone(0, 21, 0, 5, 8, "deepslate_tiles"));
+```
+
 ### See the game from any angle
 
 `screenshot` captures what the player sees, or renders from any camera pose without moving the player. Terrain behind the player is rendered too, with or without Sodium. Use it to check a build from above, frame a scene for a promo shot, or watch a test from the side.
