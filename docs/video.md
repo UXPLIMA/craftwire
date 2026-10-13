@@ -4,6 +4,8 @@
 game's sound, encoded to MP4 by ffmpeg on the same computer. It is made for promo and showcase videos of plugins and
 mods. The model itself cannot watch a video; use `screenshot` for what the AI needs to see.
 
+For a menu or an item's lore on a transparent background (`.mov`/`.webm` with alpha), see [gui-capture.md](gui-capture.md).
+
 ## What you need
 
 ffmpeg, installed once:

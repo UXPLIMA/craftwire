@@ -53,6 +53,17 @@ record {action:"start", savePath:"videos/castle.mp4", preset:"high", wait:true,
         camera:{action:"orbit", center:{x:120, y:70, z:-40}, radius:30, height:12, durationMs:12000}}
 ```
 
+### Menus and lore without a background
+
+`screenshot` and `record` can capture just the open menu, just the hovered item's tooltip, or both, on a transparent background: PNG for images, ProRes 4444 `.mov` or VP9 `.webm` for video. Drop them over your footage in Premiere, Resolve or OBS, no cutting out by hand. See [docs/gui-capture.md](docs/gui-capture.md).
+
+<img src="docs/images/gui-capture.jpg" alt="A kit menu and an item's lore tooltip, captured on a transparent background and placed over a forest" width="100%">
+
+```jsonc
+screenshot {layer:"gui+tooltip", split:true, guiScale:4, savePath:"shots/kit.png"}   // kit.gui.png + kit.tooltip.png
+record {action:"start", layer:"gui+tooltip", savePath:"videos/kit.mov", durationMs:8000, wait:true}
+```
+
 ### Read and click menus like a player
 
 `gui_read` returns the open screen as data: every slot with its item, name and lore, plus buttons and text fields. `gui_action` hovers, clicks, drags and types. Plugin menus built from chests work like any other screen.

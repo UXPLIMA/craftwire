@@ -32,3 +32,10 @@ Needs ffmpeg on the game's computer (`FFMPEG_NOT_FOUND` gives the install comman
 4. **One call for a move**: `record {action:"start", savePath:"videos/<feature>.mp4", wait:true, camera:{...}}` returns the finished file. With live actions, start without `wait`, act, then `record stop`.
 5. **Check the result**: `durationMs` as planned, `droppedFrames` 0 (else retry with a faster preset), `audio` true when sound matters. Take a `screenshot` at a key moment if you need to see what the video shows; you cannot watch the video.
 6. Keep clips short and named by feature (`videos/shop-buy.mp4`, `videos/castle-orbit.mp4`); several short clips edit better than one long take.
+
+## GUI and lore panels (transparent, see craftwire://docs/gui-capture)
+When the user wants a menu or an item's lore as its own panel (store page, a panel floating over gameplay in a video):
+1. Open the menu (the plugin's command or item), `gui_action {action:"hover", slot}` the item whose lore should show.
+2. `screenshot {layer:"gui+tooltip", split:true, guiScale:4, savePath:"shots/<feature>.png"}` writes `<feature>.gui.png` and `<feature>.tooltip.png` on transparency, trimmed. `layer:"gui"` or `"tooltip"` for one of them.
+3. Motion: `record {action:"start", layer:"gui+tooltip", savePath:"videos/<feature>.mov"}` (ProRes 4444 for Premiere, DaVinci, After Effects, Final Cut) or `.webm` (web, OBS); move the hover with `gui_action` while it records. MP4 has no transparency.
+4. For crisp panels use a large window (`client_process {windowSize:{width:3840, height:2160}}`) and a high `guiScale`; the user's own GUI scale is put back afterwards.

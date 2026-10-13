@@ -58,7 +58,7 @@ works.
 Start a hidden 4K client and capture at a large GUI scale:
 
 ```jsonc
-client_process {action:"start", windowSize:"3840x2160"}
+client_process {action:"start", windowSize:{width:3840, height:2160}}
 screenshot {layer:"gui", guiScale:6, savePath:"shots/menu.png"}
 ```
 
