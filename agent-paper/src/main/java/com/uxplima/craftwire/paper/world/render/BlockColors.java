@@ -22,13 +22,15 @@ public final class BlockColors {
         return !TABLE.isEmpty();
     }
 
+    /** The top colour, or -1 when unknown or the texture is mostly transparent (the table holds 0): use the map colour. */
     public static int top(String id) {
         int[] c = TABLE.get(id);
-        return c == null ? -1 : c[0];
+        return c == null || c[0] == 0 ? -1 : c[0];
     }
 
+    /** The side colour, or -1 as for {@link #top}. */
     public static int side(String id) {
         int[] c = TABLE.get(id);
-        return c == null ? -1 : c[1];
+        return c == null || c[1] == 0 ? -1 : c[1];
     }
 }
