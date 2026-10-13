@@ -34,6 +34,11 @@ public final class WorldRenderHandler {
 
     private record Request(World world, Region region, String viewName, JsonObject p, int grid, boolean players, boolean generate) {}
 
+    /** Adds the build preview image to a build result (Task 16 draws it; until then results pass through). */
+    public static CompletableFuture<JsonElement> attachPreview(JsonObject params, JsonObject result, CraftwirePlugin plugin) {
+        return CompletableFuture.completedFuture(result);
+    }
+
     public static CompletableFuture<JsonElement> handle(JsonObject p, CraftwirePlugin plugin) {
         return plugin.sync().global(() -> request(p)).thenCompose(req -> {
             // Chunk loads complete on the server thread; snapshots are taken there too.

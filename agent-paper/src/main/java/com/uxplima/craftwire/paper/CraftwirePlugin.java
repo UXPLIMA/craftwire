@@ -26,6 +26,7 @@ public final class CraftwirePlugin extends JavaPlugin {
     private AgentConfig config;
     private Sync sync;
     private ScriptEngine scripts;
+    private com.uxplima.craftwire.paper.build.BuildService builds;
     private SnapshotStore snapshots;
     private BotManager bots;
     private EventTap events;
@@ -45,6 +46,7 @@ public final class CraftwirePlugin extends JavaPlugin {
         sync = new Sync(this);
         getLogger().warning("Craftwire is active — do not run on production servers");
         scripts = new ScriptEngine(getClass().getClassLoader(), EvalHandler.PRELUDE);
+        builds = new com.uxplima.craftwire.paper.build.BuildService(this);
         snapshots = new SnapshotStore(getDataFolder().toPath().resolve("snapshots"));
         bots = new BotManager(this, sync);
         extensions = new PaperExtensions(this, this::sendTools);
@@ -78,6 +80,7 @@ public final class CraftwirePlugin extends JavaPlugin {
         if (extensions != null) extensions.stop();
         if (bots != null) bots.shutdown();
         if (scripts != null) scripts.close();
+        if (builds != null) builds.close();
         if (hub != null) hub.close();
         if (logs != null) logs.uninstall();
     }
@@ -129,6 +132,10 @@ public final class CraftwirePlugin extends JavaPlugin {
 
     public AgentConfig agentConfig() {
         return config;
+    }
+
+    public com.uxplima.craftwire.paper.build.BuildService builds() {
+        return builds;
     }
 
     public ScriptEngine scripts() {

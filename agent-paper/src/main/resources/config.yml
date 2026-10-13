@@ -14,3 +14,9 @@ max-edit-volume: 1000000
 # events: record every Bukkit event (counts, details, cancellations) for the events tool and wait_for.
 # Events Paper only fires while listened to (entity movement, physics, ticks) are recorded only when watched.
 record-events: true
+# build and build_manage: code-driven building with undo (stored in plugins/Craftwire/builds).
+allow-build: true
+# Most positions one build project may cover.
+max-build-volume: 5000000
+# Disk space for build undo history; the oldest undo steps are dropped first.
+build-journal-limit-mb: 512

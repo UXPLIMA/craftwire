@@ -18,6 +18,8 @@ public final class Handlers {
         d.register("world.query", p -> WorldQueryHandler.handle(p, s, plugin.bots()::isBot));
         d.register("world.render", p -> WorldRenderHandler.handle(p, plugin));
         d.register("world.edit", p -> WorldEditHandler.handle(p, plugin));
+        d.register("build.run", p -> BuildHandler.run(p, plugin));
+        d.register("build.manage", p -> BuildHandler.manage(p, plugin));
         d.register("plugin.manage", p -> PluginManageHandler.handle(p, plugin));
         d.register("events", p -> s.global(() -> EventsHandler.handle(p, plugin)));
         d.register("wait", p -> WaitHandler.handle(p, plugin));
