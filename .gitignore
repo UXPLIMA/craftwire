@@ -1,6 +1,8 @@
 node_modules/
 dist/
 build/
+# ...but not Java packages named build (build-core sources).
+!**/src/**/build/
 .gradle/
 run/
 *.log
