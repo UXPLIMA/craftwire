@@ -10,7 +10,7 @@ import java.util.Set;
  * A palette for tests: a fixed set of block ids, states kept as written (properties in the order given),
  * facing and axis turn and mirror like the game's.
  */
-public final class FakePalette implements StatePalette {
+public class FakePalette implements StatePalette {
     public static final Set<String> BLOCKS = Set.of("air", "stone", "stone_bricks", "cracked_stone_bricks", "mossy_stone_bricks",
             "oak_planks", "oak_stairs", "oak_slab", "spruce_planks", "spruce_stairs", "spruce_slab", "oak_log", "glass", "gold_block",
             "dirt", "grass_block", "oak_fence", "cobblestone", "bricks", "brick_stairs", "brick_slab", "white_wool", "torch");
