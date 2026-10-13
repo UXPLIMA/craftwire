@@ -2,17 +2,24 @@ package com.uxplima.craftwire.fabric.handlers;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.uxplima.craftwire.core.AgentError;
 import com.uxplima.craftwire.fabric.ClientScheduler;
 import com.uxplima.craftwire.fabric.Params;
 import com.uxplima.craftwire.fabric.camera.CameraMotion;
 import com.uxplima.craftwire.fabric.camera.CameraMotionJson;
+import com.uxplima.craftwire.fabric.video.FfmpegArgs;
 import com.uxplima.craftwire.fabric.video.FfmpegLocator;
 import com.uxplima.craftwire.fabric.video.RecordParams;
 import com.uxplima.craftwire.fabric.video.Recorder;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import net.minecraft.client.Minecraft;
 
 /** record: start / stop / status of a video recording (video.Recorder). */
@@ -34,8 +41,9 @@ final class RecordHandler {
     private static CompletableFuture<JsonElement> start(JsonObject p, ClientScheduler s) {
         JsonObject camera = p.has("camera") && p.get("camera").isJsonObject() ? p.getAsJsonObject("camera") : null;
         // Everything is validated before ffmpeg is looked for or the game is touched.
-        RecordParams.parse(p, camera == null ? null : CameraMotionJson.parse(camera, null));
-        return CompletableFuture.supplyAsync(RecordHandler::ffmpeg)
+        RecordParams checked = RecordParams.parse(p, camera == null ? null : CameraMotionJson.parse(camera, null));
+        FfmpegArgs.Container container = FfmpegArgs.Container.of(checked.savePath());
+        return CompletableFuture.supplyAsync(() -> withEncoder(ffmpeg(), container))
                 .thenCompose(ff -> s.call(() -> {
                     CameraMotion motion = camera == null ? null : CameraMotionJson.parse(camera, CameraHandler.currentPose(Minecraft.getInstance()));
                     RecordParams params = RecordParams.parse(p, motion);
@@ -59,10 +67,37 @@ final class RecordHandler {
     }
 
     private static CompletableFuture<Void> settle(ClientScheduler s, RecordParams params) {
-        if (!params.waitForTerrain()) return CompletableFuture.completedFuture(null);
+        // A GUI layer has no terrain in it.
+        if (!params.waitForTerrain() || params.layer() != null) return CompletableFuture.completedFuture(null);
         return s.delay(3)
                 .thenCompose(v -> ScreenshotHandler.sectionsBuilt(s, System.currentTimeMillis() + 5000))
                 .thenCompose(v -> s.delay(2));
+    }
+
+    private static final Map<Path, String> ENCODERS = new ConcurrentHashMap<>();
+
+    /** ProRes and VP9 are missing from some ffmpeg builds: say so before any frame is captured. */
+    private static Path withEncoder(Path ffmpeg, FfmpegArgs.Container container) {
+        if (container == FfmpegArgs.Container.MP4) return ffmpeg;
+        String list = ENCODERS.computeIfAbsent(ffmpeg, f -> {
+            try {
+                Process p = new ProcessBuilder(f.toString(), "-hide_banner", "-encoders").redirectErrorStream(true).start();
+                String out = new String(p.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+                p.waitFor(30, TimeUnit.SECONDS);
+                return out;
+            } catch (IOException e) {
+                return "";
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return "";
+            }
+        });
+        String enc = FfmpegArgs.requiredEncoder(container);
+        if (!FfmpegArgs.listsEncoder(list, enc)) {
+            throw new AgentError("FFMPEG_FAILED", "This ffmpeg (" + ffmpeg + ") has no " + enc + " encoder.",
+                    (container == FfmpegArgs.Container.MOV ? "Record to .webm instead" : "Record to .mov instead") + ", or install a full ffmpeg build.");
+        }
+        return ffmpeg;
     }
 
     private static Path ffmpeg() {

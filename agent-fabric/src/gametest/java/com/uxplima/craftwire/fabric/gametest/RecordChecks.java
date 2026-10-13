@@ -140,7 +140,48 @@ final class RecordChecks {
             AgentError noX265 = errorOf(ctx, Calls.start(ctx, "record", "{\"action\":\"start\",\"savePath\":\"" + json(dir.resolve("x.mp4")) + "\",\"codec\":\"h265\",\"audio\":false,\"durationMs\":500,\"wait\":true}"));
             check("RECORD_FAILED".equals(noX265.code()), "h265 without libx265: " + noX265.code());
         }
+
+        // 7. Transparent GUI recordings: ProRes 4444 .mov and VP9 .webm keep the alpha channel.
+        ctx.setScreen(() -> new net.minecraft.client.gui.screens.inventory.InventoryScreen(net.minecraft.client.Minecraft.getInstance().player));
+        ctx.waitTicks(3);
+        for (String ext : new String[] {"mov", "webm"}) {
+            Path out = dir.resolve("gui." + ext);
+            JsonObject recorded = result(ctx, Calls.start(ctx, "record", "{\"action\":\"start\",\"layer\":\"gui\",\"audio\":false,\"savePath\":\"" + json(out) + "\",\"durationMs\":1500,\"wait\":true}"));
+            check(Files.size(out) > 1000, ext + " written: " + recorded);
+            String fmt = probeAlpha(ffprobe, out);
+            check(ext.equals("mov") ? fmt.contains("yuva444p") : fmt.contains("\"alpha_mode\": \"1\"") || fmt.contains("yuva420p"), ext + " has alpha: " + fmt);
+            // One decoded frame: corner transparent, panel centre opaque.
+            Path png = dir.resolve("gui-" + ext + ".png");
+            run(ffmpeg.toString(), "-y", "-c:v", ext.equals("webm") ? "libvpx-vp9" : "prores", "-i", out.toString(), "-frames:v", "1", png.toString());
+            java.awt.image.BufferedImage img = javax.imageio.ImageIO.read(png.toFile());
+            check(img.getRGB(2, 2) >>> 24 < 8, ext + " corner transparent: " + Integer.toHexString(img.getRGB(2, 2)));
+            check(img.getRGB(img.getWidth() / 2, img.getHeight() / 2) >>> 24 > 247, ext + " panel opaque: " + Integer.toHexString(img.getRGB(img.getWidth() / 2, img.getHeight() / 2)));
+        }
+        // split: the GUI and the tooltip as two videos from the same frames.
+        Calls.call(ctx, "gui.action", "{\"action\":\"hover\",\"slot\":9}");
+        Path both = dir.resolve("kit.webm");
+        JsonObject split = result(ctx, Calls.start(ctx, "record", "{\"action\":\"start\",\"layer\":\"gui+tooltip\",\"split\":true,\"audio\":false,\"savePath\":\"" + json(both) + "\",\"durationMs\":1000,\"wait\":true}"));
+        check(split.getAsJsonArray("savedPaths").size() == 2, "split result: " + split);
+        check(Files.size(dir.resolve("kit.gui.webm")) > 1000 && Files.size(dir.resolve("kit.tooltip.webm")) > 500, "two split videos");
+        screenClosingMidRecordingKeepsRecording(ctx, dir);
+        AgentError mp4 = errorOf(ctx, Calls.start(ctx, "record", "{\"action\":\"start\",\"layer\":\"gui\",\"savePath\":\"" + json(dir.resolve("x.mp4")) + "\"}"));
+        check(mp4.getMessage().contains("MP4"), ".mp4 refused: " + mp4.getMessage());
         check(!Calls.call(ctx, "record", "{\"action\":\"status\"}").getAsJsonObject().get("recording").getAsBoolean(), "idle at the end");
+    }
+
+    /** Review Focus #2: the screen closes during a gui recording; the video still ends normally. */
+    private static void screenClosingMidRecordingKeepsRecording(ClientGameTestContext ctx, Path dir) throws IOException, InterruptedException {
+        Path out = dir.resolve("closing.webm");
+        result(ctx, Calls.start(ctx, "record", "{\"action\":\"start\",\"layer\":\"gui\",\"audio\":false,\"savePath\":\"" + json(out) + "\",\"durationMs\":3000}"));
+        ctx.waitTicks(10);
+        Calls.call(ctx, "gui.action", "{\"action\":\"close\"}");
+        ctx.waitTicks(10);
+        JsonObject done = result(ctx, Calls.start(ctx, "record", "{\"action\":\"stop\"}"));
+        check(Files.size(out) > 1000, "recording survived a closed screen: " + done);
+    }
+
+    private static String probeAlpha(Path ffprobe, Path file) throws IOException, InterruptedException {
+        return run(ffprobe.toString(), "-v", "error", "-show_entries", "stream=pix_fmt:stream_tags=alpha_mode", "-of", "json", file.toString());
     }
 
     private static String json(Path p) {

@@ -62,4 +62,22 @@ class RecordParamsTest {
     void anUppercaseExtensionIsFine() {
         assertEquals("CLIP.MP4", parse("{savePath:'CLIP.MP4'}").savePath().getFileName().toString());
     }
+
+    @Test
+    void transparentLayerNeedsMovOrWebm() {
+        assertEquals("INVALID_PARAMS", error("{savePath:'a.mp4', layer:'gui'}").code());
+        assertEquals(com.uxplima.craftwire.fabric.capture.GuiLayer.GUI, parse("{savePath:'a.mov', layer:'gui'}").layer());
+        assertEquals(com.uxplima.craftwire.fabric.capture.GuiLayer.TOOLTIP, parse("{savePath:'a.webm', layer:'tooltip'}").layer());
+        assertNull(parse("{savePath:'a.mp4'}").layer());
+        assertEquals("INVALID_PARAMS", error("{savePath:'a.mov'}").code());   // .mov only with a layer
+        assertEquals("INVALID_PARAMS", error("{savePath:'a.mov', layer:'gui', split:true}").code());
+        assertTrue(parse("{savePath:'a.mov', layer:'gui+tooltip', split:true}").split());
+        assertEquals("INVALID_PARAMS", error("{savePath:'a.mov', layer:'gui', guiScale:9}").code());
+        assertEquals(4, parse("{savePath:'a.mov', layer:'gui', guiScale:4}").guiScale());
+    }
+
+    @Test
+    void cameraMotionsDoNotApplyToATransparentLayer() {
+        assertEquals("INVALID_PARAMS", error("{savePath:'a.mov', layer:'gui', camera:{action:'orbit', center:{x:0,y:64,z:0}, radius:10, durationMs:8000}}").code());
+    }
 }
