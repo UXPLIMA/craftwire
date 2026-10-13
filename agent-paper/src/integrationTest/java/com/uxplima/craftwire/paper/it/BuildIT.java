@@ -122,6 +122,13 @@ class BuildIT {
     }
 
     @Test
+    void blocksWithoutSupportAreReported() throws Exception {
+        // A torch and a lantern in the air above a stone floor: two warnings' worth of blocks, the floor itself is fine.
+        JsonObject r = build("b11s", 4170, 4020, "fill(0,0,0,4,0,4,'stone'); set(1,3,1,'torch'); set(3,3,3,'lantern')");
+        assertTrue(r.get("warnings").toString().contains("2 blocks need support"), r.get("warnings").toString());
+    }
+
+    @Test
     void rotationOfStatesMatchesVanilla() throws Exception {
         build("b12", 4180, 4000, "rotate(1, () => { set(0,0,0,'oak_log[axis=x]'); set(0,0,-2,'rail[shape=north_south]'); set(0,0,-4,'oak_door[facing=north,half=lower]'); set(0,1,-4,'oak_door[facing=north,half=upper]'); })");
         assertTrue(blockAt(4180, -50, 4000).contains("axis=z"));

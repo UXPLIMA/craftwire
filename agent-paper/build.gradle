@@ -96,7 +96,8 @@ tasks.register('integrationTest', Test) {
     group = 'verification'
     testClassesDirs = sourceSets.integrationTest.output.classesDirs
     classpath = sourceSets.integrationTest.runtimeClasspath
-    useJUnitPlatform()
+    // The 1M-block benchmark (BuildPerfIT) runs only with -Pperf.
+    useJUnitPlatform { if (!project.hasProperty('perf')) excludeTags 'perf' }
     dependsOn tasks.named('jar'), ':test-fixtures:jar'
     def pluginJar = tasks.named('jar').flatMap { it.archiveFile }
     def fixtureJar = project(':test-fixtures').tasks.named('jar').flatMap { it.archiveFile }

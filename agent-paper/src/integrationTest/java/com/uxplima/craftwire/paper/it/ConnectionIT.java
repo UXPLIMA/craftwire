@@ -31,7 +31,15 @@ class ConnectionIT {
 
     @Test
     void serverInfoReportsVersionsAndPlugins() throws Exception {
-        JsonObject info = ItEnv.get().hub.result("server.info", "{}").getAsJsonObject();
+        ItHub hub = ItEnv.get().hub;
+        // 26.x keeps no spawn chunks: late in a long suite nothing is loaded and spawn has no region. A bot there loads it.
+        if (ItEnv.folia()) hub.result("bot.spawn", "{\"names\":[\"SpawnKeeper\"]}");
+        JsonObject info;
+        try {
+            info = hub.result("server.info", "{}").getAsJsonObject();
+        } finally {
+            if (ItEnv.folia()) hub.result("bot.remove", "{\"all\":true}");
+        }
         assertEquals(System.getProperty("craftwire.mcVersion"), info.get("minecraftVersion").getAsString());
         assertEquals(3, info.getAsJsonArray("tps").size());
         assertTrue(info.getAsJsonArray("plugins").toString().contains("\"name\":\"Craftwire\""), info.toString());
