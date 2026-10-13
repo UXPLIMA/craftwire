@@ -147,4 +147,14 @@ class BuildIT {
         JsonObject e = hub.error("build.run", "{\"project\":\"b15\",\"code\":\"set(0,0,0,'stone')\"}");
         assertEquals("BAD_ARGUMENT", e.get("code").getAsString());
     }
+
+    @Test
+    void queryLayersPasteBack() throws Exception {
+        build("b16", 4240, 4000, "fill(0,0,0,3,2,3, mix({stone:1, glass:1, oak_planks:1})); set(1,1,1,'oak_stairs[facing=east]')");
+        JsonObject q = hub.result("world.query", "{\"action\":\"region\",\"encoding\":\"layers\",\"min\":{\"x\":4240,\"y\":-50,\"z\":4000},\"max\":{\"x\":4243,\"y\":-48,\"z\":4003}}").getAsJsonObject();
+        String code = "layers(0,0,0," + q.get("legend") + "," + q.get("layers") + ")";
+        build("b17", 4250, 4000, code);
+        JsonObject copy = hub.result("world.query", "{\"action\":\"region\",\"encoding\":\"layers\",\"min\":{\"x\":4250,\"y\":-50,\"z\":4000},\"max\":{\"x\":4253,\"y\":-48,\"z\":4003}}").getAsJsonObject();
+        assertEquals(q.get("layers"), copy.get("layers"));
+    }
 }

@@ -105,4 +105,12 @@ class WorldQueryIT {
         assertEquals("INVALID_PARAMS", hub.error("world.query",
                 "{\"action\":\"find_block\",\"block\":\"not_a_block\",\"min\":{\"x\":0,\"y\":0,\"z\":0},\"max\":{\"x\":1,\"y\":1,\"z\":1}}").get("code").getAsString());
     }
+
+    @Test
+    void layersEncodingIsOneLetterPerBlock() throws Exception {
+        hub.result("world.edit", "{\"action\":\"set_blocks\",\"blocks\":[{\"x\":5000,\"y\":-50,\"z\":5000,\"block\":\"gold_block\"},{\"x\":5001,\"y\":-50,\"z\":5001,\"block\":\"stone\"}]}");
+        JsonObject r = hub.result("world.query", "{\"action\":\"region\",\"encoding\":\"layers\",\"min\":{\"x\":5000,\"y\":-50,\"z\":5000},\"max\":{\"x\":5001,\"y\":-50,\"z\":5001}}").getAsJsonObject();
+        assertEquals("a./.b", r.getAsJsonArray("layers").get(0).getAsString());
+        assertEquals("minecraft:gold_block", r.getAsJsonObject("legend").get("a").getAsString());
+    }
 }

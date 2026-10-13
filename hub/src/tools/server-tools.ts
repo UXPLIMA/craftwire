@@ -34,7 +34,7 @@ export function registerServerTools(server: McpServer, ctx: ToolContext): void {
     async (args, c) => ok(await forward(c, "server", "server.eval", args, args.timeoutMs + 5000)));
 
   defineTool(server, ctx, "world_query",
-    "Read the world: block {x,y,z}; region {min,max} as palette + runs (at most 32768; encoding:'indices' for one index per block); entities {min,max,type?}; players; find_block {block,min,max}.",
+    "Read the world: block {x,y,z}; region {min,max} as palette + runs (max 32768; encoding 'indices', or 'layers': one letter per block, max 65536, which build's layers() pastes back); entities {min,max,type?}; players; find_block {block,min,max}.",
     {
       ...targetArgs,
       action: z.enum(["block", "region", "entities", "players", "find_block"]),
@@ -44,7 +44,7 @@ export function registerServerTools(server: McpServer, ctx: ToolContext): void {
       type: z.string().optional(),
       block: z.string().optional(),
       limit: z.number().int().min(1).max(1000).default(100),
-      encoding: z.enum(["runs", "indices"]).optional(),
+      encoding: z.enum(["runs", "indices", "layers"]).optional(),
     }, call("world.query", 30_000));
 
   defineTool(server, ctx, "world_render",

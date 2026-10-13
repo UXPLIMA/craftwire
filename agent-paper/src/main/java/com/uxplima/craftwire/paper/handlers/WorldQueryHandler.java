@@ -3,6 +3,8 @@ package com.uxplima.craftwire.paper.handlers;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.uxplima.craftwire.build.BuildError;
+import com.uxplima.craftwire.build.Layers;
 import com.uxplima.craftwire.core.AgentError;
 import com.uxplima.craftwire.paper.Args;
 import com.uxplima.craftwire.paper.Sync;
@@ -28,6 +30,7 @@ import org.bukkit.util.BoundingBox;
 
 final class WorldQueryHandler {
     static final long MAX_REGION = 32_768;
+    static final long MAX_LAYERS = 65_536;
     static final long MAX_SCAN = 4_000_000;
     static final int MAX_ENTITY_CHUNKS = 1024;
 
@@ -64,13 +67,15 @@ final class WorldQueryHandler {
     private static CompletableFuture<JsonElement> region(JsonObject p, Sync sync) {
         World w = Args.world(p);
         Box box = Box.from(p);
-        if (box.volume() > MAX_REGION) {
-            throw new AgentError("QUERY_TOO_LARGE", "The region covers " + box.volume() + " blocks; the limit is " + MAX_REGION,
+        String encoding = Args.optString(p, "encoding").orElse("runs");
+        if (!encoding.equals("runs") && !encoding.equals("indices") && !encoding.equals("layers")) throw Args.invalid("encoding must be runs, indices or layers");
+        long limit = encoding.equals("layers") ? MAX_LAYERS : MAX_REGION;
+        if (box.volume() > limit) {
+            throw new AgentError("QUERY_TOO_LARGE", "The region covers " + box.volume() + " blocks; the limit is " + limit,
                     "Query a smaller box, or use find_block to locate specific blocks in a large area.");
         }
-        String encoding = Args.optString(p, "encoding").orElse("runs");
-        if (!encoding.equals("runs") && !encoding.equals("indices")) throw Args.invalid("encoding must be runs or indices");
-        return ChunkWork.forEachChunk(sync, w, box, part -> readCells(w, box, part)).thenApply(parts -> assemble(box, parts, encoding));
+        return ChunkWork.forEachChunk(sync, w, box, part -> readCells(w, box, part))
+                .thenApply(parts -> encoding.equals("layers") ? layers(box, parts) : assemble(box, parts, encoding));
     }
 
     private static List<Cell> readCells(World w, Box whole, Box part) {
@@ -90,6 +95,46 @@ final class WorldQueryHandler {
     private static String state(ChunkSnapshot snap, World w, int x, int y, int z) {
         if (y < w.getMinHeight() || y >= w.getMaxHeight()) return "minecraft:void_air";
         return snap.getBlockData(x & 15, y, z & 15).getAsString();
+    }
+
+    /** One letter per block, the notation build scripts paste back with layers(). */
+    private static JsonElement layers(Box box, List<List<Cell>> parts) {
+        int[] ids = new int[(int) box.volume()];
+        Map<String, Integer> index = new LinkedHashMap<>();
+        List<String> names = new ArrayList<>();
+        for (List<Cell> part : parts) {
+            for (Cell c : part) {
+                ids[c.index()] = index.computeIfAbsent(c.state(), st -> {
+                    names.add(st);
+                    return names.size() - 1;
+                });
+            }
+        }
+        int air = index.getOrDefault("minecraft:air", -3);
+        Layers.Encoded e;
+        try {
+            e = Layers.encode(box.sizeX(), box.sizeY(), box.sizeZ(), (dx, dy, dz) -> ids[(dy * box.sizeZ() + dz) * box.sizeX() + dx], names::get, air);
+        } catch (BuildError err) {
+            throw new AgentError(err.code(), err.getMessage(), err.hint());
+        }
+        JsonObject o = new JsonObject();
+        JsonObject origin = new JsonObject();
+        origin.addProperty("x", box.minX());
+        origin.addProperty("y", box.minY());
+        origin.addProperty("z", box.minZ());
+        o.add("origin", origin);
+        JsonArray size = new JsonArray();
+        size.add(box.sizeX());
+        size.add(box.sizeY());
+        size.add(box.sizeZ());
+        o.add("size", size);
+        JsonObject legend = new JsonObject();
+        e.legend().forEach(legend::addProperty);
+        o.add("legend", legend);
+        JsonArray out = new JsonArray();
+        e.layers().forEach(out::add);
+        o.add("layers", out);
+        return o;
     }
 
     private static JsonElement assemble(Box box, List<List<Cell>> parts, String encoding) {
