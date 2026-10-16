@@ -85,7 +85,7 @@ Adjust rendering settings and return the current values: guiScale (0=auto..8), f
 
 ### server_command
 
-Run a server command as the console and return its feedback lines. The leading / is optional. Feedback a plugin sends up to collectMs after the command returns is included. asPlayer runs it as that online player instead (feedback then goes to the player's chat; on Folia it runs on that player's region thread). Use the minecraft: prefix when a plugin overrides a vanilla command. Folia has no /scoreboard and a few other vanilla commands.
+Run a server command as the console and return its feedback lines. The leading / is optional. Feedback a plugin sends up to collectMs after the command returns is included. Plugin commands run as the real console, which plugins such as LuckPerms require; their replies are read from the console log, so a line something else logs at the same moment can show up too. Vanilla commands return exactly their own feedback. asPlayer runs it as that online player instead (feedback then goes to the player's chat; on Folia it runs on that player's region thread). Use the minecraft: prefix when a plugin overrides a vanilla command. Folia has no /scoreboard and a few other vanilla commands.
 
 ### server_eval
 

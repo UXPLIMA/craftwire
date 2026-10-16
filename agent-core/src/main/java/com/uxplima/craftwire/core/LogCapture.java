@@ -5,7 +5,9 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.ArrayDeque;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.LogEvent;
@@ -26,6 +28,7 @@ public final class LogCapture extends AbstractAppender {
     private final int capacity;
     private final ArrayDeque<Entry> backlog = new ArrayDeque<>();
     private BiConsumer<JsonObject, Long> sink;
+    private final List<Consumer<Entry>> listeners = new CopyOnWriteArrayList<>();
 
     private LogCapture(int capacity) {
         super("craftwire-capture", null, null, true, Property.EMPTY_ARRAY);
@@ -75,8 +78,16 @@ public final class LogCapture extends AbstractAppender {
     }
 
     private synchronized void record(long time, JsonObject data) {
-        backlog.addLast(new Entry(time, data));
+        Entry entry = new Entry(time, data);
+        backlog.addLast(entry);
         if (backlog.size() > capacity) backlog.removeFirst();
+        for (Consumer<Entry> l : listeners) {
+            try {
+                l.accept(entry);
+            } catch (RuntimeException ignored) {
+                // a listener's bug must not break logging
+            }
+        }
         if (sink == null) return;
         try {
             sink.accept(data, time);
@@ -95,6 +106,12 @@ public final class LogCapture extends AbstractAppender {
             }
         }
         this.sink = sink;
+    }
+
+    /** Hands every new entry to {@code listener} until the returned handle is closed; independent of the sink. */
+    public AutoCloseable listen(Consumer<Entry> listener) {
+        listeners.add(listener);
+        return () -> listeners.remove(listener);
     }
 
     public synchronized void detach() {

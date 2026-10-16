@@ -13,7 +13,7 @@ public final class Handlers {
         Dispatcher d = plugin.dispatcher();
         Sync s = plugin.sync();
         d.register("server.info", p -> s.global(ServerInfoHandler::read));
-        d.register("server.command", p -> CommandHandler.handle(p, s));
+        d.register("server.command", p -> CommandHandler.handle(p, s, plugin.logs()));
         d.register("server.eval", p -> EvalHandler.handle(p, plugin));
         d.register("world.query", p -> WorldQueryHandler.handle(p, s, plugin.bots()::isBot));
         d.register("world.render", p -> WorldRenderHandler.handle(p, plugin));

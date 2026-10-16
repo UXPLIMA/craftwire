@@ -87,4 +87,33 @@ class LogCaptureTest {
         assertDoesNotThrow(() -> log.info("still logged"));
         assertEquals(List.of("still logged"), messages(capture.backlog()));
     }
+
+    @Test
+    void listenersSeeEntriesUntilClosedAlongsideTheSink() throws Exception {
+        capture = LogCapture.install(10);
+        List<String> sink = new ArrayList<>();
+        capture.attach((d, t) -> sink.add(d.get("message").getAsString()));
+        List<String> a = new ArrayList<>();
+        List<String> b = new ArrayList<>();
+        AutoCloseable la = capture.listen(e -> a.add(e.data().get("message").getAsString()));
+        log.info("one");
+        AutoCloseable lb = capture.listen(e -> b.add(e.data().get("message").getAsString()));
+        log.info("two");
+        la.close();
+        log.info("three");
+        lb.close();
+        log.info("four");
+        assertEquals(List.of("one", "two"), a);
+        assertEquals(List.of("two", "three"), b);
+        assertEquals(List.of("one", "two", "three", "four"), sink);
+    }
+
+    @Test
+    void aFailingListenerDoesNotBreakLogging() throws Exception {
+        capture = LogCapture.install(10);
+        try (AutoCloseable l = capture.listen(e -> { throw new IllegalStateException("bad listener"); })) {
+            assertDoesNotThrow(() -> log.info("still logged"));
+        }
+        assertEquals(List.of("still logged"), messages(capture.backlog()));
+    }
 }

@@ -27,6 +27,14 @@ class CommandIT {
     }
 
     @Test
+    void consoleCommandsRunAsTheRealConsole() throws Exception {
+        // LuckPerms (and every console-only command) checks for ConsoleCommandSender; on Folia LuckPerms throws
+        // for any other sender type and the change it was making is lost.
+        JsonObject r = run("{\"command\":\"cwfixture whoami\"}");
+        assertEquals("[\"fixture: console\"]", r.getAsJsonArray("output").toString());
+    }
+
+    @Test
     void lateFeedbackIsCollected() throws Exception {
         JsonObject r = run("{\"command\":\"cwfixture\",\"collectMs\":1000}");
         assertEquals("[\"fixture: now\",\"fixture: later\"]", r.getAsJsonArray("output").toString());
@@ -36,6 +44,8 @@ class CommandIT {
     void collectMsZeroReturnsOnlyImmediateFeedback() throws Exception {
         JsonObject r = run("{\"command\":\"cwfixture\",\"collectMs\":0}");
         assertEquals("[\"fixture: now\"]", r.getAsJsonArray("output").toString());
+        // The late reply still reaches the console log; let it land before the next test reads the log.
+        Thread.sleep(500);
     }
 
     @Test

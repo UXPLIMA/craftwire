@@ -8,6 +8,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
+import org.bukkit.command.ConsoleCommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -56,6 +57,12 @@ public final class FixturePlugin extends JavaPlugin implements Listener {
             // A classic Folia bug: a block far from anyone changed from the global region thread. Paper allows it.
             Bukkit.getGlobalRegionScheduler().run(this, task -> Bukkit.getWorlds().getFirst().getBlockAt(5000, -60, 5000).setType(Material.STONE));
             sender.sendMessage(Component.text("fixture: wrong thread"));
+            return true;
+        }
+        if (args.length == 1 && args[0].equals("whoami")) {
+            // Like LuckPerms and every console-only command: the console is recognised by its type.
+            sender.sendMessage(Component.text(sender instanceof ConsoleCommandSender
+                    ? "fixture: console" : "fixture: not console (" + sender.getClass().getSimpleName() + ")"));
             return true;
         }
         sender.sendMessage(Component.text("fixture: now"));

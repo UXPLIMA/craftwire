@@ -126,6 +126,10 @@ public final class CraftwirePlugin extends JavaPlugin {
         return dispatcher;
     }
 
+    public LogCapture logs() {
+        return logs;
+    }
+
     public Sync sync() {
         return sync;
     }
