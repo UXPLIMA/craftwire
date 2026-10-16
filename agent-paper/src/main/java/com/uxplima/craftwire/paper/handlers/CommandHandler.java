@@ -28,6 +28,9 @@ final class CommandHandler {
     /** Where the console's replies are logged: plugin messages go through System.out, vanilla feedback through MinecraftServer. */
     private static final Set<String> CONSOLE_LOGGERS = Set.of("", "net.minecraft.server.MinecraftServer");
     private static final Pattern ANSI = Pattern.compile("\u001B\\[[;\\d]*m");
+    /** 26.3 logs the console's chat messages with this prefix. */
+    private static final String SYSTEM_CHAT = "System chat: ";
+    private static final String VANILLA_WRAPPER = "org.bukkit.craftbukkit.command.VanillaCommandWrapper";
 
     private CommandHandler() {}
 
@@ -76,8 +79,11 @@ final class CommandHandler {
         CommandMap map = Bukkit.getCommandMap();
         Command command = map.getCommand(label);
         if (command == null) return false;
+        // Each label gets its own wrapper object, so compare the kind: Paper wraps a vanilla command in
+        // VanillaCommandWrapper (plugins' Brigadier commands use a subclass, which must not count), and a plugin
+        // overriding the name puts its own command under the bare label.
         String bare = label.substring(label.indexOf(':') + 1).toLowerCase(Locale.ROOT);
-        return command == map.getKnownCommands().get("minecraft:" + bare);
+        return command.getClass().getName().equals(VANILLA_WRAPPER) && map.getKnownCommands().containsKey("minecraft:" + bare);
     }
 
     static Player online(String name) {
@@ -101,7 +107,8 @@ final class CommandHandler {
             sender = Bukkit.getConsoleSender();
             listening.set(logs.listen(e -> {
                 if (CONSOLE_LOGGERS.contains(e.data().get("logger").getAsString())) {
-                    output.add(ANSI.matcher(e.data().get("message").getAsString()).replaceAll(""));
+                    String line = ANSI.matcher(e.data().get("message").getAsString()).replaceAll("");
+                    output.add(line.startsWith(SYSTEM_CHAT) ? line.substring(SYSTEM_CHAT.length()) : line);
                 }
             }));
         }

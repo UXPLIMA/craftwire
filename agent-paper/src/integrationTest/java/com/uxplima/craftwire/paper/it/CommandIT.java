@@ -22,6 +22,15 @@ class CommandIT {
     }
 
     @Test
+    void vanillaOutputIsOnlyItsOwnFeedback() throws Exception {
+        // The fixture's late reply lands in the console log while the vanilla command collects.
+        run("{\"command\":\"cwfixture\",\"collectMs\":0}");
+        JsonObject r = run("{\"command\":\"time query gametime\",\"collectMs\":500}");
+        assertEquals(1, r.getAsJsonArray("output").size(), r.toString());
+        assertTrue(r.getAsJsonArray("output").get(0).getAsString().startsWith("The game time is"), r.toString());
+    }
+
+    @Test
     void leadingSlashIsOptionalAndBukkitCommandsWork() throws Exception {
         assertTrue(run("{\"command\":\"/plugins\"}").getAsJsonArray("output").toString().contains("Craftwire"));
     }
