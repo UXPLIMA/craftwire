@@ -32,6 +32,7 @@ import net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket;
 import net.minecraft.network.protocol.game.ClientboundMoveEntityPacket;
 import net.minecraft.network.protocol.game.ClientboundTeleportEntityPacket;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.PositionMoveRotation;
 import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.chunk.PalettedContainerFactory;
@@ -151,7 +152,7 @@ final class JavaWorld {
         if (world == null) return;
         TrackedEntity e = new TrackedEntity(p.getId(), p.getUUID(), EntityType.getKey(p.getType()).toString(), p.getX(), p.getY(), p.getZ());
         e.rotate(p.getYRot(), p.getXRot());
-        if (p.getType() == EntityType.PLAYER) e.name(names.get(p.getUUID()));
+        if (p.getType() == EntityTypes.PLAYER) e.name(names.get(p.getUUID()));
         world.seeEntity(e, holder);
         seen.add((long) p.getId());
     }
