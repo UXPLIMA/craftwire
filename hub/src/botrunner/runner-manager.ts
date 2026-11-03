@@ -54,13 +54,23 @@ function runnerJarDirs(): string[] {
   return [join(here, "..", "..", "..", "botrunner", "build", "libs"), join(here, "..", "..", "agent")];
 }
 
+/**
+ * The runner this hub started that a connecting agent is: the same pid, or else the same --name while that runner
+ * waits. The pid differs when `java` is a launcher stub that starts the JVM as a child (Windows' Oracle javapath).
+ */
+export function ownRunner<R extends { name: string; child: { pid?: number }; agent?: string }>(runners: R[], i: InstanceInfo): R | undefined {
+  if (i.kind !== "botrunner") return undefined;
+  return runners.find((r) => i.pid !== undefined && r.child.pid === i.pid)
+    ?? runners.find((r) => r.agent === undefined && r.name === i.name);
+}
+
 export class RunnerManager {
   private readonly runners = new Map<string, Runner>();
 
   constructor(private readonly agents: AgentServer, private readonly home: string) {
     agents.on("connected", (i: InstanceInfo) => {
-      if (i.kind !== "botrunner" || i.pid === undefined) return;
-      for (const r of this.runners.values()) if (r.child.pid === i.pid) r.agent = i.id;
+      const r = ownRunner([...this.runners.values()], i);
+      if (r !== undefined) r.agent = i.id;
     });
   }
 
