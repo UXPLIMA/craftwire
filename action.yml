@@ -1,0 +1,149 @@
+# The Craftwire GitHub Action: runs a Paper plugin's Craftwire scenarios (and, if asked, a short load test) against a
+# real Paper server in Docker, uploads the reports and comments the results on the pull request.
+#   - uses: uxplima/craftwire@v1
+#     with:
+#       plugin-jar: build/libs/my-plugin.jar
+#       eula: "true"   # you accept the Minecraft EULA (https://aka.ms/MinecraftEULA) for the test server
+name: Craftwire scenarios
+description: Test a Paper plugin with Craftwire scenarios and load tests in Docker, with JUnit, HTML reports and a PR comment.
+branding:
+  icon: check-circle
+  color: green
+inputs:
+  plugin-jar:
+    description: The plugin jar to test (put into the server's plugins folder).
+    required: true
+  eula:
+    description: Set to "true" to accept the Minecraft EULA for the test server. The server does not start otherwise.
+    required: true
+  scenarios:
+    description: Scenario files or folders (*.cwtest.json).
+    default: tests
+  craftwire-version:
+    description: The Craftwire release (npm version) the images are built from.
+    default: latest
+  minecraft-version:
+    description: Minecraft version of the test server.
+    default: "26.3"
+  paper-build:
+    description: Paper build number for that version.
+    default: "157"
+  paper-sha256:
+    description: The Paper jar's sha256 (pinned so a changed download fails instead of testing something else).
+    default: 77cdcd758777734b0b64db74974f68e56cb08637f3c36b26734842cb8521cc2e
+  load-ramp:
+    description: Bot counts for a load test after the scenarios, e.g. "10,50"; empty runs no load test.
+    default: ""
+  load-step-seconds:
+    description: Seconds per load test step.
+    default: "20"
+  load-kind:
+    description: plugin (in-server bots), java or bedrock (bots from the bot runner).
+    default: plugin
+  max-mspt:
+    description: Fail when a load step's p95 MSPT is above this (empty never fails on load).
+    default: ""
+  comment:
+    description: Comment the results on the pull request ("true" or "false").
+    default: "true"
+  github-token:
+    description: Token for the pull request comment.
+    default: ${{ github.token }}
+outputs:
+  passed:
+    description: '"true" when every scenario passed (and the load test stayed under max-mspt).'
+    value: ${{ steps.result.outputs.passed }}
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 22
+    - name: Start the hub, Paper and the bot runner
+      shell: bash
+      env:
+        EULA: ${{ inputs.eula }}
+        CRAFTWIRE_SOURCE: npm
+        CRAFTWIRE_VERSION: ${{ inputs.craftwire-version }}
+        MC_VERSION: ${{ inputs.minecraft-version }}
+        PAPER_BUILD: ${{ inputs.paper-build }}
+        PAPER_SHA256: ${{ inputs.paper-sha256 }}
+        PLUGIN_JAR: ${{ inputs.plugin-jar }}
+      run: |
+        if [ "$EULA" != "true" ]; then echo "::error::Set eula: \"true\" to accept the Minecraft EULA for the test server."; exit 2; fi
+        jar="$(realpath "$PLUGIN_JAR")"
+        printf 'services:\n  paper:\n    volumes:\n      - "%s:/data/plugins/plugin-under-test.jar:ro"\n' "$jar" > "$RUNNER_TEMP/craftwire-plugin.yml"
+        docker compose -f "$GITHUB_ACTION_PATH/docker/compose.yml" -f "$RUNNER_TEMP/craftwire-plugin.yml" up -d --build
+        for i in $(seq 1 60); do
+          token="$(docker compose -f "$GITHUB_ACTION_PATH/docker/compose.yml" exec -T hub node -e \
+            'try{process.stdout.write(JSON.parse(require("fs").readFileSync("/craftwire/http.json","utf8")).token)}catch{}')" || true
+          [ -n "$token" ] && break
+          sleep 2
+        done
+        if [ -z "$token" ]; then echo "::error::The Craftwire hub did not start."; exit 2; fi
+        echo "::add-mask::$token"
+        echo "CRAFTWIRE_TOKEN=$token" >> "$GITHUB_ENV"
+    - name: Run the scenarios
+      id: scenarios
+      shell: bash
+      env:
+        SCENARIOS: ${{ inputs.scenarios }}
+      run: |
+        set +e
+        npx --yes "craftwire@${{ inputs.craftwire-version }}" test $SCENARIOS --hub http://127.0.0.1:7777/mcp --wait 300 \
+          --junit craftwire-junit.xml --summary craftwire-summary.md
+        echo "code=$?" >> "$GITHUB_OUTPUT"
+    - name: Load test
+      id: load
+      if: inputs.load-ramp != ''
+      shell: bash
+      run: |
+        set +e
+        args=(--hub http://127.0.0.1:7777/mcp --ramp "${{ inputs.load-ramp }}" --step-seconds "${{ inputs.load-step-seconds }}"
+          --kind "${{ inputs.load-kind }}" --out craftwire-load.html --summary craftwire-load.md --json craftwire-load.json)
+        [ "${{ inputs.load-kind }}" != "plugin" ] && args+=(--address 127.0.0.1:25565)
+        [ -n "${{ inputs.max-mspt }}" ] && args+=(--max-mspt "${{ inputs.max-mspt }}")
+        npx --yes "craftwire@${{ inputs.craftwire-version }}" load-test "${args[@]}"
+        echo "code=$?" >> "$GITHUB_OUTPUT"
+    - name: Server logs
+      if: always()
+      shell: bash
+      run: docker compose -f "$GITHUB_ACTION_PATH/docker/compose.yml" logs --no-color > craftwire-docker.log 2>&1 || true
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: craftwire-reports
+        path: |
+          craftwire-junit.xml
+          craftwire-summary.md
+          craftwire-load.*
+          craftwire-docker.log
+        if-no-files-found: ignore
+    - name: Comment on the pull request
+      if: always() && inputs.comment == 'true' && github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const fs = require("fs");
+          const read = (f) => (fs.existsSync(f) ? fs.readFileSync(f, "utf8") : "");
+          const marker = "<!-- craftwire-report -->";
+          const run = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+          const body = [marker, read("craftwire-summary.md") || "Craftwire scenarios did not run.", read("craftwire-load.md"),
+            `Reports: [workflow run](${run}) (artifact craftwire-reports).`].filter(Boolean).join("\n\n");
+          const { data: comments } = await github.rest.issues.listComments({ ...context.repo, issue_number: context.issue.number });
+          const mine = comments.find((c) => c.body && c.body.includes(marker));
+          if (mine) await github.rest.issues.updateComment({ ...context.repo, comment_id: mine.id, body });
+          else await github.rest.issues.createComment({ ...context.repo, issue_number: context.issue.number, body });
+    - name: Result
+      id: result
+      if: always()
+      shell: bash
+      run: |
+        docker compose -f "$GITHUB_ACTION_PATH/docker/compose.yml" down -v || true
+        if [ "${{ steps.scenarios.outputs.code }}" = "0" ] && [ "${{ steps.load.outputs.code || '0' }}" = "0" ]; then
+          echo "passed=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "passed=false" >> "$GITHUB_OUTPUT"
+          exit 1
+        fi
