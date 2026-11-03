@@ -1,0 +1,29 @@
+plugins {
+    id 'java-library'
+}
+
+repositories {
+    mavenCentral()
+}
+
+// The bot model shared by every bot kind (plugin, java, bedrock). Plain Java: no Minecraft classes, so the
+// plugin, the bot runner and the script engine can all use it.
+dependencies {
+    api project(':agent-core')
+    // Gson ships with Minecraft and Paper; the bot runner bundles its own copy.
+    compileOnly 'com.google.code.gson:gson:2.13.2'
+
+    testImplementation 'com.google.code.gson:gson:2.13.2'
+    testImplementation platform('org.junit:junit-bom:5.13.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 25
+    options.encoding = 'UTF-8'
+}
+
+test {
+    useJUnitPlatform()
+}
