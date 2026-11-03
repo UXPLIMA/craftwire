@@ -21,6 +21,8 @@ public final class LoginRequest {
     private static final int SELF_SIGNED = 2;
     private static final String AUDIENCE = "api://auth-minecraft-services/multiplayer";
     private static final long SIX_HOURS = 6 * 3600;
+    private static final long OFFLINE_XUID_BASE = 100_000_000_000L;
+    private static final long OFFLINE_XUID_SPAN = 900_000_000_000L;
 
     private LoginRequest() {}
 
@@ -35,12 +37,22 @@ public final class LoginRequest {
         token.addProperty("mid", playFabId);
         token.addProperty("tid", "");
         token.addProperty("cpk", Jwt.encodeKey(key.getPublic()));
-        token.addProperty("xid", "");
+        token.addProperty("xid", Long.toString(offlineXuid(name)));
         token.addProperty("xname", name);
         token.addProperty("leguuid", identity.toString());
         JsonArray chain = new JsonArray();
         chain.add("");
         return encode(chain, SELF_SIGNED, Jwt.sign(token, key), Jwt.sign(clientData, key));
+    }
+
+    /**
+     * The XUID an offline login claims: Floodgate turns it into the Java UUID with Long.parseLong and kicks an empty
+     * one ("An internal error happened while handling Floodgate data"). Stable per name, and 12 digits where real
+     * XUIDs have 16, so a bot never takes over a real player's UUID or data.
+     */
+    static long offlineXuid(String name) {
+        long hash = UUID.nameUUIDFromBytes(("craftwire-xuid:" + name).getBytes(StandardCharsets.UTF_8)).getLeastSignificantBits();
+        return OFFLINE_XUID_BASE + Math.floorMod(hash, OFFLINE_XUID_SPAN);
     }
 
     /**

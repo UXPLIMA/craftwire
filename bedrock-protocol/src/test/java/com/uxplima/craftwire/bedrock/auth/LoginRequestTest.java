@@ -58,6 +58,25 @@ class LoginRequestTest {
         assertEquals("tr_TR", data.claims().get("LanguageCode").getAsString());
     }
 
+    /**
+     * Floodgate builds the Java UUID as new UUID(0, Long.parseLong(xuid)) and kicks an empty XUID. Real XUIDs have
+     * 16 digits (2535...), so a 12-digit one can never be a real player's.
+     */
+    @Test
+    void anOfflineLoginClaimsANumericXuidNoRealPlayerHas() {
+        KeyPair key = Jwt.newKeyPair();
+        String xid = Jwt.verifySelf(parse(LoginRequest.offline("Bot1", UUID.randomUUID(), "pf", key, clientData())).envelope()
+                .get("Token").getAsString()).claims().get("xid").getAsString();
+
+        assertEquals(12, xid.length(), xid);
+        assertEquals(new UUID(0, Long.parseLong(xid)), new UUID(0, LoginRequest.offlineXuid("Bot1")), "stable per name");
+        assertNotEquals(LoginRequest.offlineXuid("Bot1"), LoginRequest.offlineXuid("Bot2"));
+        for (int i = 0; i < 1000; i++) {
+            long x = LoginRequest.offlineXuid("Load" + i);
+            assertTrue(x >= 100_000_000_000L && x <= 999_999_999_999L, "12 digits: " + x);
+        }
+    }
+
     /** Our link goes first and vouches for the key the Mojang chain's first link was issued to. */
     @Test
     void anXboxLoginPutsOurLinkInFrontOfTheMojangChain() {
