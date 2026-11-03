@@ -8,7 +8,7 @@ import { join } from "node:path";
 import { CraftwireError } from "../errors.js";
 import { type DeviceCode, type LiveToken, pollDeviceCode, refreshLive, requestDeviceCode } from "./live.js";
 import { javaSession, type JavaSession } from "./minecraft-java.js";
-import { BEDROCK_RELYING_PARTY, JAVA_RELYING_PARTY, xboxUserToken, xstsToken } from "./xbox.js";
+import { BEDROCK_RELYING_PARTY, JAVA_RELYING_PARTY, PLAYFAB_RELYING_PARTY, type Xsts, xboxUserToken, xstsToken } from "./xbox.js";
 
 interface Stored {
   uuid: string;
@@ -72,11 +72,14 @@ export class Accounts {
     return s;
   }
 
-  /** An XSTS token for Bedrock's multiplayer service; the Bedrock bot requests its login chain with it. */
-  async bedrock(name: string): Promise<{ name: string; userHash: string; xsts: string }> {
+  /**
+   * XSTS tokens for a Bedrock bot: Bedrock's multiplayer service (the login chain) and PlayFab (the multiplayer
+   * token); the runner, which holds the bot's key, makes both requests.
+   */
+  async bedrock(name: string): Promise<{ name: string; chain: Xsts; playfab: Xsts }> {
     const user = await xboxUserToken((await this.refresh(name)).accessToken, this.f);
-    const x = await xstsToken(user, BEDROCK_RELYING_PARTY, this.f);
-    return { name, userHash: x.userHash, xsts: x.token };
+    const [chain, playfab] = await Promise.all([xstsToken(user, BEDROCK_RELYING_PARTY, this.f), xstsToken(user, PLAYFAB_RELYING_PARTY, this.f)]);
+    return { name, chain, playfab };
   }
 
   /** A fresh Microsoft token for a saved account; the rotated refresh token is saved. */

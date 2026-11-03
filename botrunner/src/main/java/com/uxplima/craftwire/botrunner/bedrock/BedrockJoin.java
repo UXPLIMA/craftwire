@@ -3,6 +3,7 @@ package com.uxplima.craftwire.botrunner.bedrock;
 import com.google.gson.JsonObject;
 import com.uxplima.craftwire.bedrock.auth.ClientData;
 import com.uxplima.craftwire.bedrock.auth.LoginRequest;
+import com.uxplima.craftwire.bedrock.auth.MultiplayerToken;
 import com.uxplima.craftwire.bedrock.auth.XboxChain;
 import com.uxplima.craftwire.bedrock.crypto.Jwt;
 import com.uxplima.craftwire.bedrock.packet.BedrockVersion;
@@ -24,8 +25,9 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Starting one Bedrock bot: its identity (offline, or the Xbox chain for an account's XSTS token the hub passed as
- * raw.xbox {userHash, xsts}), the client data it presents, the Bedrock version (from the server's pong), the connection, a join timeout and join failures as
+ * Starting one Bedrock bot: its identity (offline, or for an account the XSTS tokens the hub passed as raw.xbox
+ * {userHash, xsts, playfab {userHash, xsts}}, which get the login chain and the multiplayer token), the client data
+ * it presents, the Bedrock version (from the server's pong), the connection, a join timeout and join failures as
  * agent errors. The Xbox requests block, so the setup after the ping runs on the blocking executor.
  */
 final class BedrockJoin {
@@ -93,7 +95,10 @@ final class BedrockJoin {
         }
         try {
             String chain = XboxChain.request(Params.string(xbox, "userHash"), Params.string(xbox, "xsts"), key, v.game());
-            return LoginRequest.xbox(chain, key, null, clientData);
+            JsonObject playfab = Params.optObject(xbox, "playfab").orElse(null);
+            String token = playfab == null ? null
+                    : MultiplayerToken.request(Params.string(playfab, "userHash"), Params.string(playfab, "xsts"), key.getPublic(), v.game());
+            return LoginRequest.xbox(chain, key, token, clientData);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

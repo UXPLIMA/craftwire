@@ -78,7 +78,8 @@ async function accountSession(c: ToolContext, a: SpawnArgs): Promise<{ name: str
   }
   if (a.kind === "bedrock") {
     const b = await c.clients.accounts.bedrock(a.account);
-    return { name: b.name, extra: { xbox: { userHash: b.userHash, xsts: b.xsts } } };
+    const xbox = { userHash: b.chain.userHash, xsts: b.chain.token, playfab: { userHash: b.playfab.userHash, xsts: b.playfab.token } };
+    return { name: b.name, extra: { xbox } };
   }
   const s = await c.clients.accounts.session(a.account);
   return { name: s.name, extra: { session: { name: s.name, uuid: s.uuid, accessToken: s.accessToken } } };
