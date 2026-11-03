@@ -12,7 +12,7 @@ import { expandNames } from "../tools/bots/directory.js";
 /** Tools that set up the machine or look at the hub itself: a test replaying them would redo the environment. */
 const NOT_REPLAYED = new Set([
   "scenario_run", "scenario_record", "list_instances", "get_request_status", "server_process", "client_process",
-  "plugin_deploy", "botrunner_process", "load_test", "profile", "trace", "profile_diff", "screenshot", "record", "camera",
+  "plugin_deploy", "botrunner_process", "load_test", "profile", "trace", "profile_diff", "screenshot", "record", "camera", "more_tools",
 ]);
 
 export interface RecordOptions {

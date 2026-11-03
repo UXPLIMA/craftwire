@@ -59,6 +59,7 @@ async function tour(locales: string[]) {
       default: throw new Error(`unexpected ${String(p.action)}`);
     }
   });
+  await hub.call("more_tools", { enable: ["locale_tour"] });
   const r = await hub.call("locale_tour", { locales, targets: [{ name: "shop", command: "shop" }], waitMs: 100 });
   if (r.isError) throw new Error(JSON.stringify(r.content));
   return json(r) as {

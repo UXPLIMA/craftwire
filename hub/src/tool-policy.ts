@@ -1,17 +1,23 @@
-/** The tool groups `--tools` takes. Tools not listed here (added by plugins and mods) are the "extensions" group. */
+/**
+ * The tool groups `--tools` takes (`all` is every group). Tools not listed here (added by plugins and mods) are the
+ * "extensions" group. The extras are registered but switched off unless `--tools` names them: every session would
+ * otherwise pay their definitions' tokens for tools most never call, and more_tools turns them on when needed.
+ */
 export const TOOL_GROUPS: Record<string, readonly string[]> = {
-  hub: ["list_instances", "get_request_status", "wait_for", "logs", "exceptions"],
+  hub: ["list_instances", "get_request_status", "wait_for", "logs", "exceptions", "more_tools"],
   client: ["screenshot", "record", "camera", "gui_read", "gui_action", "input", "chat", "hud_read", "player_state", "client_settings"],
   server: ["server_command", "server_eval", "world_query", "world_edit", "world_render", "server_info", "plugin_manage", "events"],
   build: ["build", "build_manage"],
-  dev: ["server_process", "plugin_deploy", "client_process", "scenario_run", "scenario_record"],
-  bots: [
-    "bot_spawn", "bot_action", "bot_remove", "bot_list", "bot_behavior", "bot_form", "load_test", "botrunner_process", "dupe_hunt", "locale_tour",
-  ],
-  debug: ["profile", "trace", "client_eval", "profile_diff"],
+  dev: ["server_process", "plugin_deploy", "client_process", "scenario_run"],
+  bots: ["bot_spawn", "bot_action", "bot_remove", "bot_list", "bot_form", "botrunner_process"],
+  debug: ["profile", "trace", "client_eval"],
   proxy: ["proxy"],
+  extras: ["bot_behavior", "load_test", "dupe_hunt", "locale_tour", "scenario_record", "profile_diff"],
   extensions: [],
 };
+
+/** Switched off until more_tools (or `--tools extras`) turns them on. */
+export const EXTRAS: ReadonlySet<string> = new Set(TOOL_GROUPS.extras);
 
 const BUILT_IN = new Set(Object.values(TOOL_GROUPS).flat());
 
@@ -19,7 +25,7 @@ const BUILT_IN = new Set(Object.values(TOOL_GROUPS).flat());
 const READS = new Set([
   "list_instances", "get_request_status", "wait_for", "logs", "exceptions",
   "screenshot", "gui_read", "hud_read", "player_state",
-  "world_query", "world_render", "server_info", "profile", "trace", "bot_list", "profile_diff",
+  "world_query", "world_render", "server_info", "profile", "trace", "bot_list", "profile_diff", "more_tools",
 ]);
 
 /** Tools that read for some actions only: the actions that change nothing. */
@@ -78,20 +84,27 @@ export function parseHubArgs(argv: string[]): { policy?: ToolPolicy } {
     } else throw new Error(`Unknown option ${flag} (options: --read-only, --tools <groups>, --profile <name>)`);
   }
   if (!readOnly && groups === undefined) return {};
-  return { policy: new ToolPolicy({ readOnly, ...(groups ? { groups } : {}), ...(extraTools ? { extraTools } : {}) }) };
+  const named = groups ? { groups, showExtras: groups.has("extras") } : {};
+  return { policy: new ToolPolicy({ readOnly, ...named, ...(extraTools ? { extraTools } : {}) }) };
 }
 
 export function parseToolGroups(text: string): Set<string> {
-  const groups = new Set(text.split(",").map((g) => g.trim()).filter(Boolean));
+  const named = text.split(",").map((g) => g.trim()).filter(Boolean);
+  const groups = new Set(named.includes("all") ? Object.keys(TOOL_GROUPS) : named);
   for (const g of groups) {
-    if (!(g in TOOL_GROUPS)) throw new Error(`Unknown tool group ${g} (groups: ${Object.keys(TOOL_GROUPS).join(", ")})`);
+    if (!(g in TOOL_GROUPS)) throw new Error(`Unknown tool group ${g} (groups: ${Object.keys(TOOL_GROUPS).join(", ")}, all)`);
   }
   return groups;
 }
 
 /** Which tools a hub offers and which calls it refuses: `--read-only` and `--tools` of `craftwire serve`. */
 export class ToolPolicy {
-  constructor(private readonly o: { readOnly?: boolean; groups?: Set<string>; extraTools?: Set<string>; also?: ToolPolicy }) {}
+  constructor(private readonly o: { readOnly?: boolean; groups?: Set<string>; extraTools?: Set<string>; showExtras?: boolean; also?: ToolPolicy }) {}
+
+  /** Whether the extras start switched on: `--tools` named them (a role only allows them). */
+  showsExtras(): boolean {
+    return this.o.showExtras === true || (this.o.also?.showsExtras() ?? false);
+  }
 
   /** Both limits at once: the hub's own (--read-only, --tools) and a person's role. */
   static both(a: ToolPolicy | undefined, b: ToolPolicy | undefined): ToolPolicy | undefined {

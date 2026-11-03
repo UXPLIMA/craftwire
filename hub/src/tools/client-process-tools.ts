@@ -5,17 +5,24 @@ import { MAX_CLIENTS } from "../client/client-manager.js";
 import { type McVersion, SUPPORTED_VERSIONS } from "../client/pins.js";
 import { definedOnly } from "../dev/server-manager.js";
 import { CraftwireError } from "../errors.js";
-import { defineTool, ok, type ToolContext } from "./registry.js";
+import { defineTool, defineToolWithUnlisted, ok, type ToolContext } from "./registry.js";
 
 export function registerClientProcessTools(server: McpServer, ctx: ToolContext): void {
-  defineTool(server, ctx, "client_process",
-    `Hidden clients run by the hub (up to ${MAX_CLIENTS}): start joins server (default: the server_process one) or opens a world and `
-      + "returns its instance; stop (username, or all); status. lite: no frames unless captured, small heap, for several clients. "
-      + "Online servers: sign_in (Microsoft device code; open the URL, enter the code), then start {account}. mod_profile {name, mods} "
-      + "saves mods (jar paths or modrinth:<slug>) for start {modProfile}. First start downloads ~150 MB.",
+  defineToolWithUnlisted(server, ctx, "client_process",
+    `Hidden clients run by the hub (up to ${MAX_CLIENTS}): start joins server (host:port; default: the server_process one) or opens `
+      + "world {name, create?} and returns its instance; stop (username, or all); status. lite: small and frameless, for several "
+      + "clients. Online servers: sign_in (Microsoft device code), then start {account}. mod_profile {name, mods} for start "
+      + "{modProfile}. More (mods, windowSize, java, …): craftwire://docs/tools. First start downloads ~150 MB.",
     {
       action: z.enum(["start", "stop", "status", "sign_in", "sign_out", "mod_profile"]),
-      server: z.string().regex(/^[^\s:]+(:\d{1,5})?$/).optional().describe("host:port. Default: the server started by server_process."),
+      server: z.string().regex(/^[^\s:]+(:\d{1,5})?$/).optional(),
+      version: z.enum(SUPPORTED_VERSIONS as [string, ...string[]]).optional(),
+      username: z.string().regex(/^[A-Za-z0-9_]{3,16}$/).optional(),
+      account: z.string().regex(/^[A-Za-z0-9_]{3,16}$/).optional(),
+      lite: z.boolean().optional(),
+      all: z.boolean().optional(),
+    },
+    {
       world: z.object({
         name: z.string().describe("Save folder name."),
         create: z.object({
@@ -27,19 +34,14 @@ export function registerClientProcessTools(server: McpServer, ctx: ToolContext):
           replace: z.boolean().optional().describe("Delete an existing save of this name first."),
         }).optional().describe("Create the world (else an existing save opens)."),
       }).optional().describe("Open a singleplayer world instead of joining a server."),
-      version: z.enum(SUPPORTED_VERSIONS as [string, ...string[]]).optional(),
-      username: z.string().regex(/^[A-Za-z0-9_]{3,16}$/).optional(),
-      account: z.string().regex(/^[A-Za-z0-9_]{3,16}$/).optional().describe("A signed-in account's Minecraft name (online mode)."),
       mods: z.array(z.string()).max(50).optional().describe("start: absolute mod jar paths; mod_profile: jar paths or modrinth:<slug>."),
       modProfile: z.string().optional(),
       name: z.string().optional().describe("mod_profile name; sign_out account."),
-      lite: z.boolean().optional(),
       resourcePacks: z.enum(["accept", "decline", "prompt"]).optional().describe("Server resource packs (default prompt: vanilla's screen)."),
       visible: z.boolean().optional(),
       windowSize: z.object({ width: z.number().int().min(320).max(7680), height: z.number().int().min(240).max(4320) }).optional(),
       java: z.string().optional(),
       sounds: z.boolean().optional(),
-      all: z.boolean().optional(),
       timeoutMs: z.number().int().min(1000).max(900_000).default(300_000),
       tail: z.number().int().min(0).max(500).default(20),
     },

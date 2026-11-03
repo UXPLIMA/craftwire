@@ -36,72 +36,86 @@ export const settings = z.object({
   viewDistance: z.number().int().min(2).max(32).optional(),
 });
 
+/** bot_spawn's listed fields. */
 export const spawnShape = {
   kind: z.enum(KINDS).default("plugin"),
   count: z.number().int().min(1).max(1000).default(1),
   namePrefix: z.string().regex(/^[A-Za-z0-9_]{1,13}$/).default("Bot"),
   names: z.array(z.string().regex(NAME)).min(1).max(1000).optional(),
   group: z.string().regex(/^[A-Za-z0-9_-]{1,32}$/).optional(),
-  profile: z.enum(["light", "realistic"]).optional(),
-  perTick: z.number().int().min(1).max(100).optional(),
-  spread: z.object({ radius: z.number().int().min(1).max(10_000) }).optional(),
   location: z.object({
     world: z.string().optional(), x: z.number(), y: z.number(), z: z.number(), yaw: z.number().optional(), pitch: z.number().optional(),
   }).optional(),
+  // Protocol bots (kind java or bedrock), from a bot runner:
+  address: z.string().min(1).max(255).optional(),
+  account: z.string().optional(),
+};
+
+/** bot_spawn's other fields, checked but not listed (craftwire://docs/tools). */
+export const spawnExtras = {
+  profile: z.enum(["light", "realistic"]).optional(),
+  perTick: z.number().int().min(1).max(100).optional(),
+  spread: z.object({ radius: z.number().int().min(1).max(10_000) }).optional(),
   settings: settings.optional(),
   resourcePack: z.enum(["accept", "decline", "fail_download", "invalid_url", "fail_reload", "discard", "ignore"]).optional(),
   verifyPacks: z.boolean().optional(),
   hideBots: z.boolean().optional(),
   detail: z.boolean().optional(),
   seed: z.number().int().optional(),
-  // Protocol bots (kind java or bedrock), from a bot runner:
-  address: z.string().min(1).max(255).optional(),
   version: z.string().optional(),
   auth: z.enum(["offline", "microsoft"]).optional(),
-  account: z.string().optional(),
   worldMode: z.enum(["shared", "none"]).optional(),
   netsim: z.object({ latencyMs: z.number().int().min(0).max(5000).optional(), jitterMs: z.number().int().min(0).max(5000).optional(),
     lossPercent: z.number().min(0).max(100).optional() }).optional(),
   runner: z.string().optional(),
 };
 
+/** bot_action's listed fields: the ones most actions use. */
 export const actionShape = {
   ...selector,
   kind: z.enum(KINDS).optional(),
   action: z.enum(ACTIONS),
   text: z.string().max(256).optional(),
   command: z.string().max(32_000).optional(),
+  x: z.number().optional(), y: z.number().optional(), z: z.number().optional(),
+  sprint: z.boolean().optional(),
+  timeoutMs: z.number().int().min(500).max(120_000).optional(),
+  item: z.string().optional(),
+  count: z.number().int().min(1).max(2304).optional(),
+  slot: z.number().int().optional(),
+  click: z.enum(CLICKS).optional(),
+  key: z.number().int().min(1).max(9).optional(),
+  button: z.union([z.string(), z.number().int()]).optional(),
+  slots: z.array(z.number().int().min(0)).max(64).optional(),
+  block: blockPos.optional(),
+  entity: z.string().optional(),
+};
+
+/** bot_action's other fields, checked but not listed (craftwire://docs/tools has them per action). */
+export const actionExtras = {
   collectMs: z.number().int().min(0).max(5000).optional(),
   since: z.number().optional(),
   limit: z.number().int().min(1).max(200).optional(),
-  x: z.number().optional(), y: z.number().optional(), z: z.number().optional(),
   yaw: z.number().optional(), pitch: z.number().optional(),
   tolerance: z.number().min(0.1).max(5).optional(),
-  sprint: z.boolean().optional(),
-  timeoutMs: z.number().int().min(500).max(120_000).optional(),
   path: z.boolean().optional(),
   maxFall: z.number().int().min(0).max(10).optional(),
   openDoors: z.boolean().optional(),
   partial: z.boolean().optional(),
   on: z.boolean().optional(),
   all: z.boolean().optional(),
-  item: z.string().optional(),
-  count: z.number().int().min(1).max(2304).optional(),
-  slot: z.number().int().optional(),
-  click: z.enum(CLICKS).optional(),
-  key: z.number().int().min(1).max(9).optional(),
-  button: z.union([z.enum(["left", "right", "middle"]), z.string(), z.number().int()]).optional(),
-  slots: z.array(z.number().int().min(0)).max(64).optional(),
   from: z.union([z.number().int().min(0), z.enum(["container", "inventory"])]).optional(),
   to: z.union([z.number().int().min(0), z.enum(["hand", "offhand", "head", "chest", "legs", "feet"])]).optional(),
   inventory: z.boolean().optional(),
   settleMs: z.number().int().min(0).max(5000).optional(),
   hand: z.enum(["main", "off"]).optional(),
-  block: blockPos.optional(),
   face: z.enum(["up", "down", "north", "south", "east", "west"]).optional(),
-  entity: z.string().optional(),
   type: z.string().optional(),
   settings: settings.optional(),
+};
+
+/** The special screens' fields (anvil, sign, book, merchant, beacon, recipe book, dialogs, chat clicks), bots and clients. */
+export const screenFields = {
   lines: z.array(z.string().max(384)).max(4).optional(),
   side: z.enum(["front", "back"]).optional(),
   pages: z.array(z.string().max(1024)).max(100).optional(),

@@ -3,7 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { InstanceInfo } from "../../agents.js";
 import { CraftwireError } from "../../errors.js";
-import { defineTool, ok, targetArgs, type ToolContext } from "../registry.js";
+import { defineTool, defineToolWithUnlisted, ok, targetArgs, type ToolContext } from "../registry.js";
 import { type BotKind, directoryFor, expandNames } from "./directory.js";
 import { registerDupeTools } from "./dupe-hunt.js";
 import { registerLoadTools } from "./load-test.js";
@@ -11,7 +11,7 @@ import { registerLocaleTools } from "./locale-tour.js";
 import { merge } from "./merge.js";
 import { agentForBot, broadcast, requireAgents } from "./route.js";
 import { registerRunnerTools } from "./runner-tools.js";
-import { actionShape, behaviorShape, selector, spawnShape } from "./schemas.js";
+import { actionExtras, actionShape, behaviorShape, screenFields, selector, spawnExtras, spawnShape } from "./schemas.js";
 import { spawnOn } from "./spawn.js";
 
 const REMOVED = { sum: ["removed"], join: ["names"] };
@@ -53,12 +53,12 @@ async function onBots(c: ToolContext, args: Args, method: string, timeoutMs: num
 }
 
 export function registerBotTools(server: McpServer, ctx: ToolContext): void {
-  defineTool(server, ctx, "bot_spawn",
-    "Spawn bots that plugins treat as real players. kind: plugin (fake player inside a Paper server, default), java or bedrock (real "
-      + "protocol clients from a bot runner; need address). Up to 1000 per call, joining perTick per tick; group names them for later; "
-      + "spread {radius} scatters them; profile light (default, cheap) or realistic. Returns {spawned, names:\"Bot1..Bot50\"}.",
-    { ...targetArgs, ...spawnShape },
-    async (args, c) => ok(await spawnOn(c, args as Args & z.infer<z.ZodObject<typeof spawnShape>>)));
+  defineToolWithUnlisted(server, ctx, "bot_spawn",
+    "Spawn bots that plugins treat as real players. kind: plugin (fake player in a Paper server, default), java or bedrock (protocol "
+      + "clients from a bot runner; need address). Up to 1000 per call; group names them. Returns {spawned, names:\"Bot1..Bot50\"}. "
+      + "More (perTick, spread, profile, settings, netsim, auth, …): craftwire://docs/tools.",
+    { ...targetArgs, ...spawnShape }, spawnExtras,
+    async (args, c) => ok(await spawnOn(c, args as Args & z.infer<z.ZodObject<typeof spawnShape & typeof spawnExtras>>)));
 
   defineTool(server, ctx, "bot_remove",
     "Remove bots: bot, bots (names or a pattern), group, or all:true. Returns the count (names:true lists them).",
@@ -94,12 +94,11 @@ export function registerBotTools(server: McpServer, ctx: ToolContext): void {
       return ok(merge(answers, { sum: ["count", "joining"], concat: ["bots"], limit: Number(a.limit) }));
     });
 
-  defineTool(server, ctx, "bot_action",
-    "Drive bots like real clients (plugins see the same events). One bot, or many with bots (pattern) or group. Menus: gui_read (with "
-      + "the cursor item), gui_click {slot, click: left|right|shift|number(key)|offhand|drop|drop_stack|middle|double|drag(slots,button)"
-      + "|outside}, move_item, transfer, equip; screens: anvil_rename, sign_edit, book_edit, trade_select, menu_button, beacon, "
-      + "recipe_place, creative_set, dialog_answer, chat_click. Arguments per action: craftwire://docs/tools.",
-    { ...targetArgs, ...actionShape },
+  defineToolWithUnlisted(server, ctx, "bot_action",
+    "Drive bots like real clients (plugins see the same events): one bot, or many by bots (names, pattern) or group. Menus: gui_read, "
+      + "gui_click {slot, click; key for number; slots, button for drag}, move_item, transfer, equip, special screens. Other fields per "
+      + "action: craftwire://docs/tools.",
+    { ...targetArgs, ...actionShape }, { ...actionExtras, ...screenFields },
     async (args, c) => ok(await onBots(c, args as Args, "bot.action", actionTimeout(args) + (args.bot === undefined ? 10_000 : 0),
       { sum: ["bots", "failed"], concat: ["results"], limit: 20 })));
 

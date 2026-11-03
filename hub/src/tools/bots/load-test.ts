@@ -7,7 +7,7 @@ import { writeLoadReport } from "./load-report.js";
 import { merge } from "./merge.js";
 import { profileDiff } from "./profile-diff.js";
 import { broadcast, requireAgents } from "./route.js";
-import { BEHAVIORS, KINDS, spawnShape } from "./schemas.js";
+import { BEHAVIORS, KINDS, spawnExtras, spawnShape } from "./schemas.js";
 import { spawnOn } from "./spawn.js";
 
 export interface StepResult {
@@ -40,9 +40,9 @@ export function registerLoadTools(server: McpServer, ctx: ToolContext): void {
       ramp: z.array(z.number().int().min(1).max(1000)).min(1).max(10),
       stepSeconds: z.number().int().min(10).max(600).default(30),
       behavior: z.object({ type: z.enum(BEHAVIORS), params: z.record(z.string(), z.unknown()).optional() }).optional(),
-      profile: spawnShape.profile,
-      spread: spawnShape.spread,
-      perTick: spawnShape.perTick,
+      profile: spawnExtras.profile,
+      spread: spawnExtras.spread,
+      perTick: spawnExtras.perTick,
       namePrefix: z.string().regex(/^[A-Za-z0-9_]{1,13}$/).default("Load"),
       group: z.string().regex(/^[A-Za-z0-9_-]{1,32}$/).default("load"),
       address: spawnShape.address,

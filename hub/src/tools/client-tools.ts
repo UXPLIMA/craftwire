@@ -3,8 +3,8 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { CraftwireError } from "../errors.js";
-import { actionShape, CLICKS } from "./bots/schemas.js";
-import { defineTool, forward, ok, targetArgs, type ToolContext } from "./registry.js";
+import { actionExtras, actionShape, CLICKS, screenFields } from "./bots/schemas.js";
+import { defineTool, defineToolWithUnlisted, forward, ok, targetArgs, type ToolContext } from "./registry.js";
 
 const GUI_ACTIONS = [
   "hover", "click", "right_click", "shift_click", "drag", "move_item", "transfer", "equip", "click_widget", "type", "close",
@@ -62,11 +62,10 @@ export function registerClientTools(server: McpServer, ctx: ToolContext): void {
     "Describe the open screen: title, slots (item, count, name, lore), hovered tooltip, widgets. {open:false} when none is open.",
     { ...targetArgs }, fwd("gui.read"));
 
-  defineTool(server, ctx, "gui_action",
-    "Act on the open screen. Slots: click {slot, click: left|right|shift|number(key)|offhand|drop|drop_stack|middle|double|drag(slots,"
-      + "button)|outside}, hover, drag {slot,toSlot}; helpers move_item {from,to,count}, transfer {from:container|inventory,item,count}, "
-      + "equip {slot|item,to}; widgets: click_widget {widget}, type {text}, close; screens: anvil_rename, sign_edit, book_edit, "
-      + "trade_select, menu_button, beacon, recipe_place, creative_set, dialog_answer, chat_click (as bot_action). Returns the new gui_read.",
+  defineToolWithUnlisted(server, ctx, "gui_action",
+    "Act on the open screen. Slots: click {slot, click; key for number; slots, button for drag}, hover, drag {slot,toSlot}; helpers "
+      + "move_item {from,to,count}, transfer {from:container|inventory,item,count}, equip {slot|item,to}; widgets: click_widget {widget}, "
+      + "type {text}, close; the special screens as in bot_action (fields: craftwire://docs/tools). Returns the new gui_read.",
     {
       ...targetArgs,
       action: z.enum(GUI_ACTIONS),
@@ -76,27 +75,13 @@ export function registerClientTools(server: McpServer, ctx: ToolContext): void {
       key: z.number().int().min(1).max(9).optional(),
       button: z.union([z.string(), z.number().int()]).optional(),
       slots: z.array(z.number().int().min(0)).max(64).optional(),
-      from: actionShape.from,
-      to: actionShape.to,
+      from: actionExtras.from,
+      to: actionExtras.to,
       count: actionShape.count,
       item: actionShape.item,
       widget: z.string().optional(),
       text: z.string().max(256).optional(),
-      lines: actionShape.lines,
-      side: actionShape.side,
-      pages: actionShape.pages,
-      title: actionShape.title,
-      index: actionShape.index,
-      id: actionShape.id,
-      primary: actionShape.primary,
-      secondary: actionShape.secondary,
-      recipe: actionShape.recipe,
-      all: actionShape.all,
-      inputs: actionShape.inputs,
-      message: actionShape.message,
-      match: actionShape.match,
-      part: actionShape.part,
-    }, fwd("gui.action"));
+    }, { ...screenFields, all: actionExtras.all }, fwd("gui.action"));
 
   defineTool(server, ctx, "input",
     "Gameplay input with no screen open: keys (forward, back, left, right, jump, sneak, sprint, attack, use, pick, drop, inventory, swap_hands, chat, command, ...) with mode press|hold|release; look adds yaw/pitch; hotbar 1-9.",
@@ -173,13 +158,21 @@ export function registerClientTools(server: McpServer, ctx: ToolContext): void {
       return { content: [{ type: "image", data: r.data, mimeType: r.mime }, { type: "text", text: JSON.stringify(meta) }] };
     });
 
-  defineTool(server, ctx, "record",
-    "Record a video with sound through the user's ffmpeg. start {savePath, preset max|high|balanced|light, durationMs?, camera? (a camera tool path/orbit motion), wait?}; stop; status. layer gui|tooltip|gui+tooltip: transparent .mov/.webm. Details: craftwire://docs/video.",
+  defineToolWithUnlisted(server, ctx, "record",
+    "Record a video with sound through the user's ffmpeg. start {savePath, preset max|high|balanced|light, durationMs?, camera? (a camera tool path/orbit motion), wait?}; stop; status. layer gui|tooltip|gui+tooltip: transparent .mov/.webm. Encoding options (fps, resolution, codec, crf, …): craftwire://docs/video.",
     {
       ...targetArgs,
       action: z.enum(["start", "stop", "status"]),
       savePath: z.string().optional(),
       preset: z.enum(["max", "high", "balanced", "light"]).optional(),
+      hud: z.boolean().optional(),
+      chat: z.boolean().optional(),
+      durationMs: z.number().int().min(100).max(600_000).optional(),
+      camera: z.record(z.string(), z.unknown()).optional(),
+      wait: z.boolean().optional(),
+      layer: guiLayer,
+    },
+    {
       fps: z.number().int().min(10).max(120).optional(),
       resolution: z.enum(["source", "2160p", "1440p", "1080p", "720p", "480p"]).optional(),
       codec: z.enum(["h264", "h265"]).optional(),
@@ -187,14 +180,8 @@ export function registerClientTools(server: McpServer, ctx: ToolContext): void {
       speed: z.enum(["ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow"]).optional(),
       audio: z.boolean().optional(),
       audioBitrate: z.number().int().min(64).max(320).optional(),
-      hud: z.boolean().optional(),
-      chat: z.boolean().optional(),
-      durationMs: z.number().int().min(100).max(600_000).optional(),
       maxSeconds: z.number().int().min(1).max(600).optional(),
-      camera: z.record(z.string(), z.unknown()).optional(),
       waitForTerrain: z.boolean().optional(),
-      wait: z.boolean().optional(),
-      layer: guiLayer,
       split: z.boolean().optional(),
       guiScale: z.number().int().min(1).max(8).optional(),
     },

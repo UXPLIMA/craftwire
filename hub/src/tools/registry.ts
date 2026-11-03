@@ -10,7 +10,7 @@ import { CraftwireError, toToolError } from "../errors.js";
 import type { ExceptionTracker } from "../exceptions.js";
 import type { ExtensionRegistry } from "../extensions.js";
 import type { OperationTracker } from "../operations.js";
-import type { ToolPolicy } from "../tool-policy.js";
+import { EXTRAS, type ToolPolicy } from "../tool-policy.js";
 
 export interface ToolContext {
   agents: AgentServer;
@@ -55,6 +55,31 @@ export function defineTool<S extends z.ZodRawShape>(
   return registerAudited(server, ctx, name, description, shape, run as (args: unknown, ctx: ToolContext) => Promise<CallToolResult>);
 }
 
+/**
+ * Like defineTool, with fields that are checked but not listed: rarely used options (a sign's lines, a beacon's
+ * effects, a window size) cost every session tool-definition tokens, so they are documented in craftwire://docs/tools
+ * instead. A wrong value still fails with INVALID_PARAMS naming the field.
+ */
+export function defineToolWithUnlisted<S extends z.ZodRawShape, U extends z.ZodRawShape>(
+  server: McpServer,
+  ctx: ToolContext,
+  name: string,
+  description: string,
+  listed: S,
+  unlisted: U,
+  run: (args: z.infer<z.ZodObject<S>> & z.infer<z.ZodObject<U>>, ctx: ToolContext) => Promise<CallToolResult>,
+): RegisteredTool | undefined {
+  const hidden = z.object(unlisted);
+  return defineToolWithSchema(server, ctx, name, description, z.looseObject(listed), async (args, c) => {
+    const r = hidden.safeParse(args);
+    if (!r.success) {
+      const what = r.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
+      throw new CraftwireError("INVALID_PARAMS", `${name}: ${what}`, "The fields are described in craftwire://docs/tools.");
+    }
+    return run({ ...args, ...r.data } as never, c);
+  });
+}
+
 /** Like defineTool, for a schema built at runtime (e.g. from a plugin's JSON Schema); it may keep unknown keys. */
 export function defineToolWithSchema(
   server: McpServer,
@@ -65,6 +90,15 @@ export function defineToolWithSchema(
   run: (args: Record<string, unknown>, ctx: ToolContext) => Promise<CallToolResult>,
 ): RegisteredTool | undefined {
   return registerAudited(server, ctx, name, description, schema, run as (args: unknown, ctx: ToolContext) => Promise<CallToolResult>);
+}
+
+const switchedOff = new WeakMap<McpServer, Map<string, RegisteredTool>>();
+
+/** The extras this server registered switched off, for more_tools to turn on. */
+export function extrasOff(server: McpServer): Map<string, RegisteredTool> {
+  let m = switchedOff.get(server);
+  if (m === undefined) switchedOff.set(server, (m = new Map()));
+  return m;
 }
 
 function registerAudited(
@@ -91,7 +125,12 @@ function registerAudited(
     }
   };
   // The SDK's generic overloads do not infer through our wrapper; the shape is still validated by the SDK.
-  return server.registerTool(name, { description, inputSchema: inputSchema as never }, handler as never);
+  const tool = server.registerTool(name, { description, inputSchema: inputSchema as never }, handler as never);
+  if (EXTRAS.has(name) && !(ctx.policy?.showsExtras() ?? false)) {
+    tool.disable();
+    extrasOff(server).set(name, tool);
+  }
+  return tool;
 }
 
 function who(ctx: ToolContext): { user?: string; session?: string } {

@@ -11,6 +11,7 @@ import { registerClientTools } from "./tools/client-tools.js";
 import { registerDevTools } from "./tools/dev-tools.js";
 import { registerHubTools } from "./tools/hub-tools.js";
 import { registerLogTools } from "./tools/log-tools.js";
+import { registerMoreTools } from "./tools/more-tools.js";
 import { registerProxyTools } from "./tools/proxy-tools.js";
 import type { ToolContext } from "./tools/registry.js";
 import { registerServerTools } from "./tools/server-tools.js";
@@ -24,8 +25,8 @@ const INSTRUCTIONS = [
   "Dev loop: server_process starts/stops a local Paper server; plugin_deploy builds a plugin project (or takes a jar), installs it, restarts the server and reports whether it enabled.",
   "scenario_run runs plugin tests written as JSON steps (bots, commands, checks) and reports the failing step with context.",
   "No game open? client_process starts a hidden client the hub runs itself (offline mode, for dev servers); then use the client tools on it.",
-  "Bots: bot_spawn puts bots on a server: kind plugin (in-server fake players, default), java or bedrock (protocol clients from a bot runner); bot_action drives them (chat, command, move_to with pathfinding, every menu click, special screens, use, attack, …) one at a time or by group; bot_behavior keeps them busy on their own; load_test ramps bots up and profiles each step; dupe_hunt tries item-dupe click sequences; locale_tour lists untranslated texts; bot_remove when done.",
-  "scenario_record turns a session's calls into a scenario. A Velocity proxy with the Craftwire plugin adds the proxy tool (servers, players, send, commands).",
+  "Bots: bot_spawn puts bots on a server: kind plugin (in-server fake players, default), java or bedrock (protocol clients from a bot runner); bot_action drives them (chat, command, move_to with pathfinding, every menu click, special screens, use, attack, …) one at a time or by group; bot_remove when done.",
+  "Off until more_tools turns them on (to save tokens): bot_behavior (bots keep busy on their own), load_test (ramp bots up, profile each step), dupe_hunt (item-dupe click sequences), locale_tour (untranslated texts), scenario_record (a session's calls as a scenario), profile_diff. A Velocity proxy with the Craftwire plugin adds the proxy tool (servers, players, send, commands).",
   "Lag and slow code: profile samples a server's tick or a client's frame and names the plugin or mod, listener and method that use the time; trace times every call of a named method. client_eval runs JavaScript on a client (mods, client state).",
   "Resources: craftwire://instances, craftwire://exceptions, craftwire://instances/{name}/log (and /chat, /screenshot on clients), craftwire://docs/{tools,building,scenarios,video,extensions,http,folia,bots,velocity,docker,ci}. Prompts: test_plugin, debug_lag, write_scenario, setup.",
   "After an action that opens a menu (e.g. chat {action:'command'}), call wait_for {condition:'screen_open'} before gui_read. wait_for also waits on the server (a block, a player arriving, items, an event, a bot's message) instead of sleeping and polling.",
@@ -44,6 +45,7 @@ export function createCraftwireServer(ctx: ToolContext): McpServer {
   registerDebugTools(server, ctx);
   registerProxyTools(server, ctx);
   registerScenarioTools(server, ctx, () => createCraftwireServer(ctx));
+  registerMoreTools(server, ctx);
   // Last, so a plugin's tool can never take a built-in name.
   bindExtensionTools(server, ctx);
   registerClientProcessTools(server, ctx);

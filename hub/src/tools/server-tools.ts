@@ -4,7 +4,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { withColors } from "./colors-arg.js";
-import { defineTool, forward, ok, targetArgs, type ToolContext } from "./registry.js";
+import { defineTool, defineToolWithUnlisted, forward, ok, targetArgs, type ToolContext } from "./registry.js";
 
 const pos = z.object({ x: z.number().int(), y: z.number().int(), z: z.number().int() });
 const world = z.string().optional().describe("Default: the main world.");
@@ -80,8 +80,8 @@ export function registerServerTools(server: McpServer, ctx: ToolContext): void {
       return { content: [{ type: "image", data, mimeType: mime }, { type: "text", text: JSON.stringify(meta) }] };
     });
 
-  defineTool(server, ctx, "world_edit",
-    "Change blocks: set_blocks [{x,y,z,block}] (max 10000), fill {min,max,block,replace?}, snapshot/restore {id}, save_schematic/paste_schematic {name,at}. Over 32768 blocks a snapshot is taken first. For more than a few hundred blocks use build.",
+  defineToolWithUnlisted(server, ctx, "world_edit",
+    "Change blocks: set_blocks [{x,y,z,block}] (max 10000), fill {min,max,block,replace?}, snapshot/restore {id}, save_schematic/paste_schematic {name,at, rotation?, mirror?, includeEntities?, physics?}. Over 32768 blocks a snapshot is taken first. For more than a few hundred blocks use build.",
     {
       ...targetArgs,
       action: z.enum(["set_blocks", "fill", "snapshot", "restore", "save_schematic", "paste_schematic"]),
@@ -93,6 +93,7 @@ export function registerServerTools(server: McpServer, ctx: ToolContext): void {
       id: z.string().optional(),
       name: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/).optional(),
       at: pos.optional(),
+    }, {
       rotation: z.enum(["none", "clockwise_90", "clockwise_180", "counterclockwise_90"]).default("none"),
       mirror: z.enum(["none", "left_right", "front_back"]).default("none"),
       includeEntities: z.boolean().default(false),

@@ -21,6 +21,13 @@ export function compactSchema(node: unknown): unknown {
 
 type Handler = (request: unknown, extra: unknown) => Promise<unknown>;
 
+/** The SDK writes execution {taskSupport: "forbidden"} on every tool; that is what an absent field means already. */
+function withoutDefaultExecution(t: Tool): Tool {
+  if (t.execution?.taskSupport !== "forbidden" || Object.keys(t.execution).length !== 1) return t;
+  const { execution: _e, ...rest } = t;
+  return rest;
+}
+
 /**
  * Rewrites the SDK's tools/list answer through compactSchema. The SDK has no hook for this, so it wraps the handler
  * in the protocol's handler map; tool-budget.test.ts fails if that ever stops working.
@@ -31,6 +38,6 @@ export function compactToolList(server: McpServer): void {
   if (original === undefined) return;
   handlers.set("tools/list", async (request, extra) => {
     const r = (await original(request, extra)) as { tools: Tool[] };
-    return { ...r, tools: r.tools.map((t) => ({ ...t, inputSchema: compactSchema(t.inputSchema) as Tool["inputSchema"] })) };
+    return { ...r, tools: r.tools.map((t) => ({ ...withoutDefaultExecution(t), inputSchema: compactSchema(t.inputSchema) as Tool["inputSchema"] })) };
   });
 }

@@ -21,7 +21,8 @@ export const SERVE_USAGE = `Usage: craftwire serve [--port 7777] [--host 127.0.0
   --tls-cert <file>     serve HTTPS with this certificate (PEM) …
   --tls-key <file>      … and its private key
   --read-only           offer only tools that change nothing
-  --tools <groups>      offer only these groups: hub, client, server, build, dev, bots, debug, proxy, extensions
+  --tools <groups>      offer only these groups: hub, client, server, build, dev, bots, debug, proxy, extras,
+                        extensions, or all; naming extras also turns them on
   --profile <name>      a preset of groups and tools: build
   --build-dir <dir>     build may read script files from this folder (otherwise build takes only code)
   --allow-host <name>   another Host name this machine is reached by (repeatable)
@@ -147,7 +148,13 @@ export async function startServe(o: ServeOptions, home: string, log: (msg: strin
   const tls = o.tlsCert !== undefined && o.tlsKey !== undefined ? { cert: readFileSync(o.tlsCert), key: readFileSync(o.tlsKey) } : undefined;
   const { token, file, created } = loadOrCreateHttpToken(home, o.rotateToken);
   const hub = await startHub(home, log);
-  const policy = o.readOnly || o.tools ? new ToolPolicy({ readOnly: o.readOnly, ...(o.tools ? { groups: o.tools } : {}), ...(o.extraTools ? { extraTools: o.extraTools } : {}) }) : undefined;
+  const policy = o.readOnly || o.tools
+    ? new ToolPolicy({
+      readOnly: o.readOnly,
+      ...(o.tools ? { groups: o.tools, showExtras: o.tools.has("extras") } : {}),
+      ...(o.extraTools ? { extraTools: o.extraTools } : {}),
+    })
+    : undefined;
   const ctx = { ...hub.ctx, build: { http: true, ...(o.buildDir !== undefined ? { dir: o.buildDir } : {}) } };
   const team = new TeamTokens(home);
   const authenticate = (t: string) => team.identify(t, token);

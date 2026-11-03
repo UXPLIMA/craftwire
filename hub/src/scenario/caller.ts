@@ -3,6 +3,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import { EXTRAS } from "../tool-policy.js";
 import type { ToolCaller } from "./runner.js";
 
 /** Long enough for any single tool (plugin_deploy builds, wait_for up to 5 minutes). */
@@ -28,7 +29,13 @@ export async function httpCaller(url: string, token: string): Promise<{ call: To
 }
 
 function callerFor(client: Client): ToolCaller {
+  const turnedOn = new Set<string>();
   return async (tool, args) => {
+    if (EXTRAS.has(tool) && !turnedOn.has(tool)) {
+      // A step may use an extra the hub keeps switched off; a hub started with them on has no more_tools, which is fine.
+      turnedOn.add(tool);
+      await client.callTool({ name: "more_tools", arguments: { enable: [tool] } }).catch(() => undefined);
+    }
     let r: CallToolResult;
     try {
       r = (await client.callTool({ name: tool, arguments: args }, undefined, { timeout: CALL_TIMEOUT_MS })) as CallToolResult;

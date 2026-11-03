@@ -144,6 +144,7 @@ async function hunt(shop: Shop, args: Record<string, unknown> = {}) {
   const agent = await connectFakeAgent(hub.port, { token: hub.token, kind: "server", name: "srv" });
   agent.onRequest("bot.action", (p) => shop.action(p));
   agent.onRequest("world.query", () => ({ entities: shop.drops.map((d) => ({ type: "minecraft:item", item: d.id, count: d.count })) }));
+  await hub.call("more_tools", { enable: ["dupe_hunt"] });
   const r = await hub.call("dupe_hunt", { bot: "Hunter", open: { command: "shop" }, rounds: 1, settleMs: 0, ...args });
   if (r.isError) throw new Error(JSON.stringify(r.content));
   type Finding = { sequence: string; gained: Record<string, number>; lost: Record<string, number> };

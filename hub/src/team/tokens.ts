@@ -8,7 +8,7 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "n
 import { join } from "node:path";
 import { ToolPolicy, TOOL_GROUPS } from "../tool-policy.js";
 
-/** read-only: every group, no changes; bots: hub and bot tools; dev: everything (as the owner's token). */
+/** read-only: every group, no changes; bots: hub, bot and extra tools; dev: everything (as the owner's token). */
 export const ROLES = ["read-only", "bots", "dev"] as const;
 export type Role = (typeof ROLES)[number] | "owner";
 
@@ -39,7 +39,7 @@ export function policyFor(role: Role, groups?: string[]): ToolPolicy | undefined
     case "read-only":
       return new ToolPolicy({ readOnly: true, ...(limit ? { groups: limit } : {}) });
     case "bots":
-      return new ToolPolicy({ groups: limit ?? new Set(["hub", "bots"]) });
+      return new ToolPolicy({ groups: limit ?? new Set(["hub", "bots", "extras"]) });
   }
 }
 
