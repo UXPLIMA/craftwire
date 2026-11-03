@@ -2,6 +2,7 @@ import { connect } from "node:net";
 import { join } from "node:path";
 import { AgentServer } from "./agents.js";
 import { AuditLog } from "./audit.js";
+import { BedrockClient } from "./bedrock-client/bedrock-client.js";
 import { RunnerManager } from "./botrunner/runner-manager.js";
 import { ClientManager } from "./client/client-manager.js";
 import { prepareClient } from "./client/launcher.js";
@@ -38,15 +39,16 @@ export async function startHub(home: string, log: (msg: string) => void): Promis
   const servers = new ServerManager({ agents, home });
   const clients = new ClientManager({ agents, home, servers, prepare: (p) => prepareClient(p) });
   const runners = new RunnerManager(agents, home);
+  const bedrockClient = new BedrockClient(home);
   const ctx: ToolContext = {
-    agents, servers, clients, runners, ops: new OperationTracker(), audit: new AuditLog(join(home, "logs")),
+    agents, servers, clients, runners, bedrockClient, ops: new OperationTracker(), audit: new AuditLog(join(home, "logs")),
     exceptions: trackExceptions(agents), extensions: new ExtensionRegistry(agents), home, log,
   };
   let closing: Promise<void> | undefined;
   return {
     ctx,
     port,
-    close: () => (closing ??= Promise.all([clients.shutdown(), runners.shutdown()]).then(() => undefined)
+    close: () => (closing ??= Promise.all([clients.shutdown(), runners.shutdown()]).then(() => bedrockClient.shutdown())
       .finally(() => servers.shutdown()).finally(() => agents.close())
       .finally(() => handBack(home, port, previous))),
   };

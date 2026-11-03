@@ -12,7 +12,7 @@ export const TOOL_GROUPS: Record<string, readonly string[]> = {
   bots: ["bot_spawn", "bot_action", "bot_remove", "bot_list", "bot_form", "botrunner_process"],
   debug: ["profile", "trace", "client_eval"],
   proxy: ["proxy"],
-  extras: ["bot_behavior", "load_test", "dupe_hunt", "locale_tour", "scenario_record", "profile_diff"],
+  extras: ["bot_behavior", "load_test", "dupe_hunt", "locale_tour", "scenario_record", "profile_diff", "bedrock_client"],
   extensions: [],
 };
 

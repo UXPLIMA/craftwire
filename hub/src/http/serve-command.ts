@@ -33,10 +33,15 @@ export const SERVE_USAGE = `Usage: craftwire serve [--port 7777] [--host 127.0.0
   --no-panel            do not serve the web panel at /panel
   Teammates get their own tokens and roles with craftwire token add <name>; every call is audited by person.`;
 
-/** One person's MCP session: the hub's own limit (--read-only, --tools) and their role's, with calls audited as them. */
+/**
+ * One person's MCP session: the hub's own limit (--read-only, --tools) and their role's, with calls audited as them.
+ * Only the owner and the dev role get bedrock_client: it takes the hub machine's own screen, keyboard and mouse.
+ */
 export function personServer(ctx: ToolContext, hubPolicy: ToolPolicy | undefined, person: Person, session: string): McpServer {
   const limit = ToolPolicy.both(hubPolicy, person.policy);
-  return createCraftwireServer({ ...ctx, ...(limit ? { policy: limit } : {}), user: person.name, session });
+  const { bedrockClient, ...withoutClient } = ctx;
+  const base = person.role === "owner" || person.role === "dev" ? ctx : withoutClient;
+  return createCraftwireServer({ ...base, ...(limit ? { policy: limit } : {}), user: person.name, session });
 }
 
 export interface ServeOptions {

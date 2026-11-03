@@ -3,6 +3,7 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import type { AgentKind, AgentServer } from "../agents.js";
 import type { AuditLog } from "../audit.js";
+import type { BedrockClient } from "../bedrock-client/bedrock-client.js";
 import type { RunnerManager } from "../botrunner/runner-manager.js";
 import type { ClientManager } from "../client/client-manager.js";
 import type { ServerManager } from "../dev/server-manager.js";
@@ -20,6 +21,8 @@ export interface ToolContext {
   clients: ClientManager;
   /** Bot runners started on this machine (botrunner_process); absent where the hub must not start processes. */
   runners?: RunnerManager;
+  /** The user's own Minecraft for Windows (bedrock_client); absent where the hub must not drive this machine. */
+  bedrockClient?: BedrockClient;
   exceptions: ExceptionTracker;
   extensions: ExtensionRegistry;
   /** Limits the tools offered and the calls allowed (craftwire serve --read-only / --tools, or the person's role). */
