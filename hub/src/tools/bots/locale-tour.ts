@@ -27,6 +27,10 @@ type Seen = Map<string, string>;
 const RAW_KEY = /^[a-z0-9_-]+(\.[a-z0-9_-]+){1,}$|<lang:|<\/?[a-z_]+>|\{\d+\}|%[sd]|\$\{[^}]*\}|\{[a-z_]+\}/;
 /** Texts with no letters (numbers, symbols, item counts) say nothing about a translation. */
 const WORDY = /\p{L}{2,}/u;
+/** A server address (play.example.net) looks like a dotted key but is the same in every language. */
+const HOST = /^([a-z0-9-]+\.)+(com|net|org|gg|io|me|co|eu|uk|us|de|tr|fr|es|it|nl|pl|ru|br|xyz|club|online|network|games?)$/i;
+
+const keyLike = (text: string) => RAW_KEY.test(text) && !HOST.test(text);
 
 export function registerLocaleTools(server: McpServer, ctx: ToolContext): void {
   defineTool(server, ctx, "locale_tour",
@@ -69,7 +73,7 @@ async function tour(c: ToolContext, a: TourArgs) {
   for (const locale of locales) seen.set(locale, await visit(c, a, locale));
   const baseSeen = seen.get(a.base)!;
   const results = locales.filter((l) => l !== a.base).map((locale) => compare(locale, seen.get(locale)!, baseSeen));
-  const rawInBase = [...baseSeen].filter(([, text]) => RAW_KEY.test(text)).map(([where, text]) => ({ where, text }));
+  const rawInBase = [...baseSeen].filter(([, text]) => keyLike(text)).map(([where, text]) => ({ where, text }));
   return { base: a.base, texts: baseSeen.size, ...(rawInBase.length > 0 ? { rawKeysInBase: rawInBase.slice(0, 50) } : {}), locales: results };
 }
 
@@ -80,9 +84,10 @@ function compare(locale: string, mine: Seen, base: Seen) {
   for (const [where, text] of base) {
     const t = mine.get(where);
     if (t === undefined) missing.push(where);
-    else if (t === text && WORDY.test(t)) untranslated.push({ where, text: t });
+    else if (t === text && WORDY.test(t) && !HOST.test(t)) untranslated.push({ where, text: t });
   }
-  for (const [where, text] of mine) if (RAW_KEY.test(text)) rawKeys.push({ where, text });
+  // A key where the base showed something else; one the base shows too is listed under rawKeysInBase.
+  for (const [where, text] of mine) if (keyLike(text) && base.get(where) !== text) rawKeys.push({ where, text });
   return {
     locale, texts: mine.size, untranslated: untranslated.slice(0, 100), rawKeys: rawKeys.slice(0, 100),
     // A text the base showed that this locale never showed: a menu laid out differently, or a reply that did not come.
@@ -115,7 +120,7 @@ async function visit(c: ToolContext, a: TourArgs, locale: string): Promise<Seen>
 }
 
 type Act = (args: Record<string, unknown>) => Promise<unknown>;
-type Slot = { slot: number; name?: string; lore?: string[]; container?: string };
+type Slot = { slot: number; id?: string; name?: string; lore?: string[]; container?: string };
 
 async function readTarget(act: Act, t: Target, label: string, a: TourArgs, seen: Seen): Promise<void> {
   const started = Date.now();
@@ -127,7 +132,7 @@ async function readTarget(act: Act, t: Target, label: string, a: TourArgs, seen:
     put(seen, `${label}: menu title`, gui.title);
     for (const s of gui.slots ?? []) {
       if (s.container !== "menu") continue;
-      put(seen, `${label}: slot ${s.slot} name`, s.name);
+      if (!vanillaName(s)) put(seen, `${label}: slot ${s.slot} name`, s.name);
       (s.lore ?? []).forEach((line, n) => put(seen, `${label}: slot ${s.slot} lore ${n}`, line));
     }
     await act({ action: "gui_close" }).catch(() => undefined);
@@ -149,6 +154,17 @@ function readHud(h: Hud, label: string, seen: Seen): void {
   (h.bossbars ?? []).forEach((b, n) => put(seen, `${label}: boss bar ${n}`, b.name));
   put(seen, `${label}: sidebar title`, h.sidebar?.title);
   (h.sidebar?.entries ?? []).forEach((e, n) => put(seen, `${label}: sidebar ${n}`, e.shown ?? e.name));
+}
+
+/**
+ * An item without a custom name: the server reports its vanilla name (English, or the translation key) in every
+ * locale, since the client translates it. Not a plugin text.
+ */
+function vanillaName(s: Slot): boolean {
+  if (s.id === undefined || s.name === undefined) return false;
+  const [ns, path] = s.id.includes(":") ? s.id.split(":", 2) as [string, string] : ["minecraft", s.id];
+  const english = path.split("_").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+  return s.name === english || s.name === `item.${ns}.${path}` || s.name === `block.${ns}.${path}`;
 }
 
 function put(seen: Seen, where: string, text: string | null | undefined): void {
