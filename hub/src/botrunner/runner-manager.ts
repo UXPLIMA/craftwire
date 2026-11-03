@@ -33,6 +33,8 @@ interface Runner {
   log: RingBuffer<string>;
   startedAt: number;
   agent?: string;
+  /** The pid the runner's JVM reported; not the child's when `java` is a launcher stub. */
+  jvmPid?: number;
   exited: Promise<number | null>;
   exitCode?: number | null;
 }
@@ -70,7 +72,9 @@ export class RunnerManager {
   constructor(private readonly agents: AgentServer, private readonly home: string) {
     agents.on("connected", (i: InstanceInfo) => {
       const r = ownRunner([...this.runners.values()], i);
-      if (r !== undefined) r.agent = i.id;
+      if (r === undefined) return;
+      r.agent = i.id;
+      r.jvmPid = i.pid;
     });
   }
 
@@ -115,6 +119,9 @@ export class RunnerManager {
   /** A shutdown hook in the runner removes its bots on SIGTERM; a runner that hangs is killed after 15 s. */
   private async stopOne(r: Runner): Promise<void> {
     r.child.kill();
+    // Behind a launcher stub the JVM is a grandchild: it outlives the stub and keeps the pipes (and `exited`) open.
+    const jvm = r.jvmPid !== undefined && r.jvmPid !== r.child.pid ? r.jvmPid : undefined;
+    if (jvm !== undefined) terminate(jvm);
     let timer: NodeJS.Timeout | undefined;
     const timedOut = await Promise.race([
       r.exited.then(() => false),
@@ -123,6 +130,7 @@ export class RunnerManager {
     clearTimeout(timer);
     if (timedOut) {
       killTree(r.child.pid);
+      killTree(jvm);
       await r.exited;
     }
   }
@@ -145,8 +153,16 @@ export class RunnerManager {
 
   private snapshot(r: Runner, tail: number): Record<string, unknown> {
     return {
-      name: r.name, instance: r.agent ?? null, pid: r.child.pid, startedAt: r.startedAt,
+      name: r.name, instance: r.agent ?? null, pid: r.jvmPid ?? r.child.pid, startedAt: r.startedAt,
       logTail: tail > 0 ? r.log.toArray().slice(-tail) : [],
     };
+  }
+}
+
+function terminate(pid: number): void {
+  try {
+    process.kill(pid, "SIGTERM");
+  } catch {
+    // already gone
   }
 }
