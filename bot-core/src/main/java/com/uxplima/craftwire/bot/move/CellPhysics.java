@@ -1,22 +1,21 @@
-package com.uxplima.craftwire.botrunner.javabot.bot;
+package com.uxplima.craftwire.bot.move;
 
 import com.uxplima.craftwire.bot.model.BlockPoint;
 import com.uxplima.craftwire.bot.model.Position;
-import com.uxplima.craftwire.bot.move.BotBody;
-import com.uxplima.craftwire.bot.move.MoveInput;
 import com.uxplima.craftwire.bot.path.BlockView;
 import com.uxplima.craftwire.bot.path.Cell;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
- * The bot's own client physics, as the vanilla client runs LocalPlayer.travel each tick: ground and air
+ * A protocol bot's own client physics, as the vanilla Java client runs LocalPlayer.travel each tick: ground and air
  * acceleration, friction, gravity and drag, jumping (with the sprint-jump boost), swimming, ladders, and axis-by-axis
  * collision with step-up against the blocks the bot knows. Blocks collide as full-width boxes of their cell height,
  * which is at least as tall as the real shape, so the server never sees the bot inside a block. In a chunk the bot
- * has not received the body stays still, as a vanilla client does. Runner loop thread.
+ * has not received the body stays still, as a vanilla client does. Shared by the Java and Bedrock protocol bots, whose
+ * players move the same way (Bedrock's movement constants are the Java ones). The bot's own thread.
  */
-final class JavaPhysics implements BotBody {
+public final class CellPhysics implements BotBody {
     private static final double HALF_WIDTH = 0.3;
     private static final double HEIGHT = 1.8;
     private static final double STEP = 0.6;
@@ -47,7 +46,7 @@ final class JavaPhysics implements BotBody {
     private MoveInput input = MoveInput.stop(0f);
     private boolean jumpOnce;
 
-    JavaPhysics(Supplier<BlockView> blocks, Supplier<String> world, Consumer<Boolean> sprintSink, Consumer<BlockPoint> useSink) {
+    public CellPhysics(Supplier<BlockView> blocks, Supplier<String> world, Consumer<Boolean> sprintSink, Consumer<BlockPoint> useSink) {
         this.blocks = blocks;
         this.world = world;
         this.sprintSink = sprintSink;
@@ -55,7 +54,7 @@ final class JavaPhysics implements BotBody {
     }
 
     /** A server teleport (or the spawn position): the body is put there and stops. */
-    void teleport(double nx, double ny, double nz, float nyaw, float npitch) {
+    public void teleport(double nx, double ny, double nz, float nyaw, float npitch) {
         x = nx;
         y = ny;
         z = nz;
@@ -66,39 +65,39 @@ final class JavaPhysics implements BotBody {
         vz = 0;
     }
 
-    void look(float nyaw, float npitch) {
+    public void look(float nyaw, float npitch) {
         yaw = nyaw;
         pitch = npitch;
     }
 
     /** ClientboundSetEntityMotionPacket for the bot itself (knockback, plugin launches). */
-    void motion(double mx, double my, double mz) {
+    public void motion(double mx, double my, double mz) {
         vx = mx;
         vy = my;
         vz = mz;
     }
 
-    void sneak(boolean on) {
+    public void sneak(boolean on) {
         sneaking = on;
     }
 
-    void sprintState(boolean on) {
+    public void sprintState(boolean on) {
         sprinting = on;
     }
 
     /** One jump at the next tick when standing, for the jump action. */
-    boolean jumpNow() {
+    public boolean jumpNow() {
         if (!onGround && !inWater()) return false;
         jumpOnce = true;
         return true;
     }
 
-    float pitch() {
+    public float pitch() {
         return pitch;
     }
 
     /** One client tick. Returns whether the position changed. */
-    boolean step() {
+    public boolean step() {
         BlockView view = blocks.get();
         if (view.cell((int) Math.floor(x), (int) Math.floor(y), (int) Math.floor(z)).kind() == Cell.Kind.UNKNOWN) return false;
         double ox = x;
@@ -352,11 +351,11 @@ final class JavaPhysics implements BotBody {
         useSink.accept(block);
     }
 
-    boolean sprintingNow() {
+    public boolean sprintingNow() {
         return sprinting;
     }
 
-    MoveInput lastInput() {
+    public MoveInput lastInput() {
         return input;
     }
 }

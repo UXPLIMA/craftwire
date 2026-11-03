@@ -11,6 +11,7 @@ import com.uxplima.craftwire.bot.model.BotKind;
 import com.uxplima.craftwire.bot.model.BotState;
 import com.uxplima.craftwire.bot.model.Position;
 import com.uxplima.craftwire.bot.model.Profile;
+import com.uxplima.craftwire.bot.move.CellPhysics;
 import com.uxplima.craftwire.bot.move.Walker;
 import com.uxplima.craftwire.bot.move.WalkOptions;
 import com.uxplima.craftwire.botrunner.bot.JoinSpec;
@@ -50,7 +51,7 @@ public final class JavaBot implements RunnerBot, JavaSession.Sink {
     final JavaScreens screens = new JavaScreens(this);
     final JavaRecipes recipes = new JavaRecipes();
     final JavaWorld world;
-    final JavaPhysics body;
+    final CellPhysics body;
     final JavaPacks packs;
     final JavaMoves moves;
     final JavaLife life = new JavaLife();
@@ -82,7 +83,7 @@ public final class JavaBot implements RunnerBot, JavaSession.Sink {
         this.world = new JavaWorld(ctx.services().worlds(), ctx.blocks(), ctx.compat(), spec.host() + ":" + spec.port(), shared, this);
         JavaMoves m = new JavaMoves(this);
         this.moves = m;
-        this.body = new JavaPhysics(world::view, world::dimension, m::sprint, b -> screens.useBlock(b));
+        this.body = new CellPhysics(world::view, world::dimension, m::sprint, b -> screens.useBlock(b));
         this.packs = new JavaPacks(spec.packs(), spec.verifyPacks(), ctx.services().packs(), ctx.services().loop()::execute, p -> sendAny(p));
     }
 

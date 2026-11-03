@@ -1,6 +1,7 @@
 package com.uxplima.craftwire.botrunner.javabot.bot;
 
 import com.uxplima.craftwire.bot.model.Position;
+import com.uxplima.craftwire.bot.move.CellPhysics;
 import com.uxplima.craftwire.botrunner.javabot.world.JavaBlocks;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.common.ClientboundClearDialogPacket;
@@ -135,7 +136,7 @@ final class JavaPlay {
      * then a full position and rotation packet. The first one completes the join.
      */
     private void teleport(ClientboundPlayerPositionPacket p) {
-        JavaPhysics b = bot.body;
+        CellPhysics b = bot.body;
         Position at = b.position();
         PositionMoveRotation now = new PositionMoveRotation(new Vec3(at.x(), at.y(), at.z()), Vec3.ZERO, b.yaw(), b.pitch());
         PositionMoveRotation to = PositionMoveRotation.calculateAbsolute(now, p.change(), p.relatives());

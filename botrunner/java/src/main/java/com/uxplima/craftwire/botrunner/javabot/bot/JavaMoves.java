@@ -1,6 +1,7 @@
 package com.uxplima.craftwire.botrunner.javabot.bot;
 
 import com.uxplima.craftwire.bot.model.Position;
+import com.uxplima.craftwire.bot.move.CellPhysics;
 import com.uxplima.craftwire.bot.move.MoveInput;
 import io.netty.buffer.Unpooled;
 import net.minecraft.network.FriendlyByteBuf;
@@ -46,7 +47,7 @@ final class JavaMoves {
     }
 
     void tick(boolean moved) {
-        JavaPhysics b = bot.body;
+        CellPhysics b = bot.body;
         sendInput(b);
         Position p = b.position();
         double dx = p.x() - lastX;
@@ -79,7 +80,7 @@ final class JavaMoves {
     }
 
     /** ServerboundPlayerInputPacket: the server reads sneaking from the shift key and fires PlayerInputEvent on change. */
-    private void sendInput(JavaPhysics b) {
+    private void sendInput(CellPhysics b) {
         MoveInput in = b.lastInput();
         Input now = new Input(in.forward() > 0, false, false, false, in.jump(), b.sneaking(), in.sprint());
         if (now.equals(lastInput)) return;
