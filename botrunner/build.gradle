@@ -1,0 +1,92 @@
+plugins {
+    id 'application'
+}
+
+base {
+    archivesName = 'craftwire-botrunner'
+}
+
+repositories {
+    mavenCentral()
+}
+
+// The standalone bot runner: Java protocol bots (vanilla codecs from the server jar it downloads per version) and
+// Bedrock bots (bedrock-protocol). Unlike the agents it runs in its own JVM, so it bundles Gson and log4j itself.
+dependencies {
+    implementation project(':agent-core')
+    implementation project(':bot-core')
+    implementation project(':agent-script')
+    implementation 'com.google.code.gson:gson:2.13.2'
+    implementation "org.apache.logging.log4j:log4j-api:${log4j_version}"
+    implementation "org.apache.logging.log4j:log4j-core:${log4j_version}"
+    // Script behaviors: the runner runs GraalJS in its own JVM, so it ships the engine instead of downloading it.
+    implementation "org.graalvm.polyglot:polyglot:${graal_version}"
+    implementation "org.graalvm.js:js-language:${graal_version}"
+    implementation 'io.netty:netty-all:4.2.19.Final'
+
+    testImplementation platform('org.junit:junit-bom:5.13.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+application {
+    mainClass = 'com.uxplima.craftwire.botrunner.Main'
+}
+
+// The Java bot code, one jar for the common part and one per Minecraft version: the runner puts the common jar and
+// the target version's jar next to that version's server jar in a class loader of their own (JavaVersions).
+def javabotJars = [tasks.register('javabotCommonJar', Jar) {
+    archiveFileName = 'javabot-common.jar'
+    destinationDirectory = layout.buildDirectory.dir('javabot')
+    dependsOn ':botrunner-java:classes'
+    from { project(':botrunner-java').sourceSets.main.output }
+}] + rootProject.mcVersions.collect { mc ->
+    def path = ":botrunner-java-compat-${rootProject.mcId(mc)}"
+    tasks.register("javabotCompatJar${rootProject.mcId(mc).capitalize()}", Jar) {
+        archiveFileName = "javabot-compat-${mc}.jar"
+        destinationDirectory = layout.buildDirectory.dir('javabot')
+        dependsOn "${path}:classes"
+        from { project(path).sourceSets.main.output }
+    }
+}
+
+// Where each version's vanilla server jar comes from (versions/<mc>.properties), for the runner to download and check.
+def serverJars = tasks.register('serverJarPins') {
+    def out = layout.buildDirectory.file('pins/java-versions.properties')
+    def versions = rootProject.mcVersions
+    inputs.files(versions.collect { rootProject.file("versions/${it}.properties") })
+    outputs.file(out)
+    doLast {
+        out.get().asFile.text = versions.collect { mc ->
+            def p = rootProject.mcProps(mc)
+            "${mc}.url=${p.server_jar_url}\n${mc}.sha1=${p.server_jar_sha1}\n${mc}.size=${p.server_jar_size}"
+        }.join('\n') + '\n'
+    }
+}
+
+// The runner reports its version and the Minecraft versions it can play in hello.
+processResources {
+    def props = [version: project.version, mcVersions: rootProject.mcVersions.join(',')]
+    inputs.properties(props)
+    filesMatching('craftwire-botrunner.properties') { expand(props) }
+    javabotJars.each { jar -> from(jar) { into 'javabot' } }
+    from(serverJars) { into 'javabot' }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 25
+    options.encoding = 'UTF-8'
+}
+
+// One runnable jar (java -jar craftwire-botrunner-<version>.jar), as the hub's botrunner_process starts it.
+tasks.named('jar', Jar) {
+    manifest { attributes('Main-Class': application.mainClass, 'Multi-Release': 'true') }
+    dependsOn configurations.runtimeClasspath
+    from { configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) } }
+    exclude 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA'
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+test {
+    useJUnitPlatform()
+}

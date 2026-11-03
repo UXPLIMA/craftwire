@@ -1,5 +1,6 @@
 package com.uxplima.craftwire.core;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
@@ -21,6 +22,12 @@ public final class RpcCodec {
         if (h.serverDir() != null) params.addProperty("serverDir", h.serverDir());
         if (h.pid() != null) params.addProperty("pid", h.pid());
         if (h.gameDir() != null) params.addProperty("gameDir", h.gameDir());
+        if (h.botKinds() != null) {
+            JsonArray kinds = new JsonArray();
+            h.botKinds().forEach(kinds::add);
+            params.add("botKinds", kinds);
+        }
+        if (h.maxBots() != null) params.addProperty("maxBots", h.maxBots());
         JsonObject o = envelope();
         o.addProperty("id", 0);
         o.addProperty("method", "hello");

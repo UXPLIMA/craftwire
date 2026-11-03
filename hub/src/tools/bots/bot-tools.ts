@@ -8,6 +8,7 @@ import { type BotKind, directoryFor, expandNames } from "./directory.js";
 import { registerLoadTools } from "./load-test.js";
 import { merge } from "./merge.js";
 import { agentForBot, broadcast, requireAgents } from "./route.js";
+import { registerRunnerTools } from "./runner-tools.js";
 import { actionShape, behaviorShape, selector, spawnShape } from "./schemas.js";
 import { spawnOn } from "./spawn.js";
 
@@ -111,6 +112,7 @@ export function registerBotTools(server: McpServer, ctx: ToolContext): void {
 
   registerFormTool(server, ctx);
   registerLoadTools(server, ctx);
+  registerRunnerTools(server, ctx);
 }
 
 /** Bedrock forms: listed only while a bot runner with Bedrock bots is connected. */

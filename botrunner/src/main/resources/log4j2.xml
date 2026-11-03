@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The runner's own logging: plain lines on stdout, which the hub's botrunner_process keeps as the log tail. -->
+<Configuration status="WARN">
+  <Appenders>
+    <Console name="out" target="SYSTEM_OUT">
+      <PatternLayout pattern="[%d{HH:mm:ss}] [%t/%level] %msg%n%throwable"/>
+    </Console>
+  </Appenders>
+  <Loggers>
+    <Logger name="io.netty" level="warn"/>
+    <Root level="info">
+      <AppenderRef ref="out"/>
+    </Root>
+  </Loggers>
+</Configuration>

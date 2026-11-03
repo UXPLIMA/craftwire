@@ -1,0 +1,26 @@
+// Version-specific Java bot code (botrunner/java/compat/<mc>): the packets that changed shape between versions.
+// Compiled against that version's server code; the bot runner puts exactly this version's jar on the version class
+// loader. Applied from botrunner/java/compat/<mc>/build.gradle.
+def mc = projectDir.name
+def props = rootProject.mcProps(mc)
+
+base { archivesName = "craftwire-botrunner-java-compat-${mc}" }
+repositories { mavenCentral() }
+
+loom {
+    serverOnlyMinecraftJar()
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${props.minecraft_version}"
+    // The common Java bot code (the JavaCompat interface), compiled against the oldest version.
+    compileOnly files(rootProject.file('botrunner/java/build/classes/java/main'))
+    compileOnly project(':bot-core')
+}
+
+tasks.named('compileJava') { dependsOn ':botrunner-java:compileJava' }
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 25
+    options.encoding = 'UTF-8'
+}

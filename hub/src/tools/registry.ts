@@ -3,6 +3,7 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import type { AgentKind, AgentServer } from "../agents.js";
 import type { AuditLog } from "../audit.js";
+import type { RunnerManager } from "../botrunner/runner-manager.js";
 import type { ClientManager } from "../client/client-manager.js";
 import type { ServerManager } from "../dev/server-manager.js";
 import { CraftwireError, toToolError } from "../errors.js";
@@ -17,6 +18,8 @@ export interface ToolContext {
   audit: AuditLog;
   servers: ServerManager;
   clients: ClientManager;
+  /** Bot runners started on this machine (botrunner_process); absent where the hub must not start processes. */
+  runners?: RunnerManager;
   exceptions: ExceptionTracker;
   extensions: ExtensionRegistry;
   /** Limits the tools offered and the calls allowed (craftwire serve --read-only / --tools). */

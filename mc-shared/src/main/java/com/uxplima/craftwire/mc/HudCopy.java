@@ -1,9 +1,8 @@
-package com.uxplima.craftwire.paper.bot;
+package com.uxplima.craftwire.mc;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
-import com.uxplima.craftwire.mc.HudJson;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -39,9 +38,10 @@ import net.minecraft.world.scores.criteria.ObjectiveCriteria;
  * What a client would show on its HUD, rebuilt from the packets sent to the bot the way the vanilla client
  * applies them: scoreboard and teams, tab list, boss bars, title, action bar. Built from packets rather than
  * the Bukkit API so plugins that send scoreboard packets directly (TAB and the like) are seen too.
- * Thread-safe: plugins may send packets off the server thread.
+ * Shared by the plugin bot and the Java protocol bot, which receive the same packets. Thread-safe: plugins may send
+ * packets off the server thread.
  */
-final class BotHud {
+public final class HudCopy {
     private static final long TICK_MS = 50;
     private static final int ACTION_BAR_TICKS = 60;
     private static final int[] DEFAULT_TITLE_TIMES = {10, 70, 20};
@@ -69,7 +69,7 @@ final class BotHud {
     private Component actionBar;
     private long actionBarUntil;
 
-    synchronized void accept(Object packet, long now) {
+    public synchronized void accept(Object packet, long now) {
         switch (packet) {
             case ClientboundSetObjectivePacket p -> objective(p);
             case ClientboundSetDisplayObjectivePacket p -> board.setDisplayObjective(p.getSlot(), board.getObjective(p.getObjectiveName()));
@@ -105,7 +105,7 @@ final class BotHud {
     }
 
     /** Same shape as the client's hud.read, minus `hidden`. `viewer` is the bot's name (team-coloured sidebars). */
-    synchronized JsonObject json(String viewer, long now) {
+    public synchronized JsonObject json(String viewer, long now) {
         JsonObject o = new JsonObject();
         JsonArray bossbars = new JsonArray();
         for (Bar b : bars.values()) {

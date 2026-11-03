@@ -1,0 +1,38 @@
+plugins {
+    id 'net.fabricmc.fabric-loom' version "${loom_version}"
+}
+
+base {
+    archivesName = 'craftwire-botrunner-java'
+}
+
+repositories {
+    mavenCentral()
+}
+
+// The Java protocol bot: compiled against the vanilla server code of the oldest supported version (no client
+// classes), loaded by the bot runner in one class loader per target version next to that version's server jar.
+def baseProps = rootProject.mcProps(rootProject.baseMc)
+
+loom {
+    serverOnlyMinecraftJar()
+}
+
+// Chat clicks, dialogs, menu state and the HUD copy are shared with the plugin bot and the Fabric client.
+sourceSets.main.java.srcDir rootProject.file('mc-shared/src/main/java')
+
+dependencies {
+    minecraft "com.mojang:minecraft:${baseProps.minecraft_version}"
+    // Loaded by the runner's own class loader, which the version class loader delegates to.
+    compileOnly project(':agent-core')
+    compileOnly project(':bot-core')
+    compileOnly project(':build-core')
+    compileOnly files(rootProject.file('botrunner/build/classes/java/main'))
+}
+
+tasks.named('compileJava') { dependsOn ':botrunner:compileJava' }
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 25
+    options.encoding = 'UTF-8'
+}

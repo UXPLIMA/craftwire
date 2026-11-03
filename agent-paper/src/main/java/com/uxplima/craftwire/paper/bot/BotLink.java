@@ -2,6 +2,7 @@ package com.uxplima.craftwire.paper.bot;
 
 import com.uxplima.craftwire.bot.inbox.Inbox;
 import com.uxplima.craftwire.bot.resourcepack.PackLog;
+import com.uxplima.craftwire.mc.HudCopy;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -17,7 +18,7 @@ import net.minecraft.network.chat.ClickEvent;
  */
 final class BotLink {
     final Inbox inbox = new Inbox(200);
-    final BotHud hud = new BotHud();
+    final HudCopy hud = new HudCopy();
     final BotScreens screens = new BotScreens();
     final PackLog packs = new PackLog();
     final AtomicInteger pendingTeleport = new AtomicInteger(-1);

@@ -18,6 +18,7 @@ export interface SpawnArgs extends Record<string, unknown> {
   perTick?: number;
   spread?: { radius: number };
   address?: string;
+  account?: string;
 }
 
 /** Long enough for every join at `perTick` per 50 ms tick, plus chunk loading for spread spawns. */
@@ -44,7 +45,9 @@ export async function spawnOn(c: ToolContext, a: SpawnArgs): Promise<unknown> {
   }
   const agents = requireAgents(c, a.kind, runner ?? instance);
   return c.ops.run(operationId, async () => {
-    const shares = split(a, agents, dir);
+    const session = await accountSession(c, a);
+    if (session !== undefined) rest.session = session;
+    const shares = session !== undefined ? [{ agent: agents[0]!, names: [String(session.name)] }] : split(a, agents, dir);
     const answers: Answer[] = await Promise.all(shares.map(async (s) => {
       try {
         return { instance: s.agent, result: await c.agents.request(s.agent.id, "bot.spawn", { ...rest, names: s.names }, timeout) };
@@ -58,6 +61,22 @@ export async function spawnOn(c: ToolContext, a: SpawnArgs): Promise<unknown> {
     }
     return merge(answers, { sum: ["spawned"], max: ["ms"], join: ["names"], concat: ["failed", "bots"], limit: 1000 });
   });
+}
+
+/**
+ * A signed-in account plays as itself: one bot, named after the account, with the Minecraft session passed to the
+ * runner (which joins online-mode servers with it). The token goes to the runner only, never into a result.
+ */
+async function accountSession(c: ToolContext, a: SpawnArgs): Promise<Record<string, unknown> | undefined> {
+  if (a.account === undefined) return undefined;
+  if (a.kind !== "java") {
+    throw new CraftwireError("INVALID_PARAMS", "account is for Java bots", "Bedrock bots join offline-mode (or Geyser floodgate) servers.");
+  }
+  if ((a.names?.length ?? a.count) > 1) {
+    throw new CraftwireError("INVALID_PARAMS", "An account plays as one player", "Spawn count:1 with account, or leave account out.");
+  }
+  const s = await c.clients.accounts.session(a.account);
+  return { name: s.name, uuid: s.uuid, accessToken: s.accessToken };
 }
 
 /**

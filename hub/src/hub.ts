@@ -2,6 +2,7 @@ import { connect } from "node:net";
 import { join } from "node:path";
 import { AgentServer } from "./agents.js";
 import { AuditLog } from "./audit.js";
+import { RunnerManager } from "./botrunner/runner-manager.js";
 import { ClientManager } from "./client/client-manager.js";
 import { prepareClient } from "./client/launcher.js";
 import { hubPort, loadOrCreateToken, readHubConfig, writeHubConfig, type HubConfig } from "./config.js";
@@ -15,7 +16,10 @@ export interface Hub {
   ctx: ToolContext;
   /** The port agents connect to. */
   port: number;
-  /** Stops clients first (they may be on these servers), then servers (gracefully, so worlds are saved), then the agent port. */
+  /**
+   * Stops clients and bot runners first (they may be on these servers), then servers (gracefully, so worlds are saved),
+   * then the agent port.
+   */
   close(): Promise<void>;
 }
 
@@ -33,15 +37,17 @@ export async function startHub(home: string, log: (msg: string) => void): Promis
   agents.on("disconnected", (i) => log(`${i.id} disconnected`));
   const servers = new ServerManager({ agents, home });
   const clients = new ClientManager({ agents, home, servers, prepare: (p) => prepareClient(p) });
+  const runners = new RunnerManager(agents, home);
   const ctx: ToolContext = {
-    agents, servers, clients, ops: new OperationTracker(), audit: new AuditLog(join(home, "logs")), exceptions: trackExceptions(agents),
-    extensions: new ExtensionRegistry(agents), home, log,
+    agents, servers, clients, runners, ops: new OperationTracker(), audit: new AuditLog(join(home, "logs")),
+    exceptions: trackExceptions(agents), extensions: new ExtensionRegistry(agents), home, log,
   };
   let closing: Promise<void> | undefined;
   return {
     ctx,
     port,
-    close: () => (closing ??= clients.shutdown().finally(() => servers.shutdown()).finally(() => agents.close())
+    close: () => (closing ??= Promise.all([clients.shutdown(), runners.shutdown()]).then(() => undefined)
+      .finally(() => servers.shutdown()).finally(() => agents.close())
       .finally(() => handBack(home, port, previous))),
   };
 }
