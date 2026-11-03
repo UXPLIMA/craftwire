@@ -22,8 +22,15 @@ public final class CellPhysics implements BotBody {
     private static final double GRAVITY = 0.08;
     private static final double AIR_DRAG = 0.98;
     private static final double JUMP = 0.42;
-    /** Block friction 0.6 times the 0.91 every entity keeps of its speed. */
-    private static final double GROUND_FRICTION = 0.6 * 0.91;
+    /** An ordinary block's friction (Block.getFriction); ice and slime differ, but cells do not know them. */
+    private static final double BLOCK_FRICTION = 0.6;
+    /** What every entity keeps of its horizontal speed each tick in the air. */
+    private static final double AIR_FRICTION = 0.91;
+    private static final double GROUND_FRICTION = BLOCK_FRICTION * AIR_FRICTION;
+    private static final double WATER_DRAG = 0.8;
+    /** In water a non-sprinting player sinks by gravity / 16 (LivingEntity.getFluidFallingAdjustedMovement). */
+    private static final double WATER_GRAVITY = GRAVITY / 16;
+    private static final double CLIMB_SPEED = 0.2;
     private static final double WALK_SPEED = 0.1;
     private static final double EPS = 1e-7;
 
@@ -96,7 +103,11 @@ public final class CellPhysics implements BotBody {
         return pitch;
     }
 
-    /** One client tick. Returns whether the position changed. */
+    /**
+     * One client tick in LivingEntity.travel's order: the keys push, the body moves with collision, then the medium's
+     * drag and gravity apply. Gravity after the move is what lets a jump's first tick rise the full 0.42 (apex
+     * 1.2522); applied before, a bot cannot jump onto a block. Returns whether the position changed.
+     */
     public boolean step() {
         BlockView view = blocks.get();
         if (view.cell((int) Math.floor(x), (int) Math.floor(y), (int) Math.floor(z)).kind() == Cell.Kind.UNKNOWN) return false;
@@ -105,14 +116,26 @@ public final class CellPhysics implements BotBody {
         double oz = z;
         boolean jump = input.jump() || jumpOnce;
         jumpOnce = false;
-        if (inWater()) swim(jump);
-        else if (onClimbable()) climb(jump);
-        else walk(jump);
+        boolean water = inWater();
+        boolean climbing = !water && onClimbable();
+        // The drag is that of where the body stood before moving, as travel reads it.
+        double drag = water ? WATER_DRAG : onGround ? GROUND_FRICTION : AIR_FRICTION;
+        if (water) swim(jump);
+        else walk(jump, climbing);
         move(view);
+        vx *= drag;
+        vz *= drag;
+        if (water) {
+            vy = vy * WATER_DRAG - WATER_GRAVITY;
+        } else {
+            // Pressing into a ladder (or jumping on one) climbs at 0.2, which gravity and drag make 0.1176 a tick.
+            if (climbing && (jump || horizontal)) vy = CLIMB_SPEED;
+            vy = (vy - GRAVITY) * AIR_DRAG;
+        }
         return ox != x || oy != y || oz != z;
     }
 
-    private void walk(boolean jump) {
+    private void walk(boolean jump, boolean climbing) {
         if (jump && onGround) {
             vy = JUMP;
             if (sprinting) {
@@ -122,24 +145,22 @@ public final class CellPhysics implements BotBody {
             }
         }
         double speed = WALK_SPEED * (sprinting ? 1.3 : 1.0);
-        double accel = onGround ? speed * (0.21600002 / (GROUND_FRICTION * GROUND_FRICTION * GROUND_FRICTION)) : (sprinting ? 0.026 : 0.02);
+        // getFrictionInfluencedSpeed: speed * 0.216 / friction^3 with the block's own friction, so on ordinary ground
+        // the push is exactly the movement speed (0.1 walking, 0.13 sprinting).
+        double accel = onGround ? speed * (0.21600002 / (BLOCK_FRICTION * BLOCK_FRICTION * BLOCK_FRICTION)) : (sprinting ? 0.026 : 0.02);
         accelerate(accel);
-        vy = (vy - GRAVITY) * AIR_DRAG;
+        if (climbing) {
+            // LivingEntity.handleOnClimbable: slow sideways, slide down at most 0.15, not at all while sneaking.
+            vx = Math.clamp(vx, -0.15, 0.15);
+            vz = Math.clamp(vz, -0.15, 0.15);
+            vy = Math.max(vy, -0.15);
+            if (sneaking && vy < 0) vy = 0;
+        }
     }
 
     private void swim(boolean jump) {
         accelerate(0.02);
         if (jump) vy += 0.04;
-        vy -= 0.02;
-    }
-
-    private void climb(boolean jump) {
-        accelerate(onGround ? 0.1 : 0.02);
-        vx = Math.clamp(vx, -0.15, 0.15);
-        vz = Math.clamp(vz, -0.15, 0.15);
-        vy = Math.max(vy, sneaking ? 0 : -0.15);
-        if (jump || horizontal) vy = 0.2;
-        vy = (vy - GRAVITY) * AIR_DRAG;
     }
 
     /** Entity.moveRelative: the input as a push along the facing yaw (forward only; bots never strafe). */
@@ -152,7 +173,7 @@ public final class CellPhysics implements BotBody {
         yaw = input.yaw();
     }
 
-    /** Moves by the velocity with collision, then applies the medium's drag. */
+    /** Moves by the velocity with collision; a blocked axis loses its speed. */
     private void move(BlockView view) {
         double dy = clipY(view, vy);
         double dx = clipX(view, vx, y + dy);
@@ -180,10 +201,6 @@ public final class CellPhysics implements BotBody {
         if (dy != vy) vy = 0;
         if (blockedX) vx = 0;
         if (blockedZ) vz = 0;
-        double drag = inWater() ? 0.8 : onGround ? GROUND_FRICTION : 0.91;
-        vx *= drag;
-        vz *= drag;
-        if (inWater()) vy *= 0.8;
     }
 
     /** Entity.collide's step: lift by up to 0.6, move, settle back down; null when that gets no further. */
