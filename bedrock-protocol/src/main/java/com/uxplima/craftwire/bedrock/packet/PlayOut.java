@@ -83,14 +83,14 @@ public final class PlayOut {
         return b;
     }
 
-    /** Animate action 1: swing the main hand. */
-    public static ByteBuf swing(long runtimeId) {
+    /** Animate action 1: swing the main hand (hand 0, a field from 1.26.60 on). */
+    public static ByteBuf swing(long runtimeId, BedrockVersion v) {
         ByteBuf b = start(PacketIds.ANIMATE);
         b.writeByte(1);
         Bin.writeVarULong(b, runtimeId);
         b.writeFloatLE(0);
         Bin.writeBool(b, false);
-        b.writeByte(0);
+        if (v.has1_26_60()) b.writeByte(0);
         return b;
     }
 

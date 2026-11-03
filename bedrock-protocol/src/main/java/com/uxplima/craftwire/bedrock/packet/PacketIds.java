@@ -1,15 +1,11 @@
 package com.uxplima.craftwire.bedrock.packet;
 
 /**
- * Packet ids of the Bedrock protocol a bot uses (protocol 2225, game version 1.26.60), table-like data checked
- * against gophertunnel's id list and pmmp's protocol_info. Only the packets the bot reads or sends are listed;
- * the rest are skipped by length inside their batch.
+ * Packet ids of the Bedrock protocol a bot uses, table-like data checked against gophertunnel's id list and pmmp's
+ * protocol_info. They are the same in every {@link BedrockVersion} (1.26.60 only appended ids). Only the packets
+ * the bot reads or sends are listed; the rest are skipped by length inside their batch.
  */
 public final class PacketIds {
-    /** The protocol version the bot speaks: the latest release, as the design asks (no older versions). */
-    public static final int PROTOCOL = 2225;
-    public static final String GAME_VERSION = "1.26.60";
-
     static final int LOGIN = 1;
     static final int PLAY_STATUS = 2;
     static final int SERVER_TO_CLIENT_HANDSHAKE = 3;

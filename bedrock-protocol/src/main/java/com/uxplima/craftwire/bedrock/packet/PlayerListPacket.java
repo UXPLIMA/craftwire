@@ -14,7 +14,7 @@ public record PlayerListPacket(boolean add, List<Entry> entries) implements Clie
     /** One PlayerListEntry; on removal only `uuid` is set. */
     public record Entry(UUID uuid, long uniqueId, String name, String xuid) {}
 
-    static PlayerListPacket read(ByteBuf b) {
+    static PlayerListPacket read(ByteBuf b, BedrockVersion v) {
         int n = Bin.readVarUInt(b);
         boolean add = false;
         List<Entry> out = new ArrayList<>(Math.min(n, 256));
@@ -29,18 +29,20 @@ public record PlayerListPacket(boolean add, List<Entry> entries) implements Clie
             long unique = Bin.readVarLong(b);
             String name = Bin.readString(b);
             String xuid = Bin.readString(b);
-            Bin.readString(b);
+            // PlayFabID (in PlayerListEntry from 1.26.60, in the skin before), then PlatformChatID.
+            if (v.has1_26_60()) Bin.readString(b);
             Bin.readString(b);
             b.skipBytes(4);
-            skipSkin(b);
+            skipSkin(b, v);
             b.skipBytes(3 + 4);
             out.add(new Entry(uuid, unique, name, xuid));
         }
         return new PlayerListPacket(add, out);
     }
 
-    private static void skipSkin(ByteBuf b) {
+    private static void skipSkin(ByteBuf b, BedrockVersion v) {
         Bin.readString(b);
+        if (!v.has1_26_60()) Bin.readString(b);
         Bin.skipBytes(b);
         b.skipBytes(8);
         Bin.skipBytes(b);

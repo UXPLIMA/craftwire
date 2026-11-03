@@ -4,6 +4,7 @@ import com.google.gson.JsonObject;
 import com.uxplima.craftwire.bedrock.codec.BatchCodec;
 import com.uxplima.craftwire.bedrock.codec.BedrockCodecException;
 import com.uxplima.craftwire.bedrock.crypto.Jwt;
+import com.uxplima.craftwire.bedrock.packet.BedrockVersion;
 import com.uxplima.craftwire.bedrock.packet.Clientbound;
 import com.uxplima.craftwire.bedrock.packet.LoginOut;
 import com.uxplima.craftwire.bedrock.packet.LoginPackets;
@@ -50,24 +51,29 @@ final class BedrockSession implements RakClient.Listener {
     private final Sink sink;
     private final byte[] loginRequest;
     private final KeyPair key;
+    private final BedrockVersion version;
     private final Set<Integer> badPackets = new HashSet<>();
     private volatile RakClient rak;
     private boolean loginSent;
     private boolean heardAfterLogin;
 
-    private BedrockSession(Sink sink, byte[] loginRequest, KeyPair key) {
+    private BedrockSession(Sink sink, byte[] loginRequest, KeyPair key, BedrockVersion version) {
         this.sink = sink;
         this.loginRequest = loginRequest;
         this.key = key;
+        this.version = version;
     }
 
-    /** Connects and starts the login; completes once RakNet is up (the game login then runs on its own). */
+    /**
+     * Connects and starts the login in `version`'s protocol; completes once RakNet is up (the game login then runs
+     * on its own).
+     */
     static CompletableFuture<BedrockSession> connect(EventLoopGroup group, InetSocketAddress server, Sink sink, byte[] loginRequest, KeyPair key,
-            NetSim netsim) {
-        BedrockSession s = new BedrockSession(sink, loginRequest, key);
+            BedrockVersion version, NetSim netsim) {
+        BedrockSession s = new BedrockSession(sink, loginRequest, key, version);
         return RakClient.connect(group, server, s, netsim == null ? null : new NetSimHandler(netsim)).thenApply(r -> {
             s.rak = r;
-            s.send(List.of(LoginOut.requestNetworkSettings()));
+            s.send(List.of(LoginOut.requestNetworkSettings(version)));
             return s;
         });
     }
@@ -116,7 +122,7 @@ final class BedrockSession implements RakClient.Listener {
             int id = PacketDecoder.peekId(p);
             Clientbound c;
             try {
-                c = PacketDecoder.decode(p);
+                c = PacketDecoder.decode(p, version);
             } catch (BedrockCodecException e) {
                 // One packet this codec reads wrong should not end the session; the rest of the batch is intact.
                 if (badPackets.add(id)) LOG.warn("Bedrock packet {} did not decode: {}", id, e.getMessage());
@@ -131,7 +137,7 @@ final class BedrockSession implements RakClient.Listener {
         switch (c) {
             case LoginPackets.NetworkSettings s -> {
                 codec.compression(BatchCodec.Compression.of(s.algorithm()), s.threshold());
-                send(List.of(LoginOut.login(loginRequest)));
+                send(List.of(LoginOut.login(loginRequest, version)));
                 loginSent = true;
                 return true;
             }

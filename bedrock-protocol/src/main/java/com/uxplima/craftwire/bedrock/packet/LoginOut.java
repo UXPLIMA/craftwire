@@ -26,16 +26,16 @@ public final class LoginOut {
     }
 
     /** RequestNetworkSettings: the only packet before compression; its protocol number is big-endian. */
-    public static ByteBuf requestNetworkSettings() {
+    public static ByteBuf requestNetworkSettings(BedrockVersion v) {
         ByteBuf b = start(PacketIds.REQUEST_NETWORK_SETTINGS);
-        b.writeInt(PacketIds.PROTOCOL);
+        b.writeInt(v.protocol());
         return b;
     }
 
     /** Login: big-endian protocol, then the connection request (LoginRequest) as a byte slice. */
-    public static ByteBuf login(byte[] connectionRequest) {
+    public static ByteBuf login(byte[] connectionRequest, BedrockVersion v) {
         ByteBuf b = start(PacketIds.LOGIN);
-        b.writeInt(PacketIds.PROTOCOL);
+        b.writeInt(v.protocol());
         Bin.writeBytes(b, connectionRequest);
         return b;
     }

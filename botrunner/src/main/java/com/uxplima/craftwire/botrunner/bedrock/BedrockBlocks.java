@@ -1,6 +1,7 @@
 package com.uxplima.craftwire.botrunner.bedrock;
 
 import com.uxplima.craftwire.bedrock.codec.BlockPalette;
+import com.uxplima.craftwire.bedrock.packet.BedrockVersion;
 import com.uxplima.craftwire.bedrock.packet.StartGame;
 import com.uxplima.craftwire.bot.path.Cell;
 import com.uxplima.craftwire.botrunner.world.BlockClassifier;
@@ -24,9 +25,9 @@ import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * The block states Bedrock bots decode chunks with: the vanilla list (pinned in bedrock/bedrock-data.properties,
- * downloaded once into the runner's home and checked by sha256) plus each server's custom blocks, turned into a
- * {@link Palette} per server. Thread-safe; joins call it from their setup threads.
+ * The block states Bedrock bots decode chunks with: the vanilla list of the bot's version (pinned per protocol in
+ * bedrock/bedrock-data.properties, downloaded once into the runner's home and checked by sha256) plus each server's
+ * custom blocks, turned into a {@link Palette} per server. Thread-safe; joins call it from their setup threads.
  */
 final class BedrockBlocks {
     private static final HttpClient HTTP = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).build();
@@ -34,7 +35,7 @@ final class BedrockBlocks {
     private final Path cache;
     private final Properties pins = new Properties();
     private final Map<String, Palette> palettes = new ConcurrentHashMap<>();
-    private volatile byte[] vanilla;
+    private final Map<Integer, byte[]> vanilla = new ConcurrentHashMap<>();
 
     BedrockBlocks(Path home) {
         this.cache = home.resolve("cache").resolve("bedrock");
@@ -47,32 +48,27 @@ final class BedrockBlocks {
     }
 
     /**
-     * A server's block palette and classifier. Servers with the same custom blocks and id mode share one, since the
-     * runtime ids then match.
+     * A server's block palette and classifier. Servers on the same version with the same custom blocks and id mode
+     * share one, since the runtime ids then match.
      */
-    Palette palette(StartGame start) {
-        StringBuilder key = new StringBuilder(start.hashedBlockIds() ? "hashed" : "runtime");
+    Palette palette(StartGame start, BedrockVersion version) {
+        StringBuilder key = new StringBuilder().append(version.protocol()).append(start.hashedBlockIds() ? "|hashed" : "|runtime");
         for (StartGame.CustomBlock b : start.customBlocks()) key.append('|').append(b.name()).append(b.properties().hashCode());
-        return palettes.computeIfAbsent(key.toString(), k -> build(start));
+        return palettes.computeIfAbsent(key.toString(), k -> build(start, version));
     }
 
-    private Palette build(StartGame start) {
+    private Palette build(StartGame start, BedrockVersion version) {
         List<BlockPalette.State> custom = new ArrayList<>();
         for (StartGame.CustomBlock b : start.customBlocks()) custom.addAll(BlockPalette.customStates(b.name(), b.properties()));
-        return new Palette(BlockPalette.load(vanilla(), custom, start.hashedBlockIds()));
+        return new Palette(BlockPalette.load(vanilla.computeIfAbsent(version.protocol(), this::load), custom, start.hashedBlockIds()));
     }
 
-    private byte[] vanilla() {
-        byte[] v = vanilla;
-        if (v != null) return v;
-        synchronized (this) {
-            if (vanilla == null) vanilla = load();
-            return vanilla;
-        }
-    }
-
-    private byte[] load() {
-        String sha = pins.getProperty("blockStates.sha256");
+    /** The vanilla list of a protocol: from the cache when its hash matches, else downloaded and checked. */
+    private byte[] load(int protocol) {
+        String pin = "blockStates." + protocol + ".";
+        String sha = pins.getProperty(pin + "sha256");
+        String url = pins.getProperty(pin + "url");
+        if (sha == null || url == null) throw new IllegalStateException("bedrock/bedrock-data.properties has no block list for " + protocol);
         Path dest = cache.resolve("block_states-" + sha.substring(0, 12) + ".nbt");
         try {
             if (Files.exists(dest)) {
@@ -80,7 +76,7 @@ final class BedrockBlocks {
                 if (sha.equals(sha256(have))) return have;
             }
             Files.createDirectories(cache);
-            HttpResponse<byte[]> r = HTTP.send(HttpRequest.newBuilder(URI.create(pins.getProperty("blockStates.url"))).build(),
+            HttpResponse<byte[]> r = HTTP.send(HttpRequest.newBuilder(URI.create(url)).build(),
                     HttpResponse.BodyHandlers.ofByteArray());
             if (r.statusCode() != 200) throw new IOException("HTTP " + r.statusCode());
             String got = sha256(r.body());
@@ -91,7 +87,7 @@ final class BedrockBlocks {
             return r.body();
         } catch (IOException e) {
             throw new AgentError("BEDROCK_DATA_UNAVAILABLE", "Could not get the Bedrock block list: " + e.getMessage(),
-                    "The runner downloads it once from " + pins.getProperty("blockStates.url") + "; check the network, or put the file at "
+                    "The runner downloads it once from " + url + "; check the network, or put the file at "
                             + dest + ".");
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

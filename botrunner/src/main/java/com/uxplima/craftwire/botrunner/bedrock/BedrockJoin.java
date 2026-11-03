@@ -5,7 +5,8 @@ import com.uxplima.craftwire.bedrock.auth.ClientData;
 import com.uxplima.craftwire.bedrock.auth.LoginRequest;
 import com.uxplima.craftwire.bedrock.auth.XboxChain;
 import com.uxplima.craftwire.bedrock.crypto.Jwt;
-import com.uxplima.craftwire.bedrock.packet.PacketIds;
+import com.uxplima.craftwire.bedrock.packet.BedrockVersion;
+import com.uxplima.craftwire.bedrock.raknet.RakPing;
 import com.uxplima.craftwire.bot.json.Params;
 import com.uxplima.craftwire.bot.model.Profile;
 import com.uxplima.craftwire.botrunner.bot.JoinSpec;
@@ -24,11 +25,12 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Starting one Bedrock bot: its identity (offline, or the Xbox chain for an account's XSTS token the hub passed as
- * raw.xbox {userHash, xsts}), the client data it presents, the connection, a join timeout and join failures as
- * agent errors. The Xbox chain request blocks, so the whole setup runs on the blocking executor.
+ * raw.xbox {userHash, xsts}), the client data it presents, the Bedrock version (from the server's pong), the connection, a join timeout and join failures as
+ * agent errors. The Xbox requests block, so the setup after the ping runs on the blocking executor.
  */
 final class BedrockJoin {
     private static final long TIMEOUT_MS = 60_000;
+    private static final long PING_MS = 3_000;
     private static final int LIGHT_VIEW = 4;
     private static final int REALISTIC_VIEW = 10;
 
@@ -37,8 +39,13 @@ final class BedrockJoin {
     static CompletableFuture<RunnerBot> start(BedrockContext ctx, JoinSpec spec) {
         UUID uuid = UUID.nameUUIDFromBytes(("BedrockBot:" + spec.name()).getBytes(StandardCharsets.UTF_8));
         BedrockBot bot = new BedrockBot(ctx, spec, uuid, view(spec));
-        CompletableFuture.supplyAsync(() -> login(spec, bot.key(), view(spec)), ctx.blocking())
-                .thenCompose(req -> BedrockSession.connect(ctx.group(), new InetSocketAddress(spec.host(), spec.port()), bot, req, bot.key(),
+        InetSocketAddress server = new InetSocketAddress(spec.host(), spec.port());
+        version(ctx, server)
+                .thenApplyAsync(v -> {
+                    bot.version(v);
+                    return login(spec, bot.key(), view(spec), v);
+                }, ctx.blocking())
+                .thenCompose(req -> BedrockSession.connect(ctx.group(), server, bot, req, bot.key(), bot.version(),
                         NetSim.from(spec.raw()).orElse(null)))
                 .whenComplete((s, err) -> {
                     if (err == null) {
@@ -60,11 +67,24 @@ final class BedrockJoin {
         return v > 0 ? v : spec.profile() == Profile.LIGHT ? LIGHT_VIEW : REALISTIC_VIEW;
     }
 
+    /**
+     * The version to speak, from the server's pong; a server that does not answer the ping gets the latest, and one
+     * older than every version the bot has is refused before connecting.
+     */
+    private static CompletableFuture<BedrockVersion> version(BedrockContext ctx, InetSocketAddress server) {
+        return RakPing.ping(ctx.group(), server, PING_MS).handle((status, err) -> {
+            if (err != null || status.protocol() <= 0) return BedrockVersion.LATEST;
+            return BedrockVersion.forServer(status.protocol()).orElseThrow(() -> new AgentError("VERSION_UNSUPPORTED",
+                    "The server runs Bedrock " + status.version() + " (protocol " + status.protocol() + ")",
+                    "Bedrock bots speak " + BedrockVersion.supported() + "; update the server or put Geyser in front of it."));
+        });
+    }
+
     /** The Login packet's connection request: offline, or signed by the Xbox chain when raw.xbox is given. */
-    private static byte[] login(JoinSpec spec, KeyPair key, int view) {
+    private static byte[] login(JoinSpec spec, KeyPair key, int view, BedrockVersion v) {
         String playFab = ClientData.randomPlayFabId();
         ClientData data = new ClientData(spec.name(), ClientData.language(spec.settings().locale()), spec.host() + ":" + spec.port(),
-                PacketIds.GAME_VERSION, view);
+                v.game(), view);
         JsonObject clientData = data.json(playFab);
         JsonObject xbox = Params.optObject(spec.raw(), "xbox").orElse(null);
         if (xbox == null) {
@@ -72,7 +92,7 @@ final class BedrockJoin {
             return LoginRequest.offline(spec.name(), identity, playFab, key, clientData);
         }
         try {
-            String chain = XboxChain.request(Params.string(xbox, "userHash"), Params.string(xbox, "xsts"), key, PacketIds.GAME_VERSION);
+            String chain = XboxChain.request(Params.string(xbox, "userHash"), Params.string(xbox, "xsts"), key, v.game());
             return LoginRequest.xbox(chain, key, null, clientData);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
@@ -89,7 +109,7 @@ final class BedrockJoin {
         }
         if (reason.startsWith("kicked: ")) {
             return new AgentError("JOIN_KICKED", "The server refused the bot: " + reason.substring(8),
-                    "Check whitelist, bans, the server's version (Bedrock " + PacketIds.GAME_VERSION + ") and anti-bot plugins.");
+                    "Check whitelist, bans, the server's version (bots speak Bedrock " + BedrockVersion.supported() + ") and anti-bot plugins.");
         }
         return new AgentError("JOIN_FAILED", "The bot could not join: " + reason, "Check the address and that the Bedrock server is up.");
     }

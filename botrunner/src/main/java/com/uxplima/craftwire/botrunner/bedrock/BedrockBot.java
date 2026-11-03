@@ -3,6 +3,7 @@ package com.uxplima.craftwire.botrunner.bedrock;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.uxplima.craftwire.bedrock.crypto.Jwt;
+import com.uxplima.craftwire.bedrock.packet.BedrockVersion;
 import com.uxplima.craftwire.bedrock.packet.Clientbound;
 import com.uxplima.craftwire.bedrock.packet.ItemPackets;
 import com.uxplima.craftwire.bedrock.packet.PlayOut;
@@ -57,6 +58,8 @@ final class BedrockBot implements RunnerBot, BedrockSession.Sink {
     private final KeyPair key = Jwt.newKeyPair();
     private final int view;
     private volatile BedrockSession session;
+    /** Set once by the join (from the server's pong) before the connection starts; read on every thread after. */
+    private volatile BedrockVersion version = BedrockVersion.LATEST;
     private volatile boolean connected = true;
     private boolean serverAuthBreaking;
     private Walker walker;
@@ -80,6 +83,14 @@ final class BedrockBot implements RunnerBot, BedrockSession.Sink {
 
     KeyPair key() {
         return key;
+    }
+
+    BedrockVersion version() {
+        return version;
+    }
+
+    void version(BedrockVersion v) {
+        version = v;
     }
 
     CompletableFuture<RunnerBot> joined() {
@@ -284,7 +295,7 @@ final class BedrockBot implements RunnerBot, BedrockSession.Sink {
 
     @Override
     public void swing() {
-        send(PlayOut.swing(life.runtimeId()));
+        send(PlayOut.swing(life.runtimeId(), version));
     }
 
     @Override

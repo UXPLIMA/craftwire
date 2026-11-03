@@ -19,7 +19,7 @@ public record StartGame(long uniqueId, long runtimeId, int gameMode, float x, fl
                         String gameVersion, boolean hashedBlockIds) implements Clientbound {
     public record CustomBlock(String name, Map<String, Object> properties) {}
 
-    static StartGame read(ByteBuf b) {
+    static StartGame read(ByteBuf b, BedrockVersion v) {
         long unique = Bin.readVarLong(b);
         long runtime = Bin.readVarULong(b);
         int gameMode = Bin.readVarInt(b);
@@ -31,7 +31,7 @@ public record StartGame(long uniqueId, long runtimeId, int gameMode, float x, fl
         int dimension = Bin.readVarInt(b);
         Bin.readVarInt(b);
         int worldGameMode = Bin.readVarInt(b);
-        levelSettings(b);
+        levelSettings(b, v);
         b.skipBytes(1);
         Bin.readVarInt(b);
         boolean serverAuthBreaking = Bin.readBool(b);
@@ -52,13 +52,14 @@ public record StartGame(long uniqueId, long runtimeId, int gameMode, float x, fl
     }
 
     /** From Hardcore through Trial: the world's settings, none of which the bot uses. */
-    private static void levelSettings(ByteBuf b) {
+    private static void levelSettings(ByteBuf b, BedrockVersion v) {
         b.skipBytes(1);
         Bin.readVarInt(b);
         Bin.readBlockPos(b);
         b.skipBytes(1);
         Bin.readVarInt(b);
-        b.skipBytes(3);
+        // CreatedInEditor, ExportedFromEditor and, from 1.26.60, EditorLevelMigrationVersion (int8).
+        b.skipBytes(v.has1_26_60() ? 3 : 2);
         Bin.readVarInt(b);
         Bin.readVarUInt(b);
         b.skipBytes(1);

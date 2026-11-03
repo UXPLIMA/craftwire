@@ -89,7 +89,7 @@ final class BedrockInteract {
         float[] clickPos = {(float) e.x(), (float) (e.y() + 0.9), (float) e.z()};
         b.send(PlayOut.interact(4, e.id()));
         b.send(TransactionOut.onEntity(e.id(), action, b.life.heldSlot(), b.inventory.hotbar(b.life.heldSlot()), botPos, clickPos,
-                b.items.shieldId()));
+                b.items.shieldId(), b.version()));
     }
 
     private static TrackedEntity nearest(BedrockBot b, String type) {

@@ -3,7 +3,6 @@ package com.uxplima.craftwire.botrunner.bedrock;
 import com.uxplima.craftwire.bedrock.packet.EntityPackets;
 import com.uxplima.craftwire.bedrock.packet.ItemPackets;
 import com.uxplima.craftwire.bedrock.packet.LoginOut;
-import com.uxplima.craftwire.bedrock.packet.PacketIds;
 import com.uxplima.craftwire.bedrock.packet.PlayOut;
 import com.uxplima.craftwire.bedrock.packet.StartGame;
 import java.util.concurrent.CompletableFuture;
@@ -24,8 +23,8 @@ final class BedrockSpawn {
                 b.send(LoginOut.loadingScreen(2));
                 if (b.life.spawn() && !b.joined().isDone()) b.joined().complete(b);
             }
-            case 1 -> b.kicked("the server is newer than Bedrock " + PacketIds.GAME_VERSION);
-            case 2 -> b.kicked("the server is older than Bedrock " + PacketIds.GAME_VERSION);
+            case 1 -> b.kicked("the server is newer than Bedrock " + b.version().game());
+            case 2 -> b.kicked("the server is older than Bedrock " + b.version().game());
             case 7 -> b.kicked("the server is full");
             default -> b.kicked("login refused (play status " + status + ")");
         }
@@ -36,7 +35,7 @@ final class BedrockSpawn {
         b.life.start(s.runtimeId(), s.uniqueId(), s.gameMode(), s.worldGameMode());
         b.serverAuthBreaking(s.serverAuthBlockBreaking());
         b.moves.teleported(s.x(), s.y() - BedrockEntities.EYE, s.z(), s.yaw(), s.pitch());
-        CompletableFuture.supplyAsync(() -> b.ctx.blocks().palette(s), b.ctx.blocking())
+        CompletableFuture.supplyAsync(() -> b.ctx.blocks().palette(s, b.version()), b.ctx.blocking())
                 .whenComplete((p, err) -> b.ctx.services().loop().execute(() -> {
                     if (err != null) {
                         Throwable t = err.getCause() != null ? err.getCause() : err;

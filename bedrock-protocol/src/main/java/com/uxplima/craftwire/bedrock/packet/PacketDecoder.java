@@ -19,16 +19,17 @@ public final class PacketDecoder {
         return id;
     }
 
-    public static Clientbound decode(ByteBuf packet) {
+    /** One packet as `version` lays it out. */
+    public static Clientbound decode(ByteBuf packet, BedrockVersion version) {
         int id = Bin.readVarUInt(packet) & 0x3ff;
         try {
             return switch (id) {
-                case PacketIds.START_GAME -> StartGame.read(packet);
-                case PacketIds.PLAYER_LIST -> PlayerListPacket.read(packet);
+                case PacketIds.START_GAME -> StartGame.read(packet, version);
+                case PacketIds.PLAYER_LIST -> PlayerListPacket.read(packet, version);
                 default -> any(id, packet);
             };
         } catch (IndexOutOfBoundsException e) {
-            throw new BedrockCodecException("packet " + id + " is shorter than protocol " + PacketIds.PROTOCOL + " says", e);
+            throw new BedrockCodecException("packet " + id + " is shorter than protocol " + version.protocol() + " says", e);
         }
     }
 

@@ -35,28 +35,31 @@ public final class TransactionOut {
         return b;
     }
 
-    /** UseItemOnEntity: `action` ENTITY_INTERACT or ENTITY_ATTACK, from the bot's position at the target's. */
+    /**
+     * UseItemOnEntity: `action` ENTITY_INTERACT or ENTITY_ATTACK, from the bot's position at the target's, with the
+     * main hand (hand 0, a field from 1.26.60 on).
+     */
     public static ByteBuf onEntity(long targetRuntimeId, int action, int hotbar, BedrockItem held, float[] botPos, float[] clickPos,
-                                   int shieldId) {
+                                   int shieldId, BedrockVersion v) {
         ByteBuf b = head(TYPE_USE_ITEM_ON_ENTITY);
         Bin.writeVarULong(b, targetRuntimeId);
         Bin.writeVarInt(b, action);
         Bin.writeVarInt(b, hotbar);
-        b.writeByte(0);
+        if (v.has1_26_60()) b.writeByte(0);
         held.write(b, shieldId);
         Bin.writeVec3(b, botPos[0], botPos[1], botPos[2]);
         Bin.writeVec3(b, clickPos[0], clickPos[1], clickPos[2]);
         return b;
     }
 
-    /** ReleaseItem action 0 (release a drawn bow or trident), 1 (finish eating or drinking). */
-    public static ByteBuf release(int action, int hotbar, BedrockItem held, float[] headPos, int shieldId) {
+    /** ReleaseItem action 0 (release a drawn bow or trident), 1 (finish eating or drinking), main hand from 1.26.60. */
+    public static ByteBuf release(int action, int hotbar, BedrockItem held, float[] headPos, int shieldId, BedrockVersion v) {
         ByteBuf b = head(TYPE_RELEASE_ITEM);
         Bin.writeVarInt(b, action);
         Bin.writeVarInt(b, hotbar);
         held.write(b, shieldId);
         Bin.writeVec3(b, headPos[0], headPos[1], headPos[2]);
-        b.writeByte(0);
+        if (v.has1_26_60()) b.writeByte(0);
         return b;
     }
 }
