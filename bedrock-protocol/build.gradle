@@ -1,0 +1,30 @@
+plugins {
+    id 'java-library'
+}
+
+repositories {
+    mavenCentral()
+}
+
+// Our own Bedrock Edition protocol for the bot runner's Bedrock bots: RakNet over UDP, the batch codec with
+// compression and encryption, login chains, and the packets a bot needs. Plain Java on Netty; the runner bundles
+// Netty and Gson, so they are compile-only here.
+dependencies {
+    compileOnly 'io.netty:netty-all:4.2.19.Final'
+    compileOnly 'com.google.code.gson:gson:2.13.2'
+
+    testImplementation 'io.netty:netty-all:4.2.19.Final'
+    testImplementation 'com.google.code.gson:gson:2.13.2'
+    testImplementation platform('org.junit:junit-bom:5.13.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 25
+    options.encoding = 'UTF-8'
+}
+
+test {
+    useJUnitPlatform()
+}
