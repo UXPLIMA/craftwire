@@ -9,6 +9,8 @@ import { startHub } from "./hub.js";
 import { chooseHub, parseTestArgs, runTests, TEST_USAGE } from "./scenario/test-command.js";
 import { httpCaller, inProcessCaller } from "./scenario/caller.js";
 import { parseServeArgs, serve, SERVE_USAGE } from "./http/serve-command.js";
+import { tokenCommand } from "./team/token-command.js";
+import { LOAD_USAGE, parseLoadArgs, runLoad } from "./tools/bots/load-command.js";
 import { CraftwireError } from "./errors.js";
 import { createCraftwireServer } from "./server.js";
 import { setupCommand, setupEnvFromProcess } from "./setup.js";
@@ -102,6 +104,40 @@ async function test(args: string[]): Promise<void> {
   process.exit(code);
 }
 
+/** craftwire load-test: on a craftwire serve hub (--hub, or the one running here), else on a hub of its own. */
+async function loadTest(args: string[]): Promise<void> {
+  if (args.includes("--help") || args.includes("-h")) {
+    process.stdout.write(`${LOAD_USAGE}\n`);
+    return;
+  }
+  const out = (s: string) => process.stdout.write(`${s}\n`);
+  let opts;
+  let choice;
+  try {
+    opts = parseLoadArgs(args);
+    choice = await chooseHub(craftwireHome(), opts.hub, process.env.CRAFTWIRE_TOKEN);
+  } catch (e) {
+    fail(e);
+    process.stderr.write(`${LOAD_USAGE}\n`);
+    process.exit(2);
+  }
+  let code = 2;
+  const hub = choice.kind === "local" ? await startHub(craftwireHome(), () => {}) : undefined;
+  try {
+    const caller = choice.kind === "http" ? await httpCaller(choice.url, choice.token) : await inProcessCaller(createCraftwireServer(hub!.ctx));
+    try {
+      code = await runLoad(opts, caller.call, process.cwd(), out);
+    } finally {
+      await caller.close();
+    }
+  } catch (e) {
+    fail(e);
+  } finally {
+    await hub?.close();
+  }
+  process.exit(code);
+}
+
 async function serveCommand(args: string[]): Promise<void> {
   if (args.includes("--help") || args.includes("-h")) {
     process.stdout.write(`${SERVE_USAGE}\n`);
@@ -149,6 +185,15 @@ const fatal = (e: unknown) => {
 if (argv[0] === "doctor") doctor(argv.slice(1)).catch(fatal);
 else if (argv[0] === "test") test(argv.slice(1)).catch(fatal);
 else if (argv[0] === "serve") serveCommand(argv.slice(1)).catch(fatal);
+else if (argv[0] === "load-test") loadTest(argv.slice(1)).catch(fatal);
+else if (argv[0] === "token") {
+  try {
+    process.exit(tokenCommand(argv.slice(1), craftwireHome(), (s) => process.stdout.write(s)));
+  } catch (e) {
+    process.stderr.write(`craftwire token: ${e instanceof Error ? e.message : String(e)}\n`);
+    process.exit(1);
+  }
+}
 else if (argv[0] === "setup") {
   try {
     setup(argv.slice(1));

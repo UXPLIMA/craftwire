@@ -7,9 +7,11 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { afterEach, describe, expect, it } from "vitest";
 import { startHttpServer, type HttpHub, type HttpOptions } from "../src/http/serve.js";
 import { createCraftwireServer } from "../src/server.js";
+import type { Person } from "../src/team/tokens.js";
 import { startHub } from "./helpers/hub.js";
 
 const HTTP_TOKEN = "c".repeat(64);
+const owner = (t: string): Person | undefined => (t === HTTP_TOKEN ? { name: "owner", role: "owner" } : undefined);
 let hub: Awaited<ReturnType<typeof startHub>> | undefined;
 let http: HttpHub | undefined;
 const clients: Client[] = [];
@@ -24,7 +26,7 @@ afterEach(async () => {
 async function serve(o: Partial<HttpOptions> = {}): Promise<HttpHub> {
   hub = await startHub();
   const ctx = hub.ctx;
-  http = await startHttpServer({ host: "127.0.0.1", port: 0, token: HTTP_TOKEN, makeServer: () => createCraftwireServer(ctx), ...o });
+  http = await startHttpServer({ host: "127.0.0.1", port: 0, authenticate: owner, makeServer: () => createCraftwireServer(ctx), ...o });
   return http;
 }
 
@@ -113,7 +115,7 @@ describe("craftwire serve (MCP over HTTP)", () => {
   it("will not listen beyond this machine without --allow-remote", async () => {
     hub = await startHub();
     const ctx = hub.ctx;
-    await expect(startHttpServer({ host: "0.0.0.0", port: 0, token: HTTP_TOKEN, makeServer: () => createCraftwireServer(ctx) })).rejects.toThrow(/--allow-remote/);
+    await expect(startHttpServer({ host: "0.0.0.0", port: 0, authenticate: owner, makeServer: () => createCraftwireServer(ctx) })).rejects.toThrow(/--allow-remote/);
   });
 
   it("serves over TLS with a certificate", async () => {

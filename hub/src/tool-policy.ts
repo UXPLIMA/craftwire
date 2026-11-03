@@ -87,10 +87,18 @@ export function parseToolGroups(text: string): Set<string> {
 
 /** Which tools a hub offers and which calls it refuses: `--read-only` and `--tools` of `craftwire serve`. */
 export class ToolPolicy {
-  constructor(private readonly o: { readOnly?: boolean; groups?: Set<string>; extraTools?: Set<string> }) {}
+  constructor(private readonly o: { readOnly?: boolean; groups?: Set<string>; extraTools?: Set<string>; also?: ToolPolicy }) {}
+
+  /** Both limits at once: the hub's own (--read-only, --tools) and a person's role. */
+  static both(a: ToolPolicy | undefined, b: ToolPolicy | undefined): ToolPolicy | undefined {
+    if (a === undefined) return b;
+    if (b === undefined) return a;
+    return new ToolPolicy({ ...a.o, also: ToolPolicy.both(a.o.also, b) ?? b });
+  }
 
   /** Whether the tool is offered at all. */
   lists(tool: string): boolean {
+    if (this.o.also !== undefined && !this.o.also.lists(tool)) return false;
     if (this.o.groups !== undefined && !this.o.extraTools?.has(tool)) {
       const group = BUILT_IN.has(tool) ? Object.keys(TOOL_GROUPS).find((g) => TOOL_GROUPS[g]!.includes(tool)) : "extensions";
       if (!this.o.groups.has(group!)) return false;
@@ -101,6 +109,8 @@ export class ToolPolicy {
 
   /** Why this call is not allowed, or undefined when it is. */
   refusal(tool: string, args: Record<string, unknown>): string | undefined {
+    const other = this.o.also?.refusal(tool, args);
+    if (other !== undefined) return other;
     if (!this.o.readOnly) return undefined;
     const reading = READING_ACTIONS[tool];
     if (reading !== undefined && !reading.includes(String(args.action))) {

@@ -22,8 +22,11 @@ export interface ToolContext {
   runners?: RunnerManager;
   exceptions: ExceptionTracker;
   extensions: ExtensionRegistry;
-  /** Limits the tools offered and the calls allowed (craftwire serve --read-only / --tools). */
+  /** Limits the tools offered and the calls allowed (craftwire serve --read-only / --tools, or the person's role). */
   policy?: ToolPolicy;
+  /** Who this MCP session belongs to (the person behind the token) and its id, for the audit log. */
+  user?: string;
+  session?: string;
   /** build files: over HTTP (craftwire serve) they are read only from --build-dir. */
   build?: { dir?: string; http: boolean };
   /** CRAFTWIRE_HOME, for caches such as the block colour tables; unset in tests that must not download. */
@@ -79,15 +82,20 @@ function registerAudited(
       const refused = ctx.policy?.refusal(name, (args ?? {}) as Record<string, unknown>);
       if (refused !== undefined) throw new CraftwireError("READ_ONLY", refused, "Ask the person running the hub; it was started with --read-only.");
       const result = await run(args, ctx);
-      ctx.audit.write({ tool: name, args, ok: !result.isError, ms: Date.now() - started });
+      ctx.audit.write({ tool: name, args, ok: !result.isError, ms: Date.now() - started, ...who(ctx), result });
       return result;
     } catch (e) {
-      ctx.audit.write({ tool: name, args, ok: false, ms: Date.now() - started, error: e instanceof CraftwireError ? e.toJSON() : String(e) });
+      const error = e instanceof CraftwireError ? e.toJSON() : String(e);
+      ctx.audit.write({ tool: name, args, ok: false, ms: Date.now() - started, ...who(ctx), error });
       return toToolError(e);
     }
   };
   // The SDK's generic overloads do not infer through our wrapper; the shape is still validated by the SDK.
   return server.registerTool(name, { description, inputSchema: inputSchema as never }, handler as never);
+}
+
+function who(ctx: ToolContext): { user?: string; session?: string } {
+  return { ...(ctx.user !== undefined ? { user: ctx.user } : {}), ...(ctx.session !== undefined ? { session: ctx.session } : {}) };
 }
 
 /** Routes a tool call to one agent of `kind`; `instance` picks it, `operationId` makes retries idempotent. */

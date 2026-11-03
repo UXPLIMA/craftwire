@@ -4,15 +4,18 @@ import { createServer as createHttpsServer } from "node:https";
 import type { AddressInfo } from "node:net";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { tokensEqual } from "../config.js";
+import type { Person } from "../team/tokens.js";
 import { allowedHosts, bearer, hostAllowed, isLoopback, originAllowed, RateLimiter } from "./gate.js";
 
 export interface HttpOptions {
   host: string;
   port: number;
-  token: string;
-  /** A fresh MCP server per session, all on the same hub. */
-  makeServer: () => McpServer;
+  /** The person a bearer token belongs to (the serve token is the owner), or undefined for a wrong token. */
+  authenticate: (token: string) => Person | undefined;
+  /** A fresh MCP server per session, all on the same hub, limited to what the person may do. */
+  makeServer: (person: Person, session: string) => McpServer;
+  /** The web panel at /panel; it checks its own sign-in (a cookie made from a token). */
+  panel?: (req: IncomingMessage, res: ServerResponse) => Promise<void>;
   allowRemote?: boolean;
   tls?: { cert: Buffer; key: Buffer };
   /** Extra Host names (e.g. a DNS name of this machine) and browser origins to accept. */
@@ -28,6 +31,8 @@ export interface HttpOptions {
 interface Session {
   transport: StreamableHTTPServerTransport;
   server: McpServer;
+  /** A session stays with the person who started it; another token cannot take it over. */
+  person: string;
   lastSeen: number;
   openStreams: number;
 }
@@ -45,7 +50,8 @@ const json = (res: ServerResponse, status: number, message: string, headers: Rec
 };
 
 /**
- * MCP over Streamable HTTP at /mcp for `craftwire serve`. Every request needs the bearer token; Host and Origin are
+ * MCP over Streamable HTTP at /mcp for `craftwire serve`, and the web panel at /panel. Every MCP request needs a
+ * bearer token (the serve token or a teammate's), and its session stays with that person; Host and Origin are
  * checked against DNS rebinding; requests are rate limited; idle sessions expire.
  */
 export async function startHttpServer(o: HttpOptions): Promise<HttpHub> {
@@ -68,11 +74,13 @@ export async function startHttpServer(o: HttpOptions): Promise<HttpHub> {
 
   const handle = async (req: IncomingMessage, res: ServerResponse) => {
     const path = new URL(req.url ?? "/", "http://hub").pathname;
-    if (path !== "/mcp") return json(res, 404, "Not found: the MCP endpoint is /mcp");
     if (!hostAllowed(req.headers.host, hosts)) return json(res, 421, "This Host is not served here");
+    if (o.panel && (path === "/panel" || path.startsWith("/panel/"))) return o.panel(req, res);
+    if (path !== "/mcp") return json(res, 404, "Not found: the MCP endpoint is /mcp");
     if (!originAllowed(req.headers.origin, o.allowOrigins ?? [])) return json(res, 403, "Requests from web pages are not accepted");
     const token = bearer(req.headers.authorization);
-    if (token === undefined || !tokensEqual(token, o.token)) {
+    const person = token === undefined ? undefined : o.authenticate(token);
+    if (person === undefined) {
       return json(res, 401, "Missing or wrong bearer token", { "www-authenticate": 'Bearer realm="craftwire"' });
     }
     const wait = limiter.take();
@@ -82,6 +90,7 @@ export async function startHttpServer(o: HttpOptions): Promise<HttpHub> {
     if (typeof id === "string") {
       const s = sessions.get(id);
       if (!s) return json(res, 404, "Session not found or expired: start a new one");
+      if (s.person !== person.name) return json(res, 403, "This session belongs to someone else");
       s.lastSeen = now();
       s.openStreams++;
       res.once("close", () => { s.openStreams--; s.lastSeen = now(); });
@@ -90,10 +99,11 @@ export async function startHttpServer(o: HttpOptions): Promise<HttpHub> {
     if (req.method !== "POST") return json(res, 400, "Start a session with an initialize request");
     if (sessions.size >= (o.maxSessions ?? 32)) return json(res, 503, "Too many sessions");
 
-    const server = o.makeServer();
+    const sessionId = randomUUID();
+    const server = o.makeServer(person, sessionId);
     const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: () => randomUUID(),
-      onsessioninitialized: (sid) => { sessions.set(sid, { transport, server, lastSeen: now(), openStreams: 0 }); },
+      sessionIdGenerator: () => sessionId,
+      onsessioninitialized: (sid) => { sessions.set(sid, { transport, server, person: person.name, lastSeen: now(), openStreams: 0 }); },
       onsessionclosed: (sid) => { void closeSession(sid); },
       maxRequestBodySize: o.maxBodyBytes ?? 4 * 1024 * 1024,
     });

@@ -2,7 +2,9 @@ import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadOrCreateHttpToken } from "../config.js";
 import { runningHub, startHub } from "../hub.js";
+import { createPanel } from "../panel/panel.js";
 import { createCraftwireServer } from "../server.js";
+import { type Person, TeamTokens } from "../team/tokens.js";
 import { parseToolGroups, profile, ToolPolicy } from "../tool-policy.js";
 import { HUB_VERSION } from "../version.js";
 import { isLoopback, isWildcard } from "./gate.js";
@@ -24,7 +26,9 @@ export const SERVE_USAGE = `Usage: craftwire serve [--port 7777] [--host 127.0.0
   --allow-origin <url>  a web page origin to accept (repeatable; none by default)
   --rate-limit <n>      requests per minute (default 120)
   --idle <minutes>      end sessions whose client left after this long (default 30)
-  --rotate-token        make a new token (clients must be set up again)`;
+  --rotate-token        make a new token (clients must be set up again)
+  --no-panel            do not serve the web panel at /panel
+  Teammates get their own tokens and roles with craftwire token add <name>; every call is audited by person.`;
 
 export interface ServeOptions {
   port: number;
@@ -43,10 +47,12 @@ export interface ServeOptions {
   rateLimit: number;
   idleMinutes: number;
   rotateToken: boolean;
+  panel: boolean;
 }
 
 export function parseServeArgs(argv: string[]): ServeOptions {
-  const o: ServeOptions = { port: 7777, host: "127.0.0.1", allowRemote: false, readOnly: false, allowHosts: [], allowOrigins: [], rateLimit: 120, idleMinutes: 30, rotateToken: false };
+  const o: ServeOptions = { port: 7777, host: "127.0.0.1", allowRemote: false, readOnly: false, allowHosts: [], allowOrigins: [], rateLimit: 120, idleMinutes: 30,
+    rotateToken: false, panel: true };
   const number = (flag: string, v: string, min: number, max: number) => {
     const n = Number(v);
     if (!Number.isInteger(n) || n < min || n > max) throw new Error(`${flag} must be a whole number from ${min} to ${max}`);
@@ -79,6 +85,7 @@ export function parseServeArgs(argv: string[]): ServeOptions {
       case "--rate-limit": o.rateLimit = number(a, value(), 1, 100_000); break;
       case "--idle": o.idleMinutes = number(a, value(), 1, 24 * 60); break;
       case "--rotate-token": o.rotateToken = true; break;
+      case "--no-panel": o.panel = false; break;
       default: throw new Error(`Unknown option ${a}`);
     }
   }
@@ -133,11 +140,18 @@ export async function startServe(o: ServeOptions, home: string, log: (msg: strin
   const { token, file, created } = loadOrCreateHttpToken(home, o.rotateToken);
   const hub = await startHub(home, log);
   const policy = o.readOnly || o.tools ? new ToolPolicy({ readOnly: o.readOnly, ...(o.tools ? { groups: o.tools } : {}), ...(o.extraTools ? { extraTools: o.extraTools } : {}) }) : undefined;
-  const ctx = { ...hub.ctx, ...(policy ? { policy } : {}), build: { http: true, ...(o.buildDir !== undefined ? { dir: o.buildDir } : {}) } };
+  const ctx = { ...hub.ctx, build: { http: true, ...(o.buildDir !== undefined ? { dir: o.buildDir } : {}) } };
+  const team = new TeamTokens(home);
+  const authenticate = (t: string) => team.identify(t, token);
+  const makeServer = (person: Person, session: string) => {
+    const limit = ToolPolicy.both(policy, person.policy);
+    return createCraftwireServer({ ...ctx, ...(limit ? { policy: limit } : {}), user: person.name, session });
+  };
   let http;
   try {
     http = await startHttpServer({
-      host: o.host, port: o.port, token, allowRemote: o.allowRemote, makeServer: () => createCraftwireServer(ctx),
+      host: o.host, port: o.port, authenticate, allowRemote: o.allowRemote, makeServer,
+      ...(o.panel ? { panel: createPanel({ ...ctx, ...(policy ? { policy } : {}) }, authenticate, tls !== undefined) } : {}),
       allowHosts: o.allowHosts, allowOrigins: o.allowOrigins, rateLimitPerMinute: o.rateLimit, sessionIdleMs: o.idleMinutes * 60_000,
       ...(tls ? { tls } : {}),
     });
@@ -152,6 +166,9 @@ export async function startServe(o: ServeOptions, home: string, log: (msg: strin
   log(`hub ${HUB_VERSION} serving MCP at ${http.url} (games connect on 127.0.0.1:${hub.port})`);
   log(`token ${created ? (o.rotateToken ? "rotated" : "created") : "read"}: ${file}`);
   log(`Claude Code: claude mcp add --transport http craftwire ${http.url} --header "Authorization: Bearer ${token}"`);
+  if (o.panel) log(`panel: ${http.url.replace(/\/mcp$/, "/panel")} (sign in with a token)`);
+  const teammates = team.list().length;
+  if (teammates > 0) log(`${teammates} teammate token${teammates === 1 ? "" : "s"} accepted (craftwire token list)`);
   if (policy) log(`offering ${o.readOnly ? "read-only " : ""}tools${o.tools ? ` from ${[...o.tools].join(", ")}` : ""}`);
   if (!isLoopback(o.host)) {
     log(isWildcard(o.host) ? "listening on every network interface" : `listening on ${o.host}`);
