@@ -5,11 +5,22 @@ this page (`craftwire://docs/tools`) has the details. Every tool also takes `ins
 list_instances; needed only when several instances match) and `operationId` (an idempotency key: a retry with the
 same id returns the first result).
 
+Some tools list only their common fields; the others described here (a sign's `lines`, `rotation` of a schematic, a
+client's `windowSize`, …) are accepted and checked all the same. Six tools are off in a new session to save tokens:
+bot_behavior, load_test, dupe_hunt, locale_tour, scenario_record and profile_diff. `more_tools {enable: [names] | "all"}`
+turns them on for the session, and a hub started with `--tools all` (or `--tools ...,extras`) has them on from the
+start. Scenarios and `craftwire load-test` turn on what they use by themselves.
+
 ## Hub
 
 ### list_instances
 
 List connected Minecraft clients and servers (id, name, versions, and `tools` that plugins or mods added through the Craftwire API). Call this first; other tools take `instance` from here.
+
+### more_tools
+
+Turn on the extra tools this session keeps off: `enable` takes their names or `"all"`. They join the tool list (the
+client is told the list changed) and stay on until the session ends. Listed only while some are off.
 
 ### get_request_status
 
@@ -105,6 +116,10 @@ Read the world. block: one block at x,y,z. region: every block in min..max (incl
 Change the world. set_blocks: blocks [{x,y,z,block}] (up to 10000). fill: min..max with block, only where `replace` matches if given. snapshot: save min..max and return an id; restore: put snapshot `id` back. save_schematic: save min..max as structure `name`; paste_schematic: place it with its origin at `at`, optionally rotated/mirrored around that point. Edits over 32768 blocks take a snapshot first and return its snapshotId. Block states use Minecraft syntax, e.g. 'oak_stairs[facing=east]'.
 
 - `world`: World name. Defaults to the main world.
+- `rotation` (paste_schematic): none, clockwise_90, clockwise_180 or counterclockwise_90 around `at`.
+- `mirror` (paste_schematic): none, left_right or front_back.
+- `includeEntities` (save_schematic, paste_schematic): save and place the entities in the area too (default false).
+- `physics`: let placed blocks update their neighbours (sand falls, water flows); default false, as WorldEdit does.
 
 ### world_render
 
@@ -173,6 +188,12 @@ Start, stop or inspect a headless Minecraft client run by the hub (offline mode,
 - `sounds`: Also download the sound assets (~360 MB). Off by default; the game runs fine without them.
 - `timeoutMs`: How long start waits for the player to be in the world (downloads not counted).
 - `tail`: status: log lines per client.
+- `lite`: a small heap and no frames unless something is captured, to run several clients at once.
+- `resourcePacks`: what the client does with a server pack: accept, decline, or prompt (vanilla's screen, the default).
+- `account`: start with a Microsoft account signed in with `sign_in` (a device code: open the URL it returns and enter
+  the code); `sign_out {name}` forgets one. Needed for online-mode servers.
+- `mod_profile {name, mods}` saves a set of mods (jar paths or `modrinth:<slug>`, downloaded once); `start
+  {modProfile}` loads it.
 
 ### scenario_run
 
@@ -194,7 +215,8 @@ Java and Bedrock bots need `address` (host or host:port) and a bot runner (botru
 
 ### bot_action
 
-Drive a bot. chat {text}. command {command, collectMs} sends it like a client (PlayerCommandPreprocessEvent fires, so command blockers apply) and returns success (the command exists and no plugin cancelled it; cancelled/unknown say why) and the messages the bot received. messages {since?, limit?}. look {yaw,pitch} or {x,y,z}. move_to {x,y,z, tolerance?, sprint?, timeoutMs? (30000)} finds a path and walks it: around walls, up steps and slabs (jumps one block), down drops of up to maxFall (3), through doors and fence gates (opened with a real right-click; openDoors:false avoids them), up ladders and vines, swimming through water; never into lava, fire, magma or cactus. Searches loaded chunks only, within 256 blocks; searches again when blocked by a mob or player. Returns reached + reason (arrived; no_path with closest — the nearest point it can reach, partial:true walks there; blocked — a door that would not open; height — right x/z but the target y is not where the bot can stand; stuck; timeout; died) and path {nodes, length, complete}. path:false walks in a straight line instead. break_block {block:{x,y,z}, face?} digs it like a survival player (the real dig time for the held tool; instant in creative) and returns broken, the block, ticks, and cancelledBy (BlockBreakEvent / BlockDamageEvent) when a plugin refused; reason unbreakable/timeout/refused otherwise; out of reach is an error: move_to first. jump. sneak {on} and sprint {on} (PlayerToggleSneakEvent / PlayerToggleSprintEvent). drop {all?} drops the held item or stack (PlayerDropItemEvent; cancelled:true when a plugin refused). swap_hands (PlayerSwapHandItemsEvent). state: position, health, held item, inventory, open menu, moving, digging, sneaking, sprinting. give {item, count} (ids like diamond_sword, components allowed). select_hotbar {slot 0-8}. gui_read / gui_click {slot, click: left|right|shift|number (key 1-9)|offhand|drop|drop_stack|middle|double|drag (slots, button)|outside} / gui_close for plugin menus; move_item {from, to, count?}, transfer {from: container|inventory} and equip {to: hand|offhand|head|chest|legs|feet} move items the way a player would (slots as in gui_read; gui_click returns the menu after the plugin reacted; with inventory:true and no menu open they act on the bot's own inventory like a player pressing E: 5-8 armour, 9-35 main, 36-44 hotbar, 45 offhand). use: right-click with the held item — {block:{x,y,z}, face} on a block, {entity: uuid} on an entity, or nothing for the air. attack {entity: uuid} or {type: 'zombie'} (nearest within reach). hud_read: what the bot's screen would show, rebuilt from the packets it received (works with plugins that send scoreboard packets directly) — same fields as the client hud_read. Special screens: anvil_rename {text}, sign_edit {block, lines, side?}, book_edit {pages, title?}, trade_select {index}, menu_button {id} (enchanting, stonecutter, loom, lectern), beacon {primary, secondary?}, recipe_place {recipe}, creative_set {slot, item}, dialog_answer {id, inputs?} (server dialogs; Bedrock forms too), chat_click {message, part?} (a clickable chat component). settings changes the client settings; resource_packs lists the packs offered and what the bot did. stop ends a move_to. Actions go through the server's packet handlers (or the real protocol for java and bedrock bots), so plugins see the same events as from a real client.
+Drive a bot. chat {text}. command {command, collectMs} sends it like a client (PlayerCommandPreprocessEvent fires, so command blockers apply) and returns success (the command exists and no plugin cancelled it; cancelled/unknown say why) and the messages the bot received. messages {since?, limit?}. look {yaw,pitch} or {x,y,z}. move_to {x,y,z, tolerance?, sprint?, timeoutMs? (30000)} finds a path and walks it: around walls, up steps and slabs (jumps one block), down drops of up to maxFall (3), through doors and fence gates (opened with a real right-click; openDoors:false avoids them), up ladders and vines, swimming through water; never into lava, fire, magma or cactus. Searches loaded chunks only, within 256 blocks; searches again when blocked by a mob or player. Returns reached + reason (arrived; no_path with closest — the nearest point it can reach, partial:true walks there; blocked — a door that would not open; height — right x/z but the target y is not where the bot can stand; stuck; timeout; died) and path {nodes, length, complete}. path:false walks in a straight line instead. break_block {block:{x,y,z}, face?} digs it like a survival player (the real dig time for the held tool; instant in creative) and returns broken, the block, ticks, and cancelledBy (BlockBreakEvent / BlockDamageEvent) when a plugin refused; reason unbreakable/timeout/refused otherwise; out of reach is an error: move_to first. jump. sneak {on} and sprint {on} (PlayerToggleSneakEvent / PlayerToggleSprintEvent). drop {all?} drops the held item or stack (PlayerDropItemEvent; cancelled:true when a plugin refused). swap_hands (PlayerSwapHandItemsEvent). state: position, health, held item, inventory, open menu, moving, digging, sneaking, sprinting. give {item, count} (ids like diamond_sword, components allowed). select_hotbar {slot 0-8}. gui_read / gui_click {slot, click: left|right|shift|number (key 1-9)|offhand|drop|drop_stack|middle|double|drag (slots, button)|outside} / gui_close for plugin menus (`settleMs`, default 150, is how long gui_click waits for the plugin before reading the
+menu back); move_item {from, to, count?}, transfer {from: container|inventory} and equip {to: hand|offhand|head|chest|legs|feet} move items the way a player would (slots as in gui_read; gui_click returns the menu after the plugin reacted; with inventory:true and no menu open they act on the bot's own inventory like a player pressing E: 5-8 armour, 9-35 main, 36-44 hotbar, 45 offhand). use: right-click with the held item — {block:{x,y,z}, face} on a block, {entity: uuid} on an entity, or nothing for the air. attack {entity: uuid} or {type: 'zombie'} (nearest within reach). hud_read: what the bot's screen would show, rebuilt from the packets it received (works with plugins that send scoreboard packets directly) — same fields as the client hud_read. Special screens: anvil_rename {text}, sign_edit {block, lines, side?}, book_edit {pages, title?}, trade_select {index}, menu_button {id} (enchanting, stonecutter, loom, lectern), beacon {primary, secondary?}, recipe_place {recipe}, creative_set {slot, item}, dialog_answer {id, inputs?} (server dialogs; Bedrock forms too), chat_click {message, part?} (a clickable chat component). settings changes the client settings; resource_packs lists the packs offered and what the bot did. stop ends a move_to. Actions go through the server's packet handlers (or the real protocol for java and bedrock bots), so plugins see the same events as from a real client.
 
 - `path`: move_to: find a path (default) or walk in a straight line (false).
 - `partial`: move_to: when the target cannot be reached, walk to the closest point instead of not moving.

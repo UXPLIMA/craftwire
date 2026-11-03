@@ -54,6 +54,10 @@ Velocity plugin installed, watch them move with `wait_for {condition: "server_sw
 
 ## Finding bugs with bots
 
+bot_behavior, load_test, dupe_hunt, locale_tour and scenario_record are off in a new session (their definitions
+would cost tokens in every session): the AI turns them on with `more_tools`, and scenarios and `craftwire load-test`
+do it by themselves.
+
 - Scenarios (`*.cwtest.json`) replay a flow after every change; `scenario_record` turns a session you did by hand
   into one.
 - `dupe_hunt` tries click sequences that duplicate or lose items and counts the items before and after.

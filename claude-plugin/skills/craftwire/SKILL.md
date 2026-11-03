@@ -58,6 +58,7 @@ If `gui_action` returns `SLOT_OUT_OF_RANGE` or `NO_SCREEN_OPEN`, the screen chan
 ## Bots
 - `bot_spawn {count}` (or `names`), then drive with `bot_action`. Bots are real players to plugins: permissions, join/quit, chat and click events all fire.
 - Kinds: `plugin` (default, inside the Paper server), `java` and `bedrock` (protocol clients from a bot runner; need `address`, join any server or proxy). No runner yet: `botrunner_process {action:"start"}`. Online-mode servers: `client_process {action:"sign_in"}` once, then `account`.
+- `bot_behavior`, `load_test`, `dupe_hunt`, `locale_tour`, `scenario_record` and `profile_diff` are off at first (they cost tokens in every session): `more_tools {enable:["load_test"]}` (or `"all"`) turns them on.
 - Many bots: `count` up to 1000, `group`, then `bots:"Load*"` or `group` in `bot_action` / `bot_behavior` instead of `bot`. `load_test {ramp:[10,50,100]}` for a measured ramp.
 - Menus: `bot_action {action:"command", command:"shop"}` → `gui_read` → `gui_click {slot}`; the click result already includes the menu after the plugin reacted. Read replies with `messages`.
 - `move_to {x,y,z}` finds a path (around walls, up steps, down drops up to `maxFall`, through doors, up ladders, through water; never into lava or fire) within 256 blocks in loaded chunks. `reason: no_path` comes with `closest`; `partial:true` walks there. `path:false` walks straight.

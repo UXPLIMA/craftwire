@@ -241,12 +241,13 @@ The Craftwire Velocity plugin connects a proxy to the hub: the `proxy` tool ping
 
 | Area | Tools |
 |---|---|
-| Hub | `list_instances` · `wait_for` · `get_request_status` · `logs` · `exceptions` |
+| Hub | `list_instances` · `wait_for` · `get_request_status` · `logs` · `exceptions` · `more_tools` |
 | Client | `screenshot` · `record` · `camera` · `gui_read` · `gui_action` · `input` · `chat` · `hud_read` · `player_state` · `client_settings` |
 | Server | `server_command` · `server_eval` · `world_query` · `world_edit` · `world_render` · `server_info` · `plugin_manage` · `events` |
-| Dev loop | `server_process` · `plugin_deploy` · `client_process` · `scenario_run` · `scenario_record` |
-| Bots | `bot_spawn` · `bot_action` · `bot_remove` · `bot_list` · `bot_behavior` · `bot_form` · `botrunner_process` · `load_test` · `dupe_hunt` · `locale_tour` |
-| Debugging | `profile` · `trace` · `profile_diff` · `client_eval` |
+| Dev loop | `server_process` · `plugin_deploy` · `client_process` · `scenario_run` |
+| Bots | `bot_spawn` · `bot_action` · `bot_remove` · `bot_list` · `bot_form` · `botrunner_process` |
+| Debugging | `profile` · `trace` · `client_eval` |
+| Extras (off until `more_tools` turns them on) | `bot_behavior` · `load_test` · `dupe_hunt` · `locale_tour` · `scenario_record` · `profile_diff` |
 | Proxy | `proxy` (while a Velocity proxy is connected) |
 | CLI | `npx craftwire setup` · `npx craftwire doctor` · `npx craftwire test` · `npx craftwire serve` · `npx craftwire token` · `npx craftwire load-test` |
 

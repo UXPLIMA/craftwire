@@ -36,6 +36,7 @@ Once a flow works, keep it as a scenario so it is checked after every change: wr
 - CI: `npx craftwire test tests --server <dir> --junit report.xml`, or the GitHub Action `uxplima/craftwire@v1` (Docker, PR comment): craftwire://docs/ci.
 
 ## Before a release
+These tools are off at first: `more_tools {enable:"all"}` turns them on (scenario_record too).
 - `dupe_hunt {bot, open:{command:"<menu command>"}}` with items in the bot's inventory: any `gained` is a dupe to fix.
 - `locale_tour {locales:["tr_tr","de_de"], targets:[{name, command}]}` lists untranslated menu, chat and HUD texts.
 - `load_test {ramp:[10,50,100], behavior:{type:"wander"}}` and `profile_diff` before/after a performance fix.

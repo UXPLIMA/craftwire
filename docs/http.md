@@ -25,7 +25,7 @@ stdio entry, so only one hub runs. Games connect to the hub exactly as before.
 | `--allow-remote` | Required for any other address. |
 | `--tls-cert <file> --tls-key <file>` | Serve HTTPS (PEM files). |
 | `--read-only` | Offer only tools that change nothing (screenshots, reads, logs, renders, status). |
-| `--tools <groups>` | Offer only these groups: `hub`, `client`, `server`, `dev`, `bots`, `extensions`. |
+| `--tools <groups>` | Offer only these groups: `hub`, `client`, `server`, `build`, `dev`, `bots`, `debug`, `proxy`, `extras`, `extensions`, or `all`. The extras (load_test, dupe_hunt, …) start switched off unless `--tools` names them; `more_tools` turns them on in a session. |
 | `--allow-host <name>` | Another name this machine is reached by (repeatable). |
 | `--allow-origin <url>` | A web page origin to accept (repeatable; none by default). |
 | `--rate-limit <n>` | Requests per minute (default 120). |

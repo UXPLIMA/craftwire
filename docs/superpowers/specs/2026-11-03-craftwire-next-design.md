@@ -241,3 +241,16 @@ Then: compile everything, fix the build; then tests (approach to be given by the
   The command console implements Adventure's deprecated `sendMessage(Identity, Component, MessageType)` as well as
   `sendMessage(Component)`, so replies are caught whichever entry point a plugin uses; check it on the Adventure
   version Velocity ships. The agent core targets Java 25, so the proxy has to run on Java 25.
+
+## 17. Tool-definition budget (decided in the test phase)
+
+The new tools took the definitions every session loads from under 28,000 characters to 40,158. Decided: keep the
+budget (28,000 in all, 1,800 per tool, 10,500 for `--profile build`) and meet it two ways.
+
+- Extras: bot_behavior, load_test, dupe_hunt, locale_tour, scenario_record and profile_diff form the `extras` group.
+  They are registered but switched off unless `--tools` names `extras` (or `all`); `more_tools {enable}` turns them on
+  in a session (the client gets a list-changed notification). Scenario steps and `craftwire load-test` turn on what
+  they call. Roles allow them (`bots` includes the group) without switching them on.
+- Unlisted fields: rarely used options of bot_action, gui_action, bot_spawn, client_process, record and world_edit
+  are checked by the hub but not listed in the definition; craftwire://docs/tools describes them.
+- The SDK's `execution: {taskSupport: "forbidden"}` is dropped from tools/list, since an absent field means the same.
