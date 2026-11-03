@@ -8,6 +8,7 @@ import com.google.gson.JsonPrimitive;
 import com.uxplima.craftwire.bedrock.packet.UiPackets;
 import com.uxplima.craftwire.core.AgentError;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.IntFunction;
@@ -143,6 +144,20 @@ final class BedrockForms {
             return a;
         }
         throw new AgentError("NO_DIALOG", "No form or NPC dialogue is open", "Wait for the server to show one (gui_read shows screen.dialog).");
+    }
+
+    /** bot_form's `values`, one per input of the open custom form in order, as dialog inputs keyed by element index. */
+    Map<String, String> inputs(List<String> values) {
+        Map<String, String> out = new HashMap<>();
+        if (form == null || !"custom_form".equals(str(parsed, "type")) || !parsed.has("content")) return out;
+        JsonArray content = parsed.getAsJsonArray("content");
+        int next = 0;
+        for (int i = 0; i < content.size() && next < values.size(); i++) {
+            String type = str(content.get(i).getAsJsonObject(), "type");
+            if (type.equals("label") || type.equals("header") || type.equals("divider")) continue;
+            out.put(Integer.toString(i), values.get(next++));
+        }
+        return out;
     }
 
     /** Closing the form the way the client does: a response without data, cancel reason "user closed". */

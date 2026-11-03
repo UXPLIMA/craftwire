@@ -13,6 +13,7 @@ import com.uxplima.craftwire.bot.model.BotErrors;
 import com.uxplima.craftwire.bot.model.ClientSettings;
 import com.uxplima.craftwire.bot.model.ItemInfo;
 import com.uxplima.craftwire.core.AgentError;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -23,7 +24,7 @@ import java.util.function.Function;
 /**
  * The bot_action actions of a Bedrock bot beyond the common ones, with the names Java bots use: hud_read,
  * resource_packs, settings, jump, sneak, sprint, select_hotbar, drop, swap_hands, use, attack, break_block,
- * respawn, entities, and dialog_answer for forms and NPC dialogues (plus form_close and server_settings). Actions
+ * respawn, entities, form (bot_form) and dialog_answer for forms and NPC dialogues, form_close and server_settings. Actions
  * whose effect only the server knows report the bot's view after a short settle. Runner loop thread.
  */
 final class BedrockActions {
@@ -53,6 +54,7 @@ final class BedrockActions {
             case "break_block" -> breakBlock(b, p);
             case "respawn" -> now(respawn(b));
             case "entities" -> now(entities(b, p));
+            case "form" -> form(b, p);
             case "form_close" -> {
                 b.closeForm();
                 yield now(new JsonObject());
@@ -73,6 +75,31 @@ final class BedrockActions {
         }
         b.answerForm(d.button(), d.inputs());
         return settled(b, new JsonObject(), bot -> bot.gui().json(), "gui");
+    }
+
+    /** bot_form: read, answer {button} / {values} (one per input, in form order), or close. */
+    private static CompletableFuture<JsonElement> form(BedrockBot b, JsonObject p) {
+        String what = Params.optString(p, "action").orElse("read");
+        switch (what) {
+            case "answer" -> {
+                String button = p.has("button") && !p.get("button").isJsonNull() ? p.get("button").getAsString() : null;
+                List<String> values = new ArrayList<>();
+                if (p.has("values")) for (JsonElement v : p.getAsJsonArray("values")) values.add(v.getAsString());
+                b.answerForm(button, b.forms.inputs(values));
+                return settled(b, new JsonObject(), bot -> bot.gui().json(), "gui");
+            }
+            case "close" -> {
+                b.closeForm();
+                return now(new JsonObject());
+            }
+            default -> {
+                JsonObject screen = b.forms.json();
+                JsonObject r = new JsonObject();
+                r.addProperty("open", screen != null);
+                if (screen != null) r.add("form", screen.get("dialog"));
+                return now(r);
+            }
+        }
     }
 
     private static CompletableFuture<JsonElement> now(JsonObject r) {
