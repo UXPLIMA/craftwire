@@ -3,7 +3,7 @@
 Transport: WebSocket `ws://127.0.0.1:<port>/` (port from `~/.craftwire/hub.json`). Framing: JSON-RPC 2.0, one message per text frame.
 
 1. Agent → hub, first message: request `hello` with id `0`.
-   params: `token`, `agentKind` ("client"|"server"), `agentVersion`, `protocolVersion` (1), `mcVersion`, `instanceName`. Server agents (0.3.0+) also send `serverDir` (the server's working directory) and `pid` (its JVM process id); the hub uses them to recognise servers it started.
+   params: `token`, `agentKind` ("client"|"server", and on next "botrunner"|"proxy"), `agentVersion`, `protocolVersion` (1), `mcVersion`, `instanceName`. Server agents (0.3.0+) also send `serverDir` (the server's working directory) and `pid` (its JVM process id); the hub uses them to recognise servers it started.
 2. Hub → agent: response id `0` with `result.instanceId`, or `error` with `data.code` (`UNAUTHORIZED`, `PROTOCOL_MISMATCH`) followed by close.
 3. Hub → agent: requests `{id, method, params}`. Params may include `operationId`.
 4. Agent → hub: responses `{id, result}` or `{id, error: {code: -32000, message, data: {code, hint}}}`.
@@ -74,3 +74,36 @@ Server methods:
 - `profile.run` on Folia samples every region thread: `thread` is `Folia Region Scheduler Thread #*`, plus `threads: [{name, samples}]`.
 - `plugin.manage enable|disable` on Folia → `UNSUPPORTED`.
 - `bot.*` on a bot that left between the lookup and the action → `BOT_NOT_FOUND`.
+
+Next (protocol version unchanged; older agents answer `UNKNOWN_METHOD` for the new methods):
+
+Hello:
+- `agentKind` is also `"botrunner"` (the external bot runner) or `"proxy"` (the Velocity plugin). A bot runner adds `botKinds` (`["java", "bedrock"]`, the kinds it runs) and `maxBots`; the hub splits a protocol-bot spawn over the runners of that kind by their free capacity. The proxy sends `serverDir` and `pid` like a server, and as `mcVersion` the newest Minecraft version it accepts.
+
+Bot methods (Paper agent for `kind: plugin`, bot runners for `java` and `bedrock`; same shapes on both):
+- `bot.spawn` `{kind?, count?, namePrefix?, names?, group?, location?, spread?: {radius}, perTick?, profile?: light|realistic, settings?: {locale?, brand?, ping?, skin?, mainHand?, chat?, skinParts?, viewDistance?}, resourcePack?, verifyPacks?, hideBots?, detail?, seed?}`; protocol bots add `address`, `version?`, `auth?: offline|microsoft`, `session?` / `xbox?` (the account's tokens, put in by the hub from `account`; never logged), `worldMode?: shared|none`, `netsim?: {latencyMs?, jitterMs?, lossPercent?}` → `{spawned, names (compact, "Bot1..Bot50"), failed?: [{name, error}], ms, bots? (with detail)}`.
+- `bot.remove` `{bot | name | bots (names or a pattern) | group | all: true, names?}` → `{removed, names?}`.
+- `bot.list` `{bot?, bots?, group?, limit?}` → `{count, joining, bots: [{name, kind, uuid, group?, world, x, y, z}]}`.
+- `bot.action` `{bot | bots | group, action, …}`: one bot answers with the action's result; a selector answers `{bots, failed, results: [{bot, result | error}]}`. Actions: chat, command, messages, look, move_to, stop, state, give, select_hotbar, settings, resource_packs, gui_read, gui_click (`click`: left|right|shift|number (`key`)|offhand|drop|drop_stack|middle|double|drag (`slots`, `button`)|outside), gui_close, move_item, transfer, equip, use, attack, hud_read, break_block, jump, sneak, sprint, drop, swap_hands, anvil_rename, sign_edit, book_edit, trade_select, menu_button, beacon, recipe_place, creative_set, dialog_answer, chat_click. A kind that cannot do one answers `UNSUPPORTED_FOR_KIND`.
+- `bot.behavior` `{bot | bots | group, action: set|stop|status, type?: wander|follow|patrol|chat|command_loop|menu_click|idle|script, params?, seed?}`.
+- `bot.form` `{bot, action: read|answer|close, button?, values?}` (Bedrock bots; Java bots answer `UNSUPPORTED_FOR_KIND`).
+- `world.query entities` rows of dropped items add `item` (namespaced id) and `count`.
+
+Bot runner methods:
+- `runner.stats` `{}` → `{bots, maxBots, tickMs, heapMb, worldCache}`; `load_test` reads it each step to show how the bots were spread over runners.
+
+Client events:
+- `resource_pack` `{id, status: accepted|downloaded|successfully_loaded|declined|failed_download|invalid_url|failed_reload|discarded, final}`; `final: true` once the pack loaded or failed.
+
+Proxy methods (`agentKind: "proxy"`):
+- `proxy.info` `{}` → `{name, version, vendor, port, onlineMode, players, tryOrder: [server names], servers: [{name, address, players}]}`
+- `proxy.servers` `{ping? (true), timeoutMs? (3000)}` → `{count, servers: [{name, address, players, online?, latencyMs?, version?, protocol?, onlinePlayers?, maxPlayers?, motd?, error?}]}`
+- `proxy.players` `{server?, limit? (200)}` → `{count, players: [{name, uuid, server?, pingMs, protocol, version, onlineMode}]}`
+- `proxy.send` `{player, server}` → `{player, server, status: success|already_connected|connection_in_progress|connection_cancelled|server_disconnected, successful, reason?, hint?}`
+- `proxy.kick` `{player, reason?}` → `{player, kicked: true}`
+- `proxy.command` `{command, collectMs? (300)}` runs a proxy command as a console with every permission → `{command, success, output[]}`; `UNKNOWN_COMMAND` when nothing handled it.
+- Errors: `PLAYER_NOT_FOUND`, `SERVER_NOT_FOUND`, `INVALID_PARAMS`.
+
+Proxy events:
+- `proxy` `{action: join|switch|kick|leave, name, server?, from?, reason?, duringJoin?, text}` (`text` is what `wait_for {condition: "server_switch", pattern}` matches, e.g. `Bob lobby -> games`).
+- `log` as from the other agents.

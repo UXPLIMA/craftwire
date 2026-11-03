@@ -59,7 +59,6 @@ export const spawnShape = {
   version: z.string().optional(),
   auth: z.enum(["offline", "microsoft"]).optional(),
   account: z.string().optional(),
-  proxy: z.string().optional(),
   worldMode: z.enum(["shared", "none"]).optional(),
   netsim: z.object({ latencyMs: z.number().int().min(0).max(5000).optional(), jitterMs: z.number().int().min(0).max(5000).optional(),
     lossPercent: z.number().min(0).max(100).optional() }).optional(),

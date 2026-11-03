@@ -17,7 +17,7 @@ Status of a request sent with an operationId: unknown, running, done (with resul
 
 ### wait_for
 
-Block until something happens or the timeout expires; only what happens after the call counts. Events from any instance: chat_match, hud_match (actionbar), screen_open, screen_closed, log_match, player_join (`pattern` is a case-insensitive regex on the event text). Checked on the Paper server every tick: block {x,y,z,world?, is|isNot: id or state like oak_door[open=true]; properties left out match anything}, player_near {player, x,y,z, radius=1.5} (bots too), inventory {player, item, count=1 (at least) | atMost}, event {type: Bukkit event (also a plugin's own), player?, pattern?: regex on the event's JSON e.g. "cancelled":true}, message {player: bot, pattern} (chat, system line or action bar the bot receives), expr {js: server_eval script that must become truthy}. Returns which condition held, the value that met it and elapsedMs; a server condition's TIMEOUT carries the last value seen.
+Block until something happens or the timeout expires; only what happens after the call counts. Events from any instance: chat_match, hud_match (actionbar), screen_open, screen_closed, log_match, player_join, resource_pack (a client's server resource pack loaded or failed; pattern on the status), server_switch (a player moved between a Velocity proxy's servers; pattern on text like `Bob lobby -> games`) (`pattern` is a case-insensitive regex on the event text). Checked on the Paper server every tick: block {x,y,z,world?, is|isNot: id or state like oak_door[open=true]; properties left out match anything}, player_near {player, x,y,z, radius=1.5} (bots too), inventory {player, item, count=1 (at least) | atMost}, event {type: Bukkit event (also a plugin's own), player?, pattern?: regex on the event's JSON e.g. "cancelled":true}, message {player: bot, pattern} (chat, system line or action bar the bot receives), expr {js: server_eval script that must become truthy}. Returns which condition held, the value that met it and elapsedMs; a server condition's TIMEOUT carries the last value seen.
 
 ### logs
 
@@ -178,15 +178,23 @@ Start, stop or inspect a headless Minecraft client run by the hub (offline mode,
 
 Run test scenarios: steps (tool calls and checks) the hub runs in order, stopping at the first failure and reporting what was expected, what was found, and the context at that moment (bots' messages and HUD, events, new exceptions, warnings). Cleanup always runs. Pass `scenario` (inline) or `files` (*.cwtest.json files or folders, relative to the hub's working directory). A scenario: {name, vars?, bots?: [names], setup?: [steps], steps: [steps], cleanup?: [steps] (always runs), timeoutMs?}. Steps: {tool, args} (any Craftwire tool); {bot, command} / {bot, chat} / {bot, action, …} (bot_action); {command} (server_command); {wait: {…wait_for}}; {sleep: ms}. Any of these may add save: "name" (use the result later as ${name.path}), expect: {path, equals|matches|contains|exists|lessThan|greaterThan|length} (or a list), within: ms (retry until it holds) and expectError: "CODE". Checks: {expect: {tool, args, path, equals…}}, {expect_message: {bot, matches}}, {expect_hud: {bot, path?, matches|equals|contains}}, {expect_block: {x,y,z, is|isNot}}, {expect_event: {type, player?, matches?}} (these wait up to `within`, default 5000 ms, and look at what happened since the last action), {expect_no_exceptions: {}}. Paths: a.b[0].c, [-1] for the last element, [*] for any element. ${start} is the scenario's start time.
 
+### scenario_record
+
+Turn the calls of an MCP session into a scenario that repeats them: `session` (default: this one; the web panel's replay tab lists the others), `from`/`to` (call positions as the panel numbers them), `name`. Bot actions become `{bot, command|chat|action}` steps, server commands `{command}`, waits `{wait}`, other changes `{tool, args}`; failed calls, environment tools (server_process, plugin_deploy, client_process, load_test, …) and calls that only read are left out and listed in `skipped` with the reason (`includeReads:true` keeps the reads). Idempotency keys are dropped so every call runs again, bots the session spawned and did not remove are removed in `cleanup`, and the scenario ends with `expect_no_exceptions`. Add your own `expect` checks before keeping it. `file` (ending in .cwtest.json, `overwrite` to replace) writes it on the hub's machine; over `craftwire serve` the scenario is only returned. A teammate can record only their own sessions.
+
 ## Bots
+
+Bots come in three kinds: `plugin` (fake players inside a Paper server with the Craftwire plugin, the default), `java` and `bedrock` (real protocol clients run by a bot runner, joining any server by `address`, including servers without Craftwire, proxies and other versions). The same tools drive all three; an action a kind cannot do answers `UNSUPPORTED_FOR_KIND`. Many bots at once: name them with `bots` (a list or a pattern like `Load*`) or `group` instead of `bot`.
 
 ### bot_spawn
 
-Spawn server-side fake players (bots) on a Paper server running the Craftwire plugin. They join like real players (join event, tab list) and plugins treat them as players. Names: `names`, or `count` × namePrefix1, namePrefix2, …. location defaults to the main world's spawn. Bots skip the login checks (whitelist, bans), and their player data, stats and advancements are deleted when they leave. Returns each bot's name and position.
+Spawn bots that plugins treat as real players (join event, tab list, permissions). Names: `names`, or `count` (up to 1000 per call) × `namePrefix`1, 2, …; `group` names the batch for later calls. `location` defaults to the main world's spawn; `spread {radius}` scatters them. `perTick` joins that many per tick. `profile`: light (default: cheap, no chunk view) or realistic (view distance, chunk loading like a client). `settings` sets the client settings plugins read: locale, brand, ping, skin, mainHand, chat, skinParts, viewDistance. `resourcePack` says what the bot does with a server pack (accept, decline, fail_download, …; `verifyPacks` downloads and checks it). Plugin bots skip the login checks (whitelist, bans) and their player data is deleted when they leave; `hideBots` makes them invisible to every player (pure load tests).
+
+Java and Bedrock bots need `address` (host or host:port) and a bot runner (botrunner_process start, or one on another machine). `version` picks the Java protocol (default: the server's), `auth: microsoft` with `account` (signed in once with client_process {action:'sign_in'}) joins online-mode servers, `netsim {latencyMs, jitterMs, lossPercent}` adds network trouble, `worldMode: none` skips the shared chunk cache (cheaper, but the bot cannot walk with move_to). Returns `{spawned, names: "Bot1..Bot50", failed?}`.
 
 ### bot_action
 
-Drive a bot. chat {text}. command {command, collectMs} sends it like a client (PlayerCommandPreprocessEvent fires, so command blockers apply) and returns success (the command exists and no plugin cancelled it; cancelled/unknown say why) and the messages the bot received. messages {since?, limit?}. look {yaw,pitch} or {x,y,z}. move_to {x,y,z, tolerance?, sprint?, timeoutMs? (30000)} finds a path and walks it: around walls, up steps and slabs (jumps one block), down drops of up to maxFall (3), through doors and fence gates (opened with a real right-click; openDoors:false avoids them), up ladders and vines, swimming through water; never into lava, fire, magma or cactus. Searches loaded chunks only, within 256 blocks; searches again when blocked by a mob or player. Returns reached + reason (arrived; no_path with closest — the nearest point it can reach, partial:true walks there; blocked — a door that would not open; height — right x/z but the target y is not where the bot can stand; stuck; timeout; died) and path {nodes, length, complete}. path:false walks in a straight line instead. break_block {block:{x,y,z}, face?} digs it like a survival player (the real dig time for the held tool; instant in creative) and returns broken, the block, ticks, and cancelledBy (BlockBreakEvent / BlockDamageEvent) when a plugin refused; reason unbreakable/timeout/refused otherwise; out of reach is an error: move_to first. jump. sneak {on} and sprint {on} (PlayerToggleSneakEvent / PlayerToggleSprintEvent). drop {all?} drops the held item or stack (PlayerDropItemEvent; cancelled:true when a plugin refused). swap_hands (PlayerSwapHandItemsEvent). state: position, health, held item, inventory, open menu, moving, digging, sneaking, sprinting. give {item, count} (ids like diamond_sword, components allowed). select_hotbar {slot 0-8}. gui_read / gui_click {slot, click: left|right|shift} / gui_close for plugin menus (slots as in gui_read; gui_click returns the menu after the plugin reacted; with inventory:true and no menu open they act on the bot's own inventory like a player pressing E: 5-8 armour, 9-35 main, 36-44 hotbar, 45 offhand). use: right-click with the held item — {block:{x,y,z}, face} on a block, {entity: uuid} on an entity, or nothing for the air. attack {entity: uuid} or {type: 'zombie'} (nearest within reach). hud_read: what the bot's screen would show, rebuilt from the packets it received (works with plugins that send scoreboard packets directly) — same fields as the client hud_read. Actions go through the server's packet handlers, so plugins see the same events as from a real client.
+Drive a bot. chat {text}. command {command, collectMs} sends it like a client (PlayerCommandPreprocessEvent fires, so command blockers apply) and returns success (the command exists and no plugin cancelled it; cancelled/unknown say why) and the messages the bot received. messages {since?, limit?}. look {yaw,pitch} or {x,y,z}. move_to {x,y,z, tolerance?, sprint?, timeoutMs? (30000)} finds a path and walks it: around walls, up steps and slabs (jumps one block), down drops of up to maxFall (3), through doors and fence gates (opened with a real right-click; openDoors:false avoids them), up ladders and vines, swimming through water; never into lava, fire, magma or cactus. Searches loaded chunks only, within 256 blocks; searches again when blocked by a mob or player. Returns reached + reason (arrived; no_path with closest — the nearest point it can reach, partial:true walks there; blocked — a door that would not open; height — right x/z but the target y is not where the bot can stand; stuck; timeout; died) and path {nodes, length, complete}. path:false walks in a straight line instead. break_block {block:{x,y,z}, face?} digs it like a survival player (the real dig time for the held tool; instant in creative) and returns broken, the block, ticks, and cancelledBy (BlockBreakEvent / BlockDamageEvent) when a plugin refused; reason unbreakable/timeout/refused otherwise; out of reach is an error: move_to first. jump. sneak {on} and sprint {on} (PlayerToggleSneakEvent / PlayerToggleSprintEvent). drop {all?} drops the held item or stack (PlayerDropItemEvent; cancelled:true when a plugin refused). swap_hands (PlayerSwapHandItemsEvent). state: position, health, held item, inventory, open menu, moving, digging, sneaking, sprinting. give {item, count} (ids like diamond_sword, components allowed). select_hotbar {slot 0-8}. gui_read / gui_click {slot, click: left|right|shift|number (key 1-9)|offhand|drop|drop_stack|middle|double|drag (slots, button)|outside} / gui_close for plugin menus; move_item {from, to, count?}, transfer {from: container|inventory} and equip {to: hand|offhand|head|chest|legs|feet} move items the way a player would (slots as in gui_read; gui_click returns the menu after the plugin reacted; with inventory:true and no menu open they act on the bot's own inventory like a player pressing E: 5-8 armour, 9-35 main, 36-44 hotbar, 45 offhand). use: right-click with the held item — {block:{x,y,z}, face} on a block, {entity: uuid} on an entity, or nothing for the air. attack {entity: uuid} or {type: 'zombie'} (nearest within reach). hud_read: what the bot's screen would show, rebuilt from the packets it received (works with plugins that send scoreboard packets directly) — same fields as the client hud_read. Special screens: anvil_rename {text}, sign_edit {block, lines, side?}, book_edit {pages, title?}, trade_select {index}, menu_button {id} (enchanting, stonecutter, loom, lectern), beacon {primary, secondary?}, recipe_place {recipe}, creative_set {slot, item}, dialog_answer {id, inputs?} (server dialogs; Bedrock forms too), chat_click {message, part?} (a clickable chat component). settings changes the client settings; resource_packs lists the packs offered and what the bot did. stop ends a move_to. Actions go through the server's packet handlers (or the real protocol for java and bedrock bots), so plugins see the same events as from a real client.
 
 - `path`: move_to: find a path (default) or walk in a straight line (false).
 - `partial`: move_to: when the target cannot be reached, walk to the closest point instead of not moving.
@@ -195,7 +203,41 @@ Drive a bot. chat {text}. command {command, collectMs} sends it like a client (P
 
 ### bot_remove
 
-Remove a bot (`name`) or every bot (`all:true`). Bots leave like players logging out (quit event, data saved).
+Remove bots: `bot`, `bots` (names or a pattern), `group`, or `all:true`. Bots leave like players logging out (quit event, data saved). Returns the count; `names:true` lists them.
+
+### bot_list
+
+The bots of every kind (or by `bot`, `bots`, `group`, `kind`): count, joining, and per bot its name, kind, group and position.
+
+### bot_behavior
+
+Give bots something to keep doing without a call per step: `set {type, params}` with wander, follow, patrol, chat, command_loop, menu_click, idle or script (JavaScript with `bots.onTick` and `bots.onMessage`), `stop`, `status`. `seed` makes random behaviors repeatable. load_test uses them for realistic load.
+
+### bot_form
+
+Bedrock bots only: read the open form (simple buttons, modal yes/no, custom inputs), `answer` it with `button` (index or text) or `values` (one per custom input), or `close` it. Listed while a bot runner with Bedrock bots is connected.
+
+### botrunner_process
+
+Start, stop or show the bot runner this hub runs (`kinds`, `maxBots`, `memoryMb`, `java`). A runner on another machine connects by itself with the hub token (`java -jar craftwire-botrunner.jar --name runner-2`); its bots are then spawned on it as well, split by free capacity.
+
+### load_test
+
+Spawn bots in steps (`ramp`, e.g. [10, 50, 100, 200], `stepSeconds` each), optionally run a `behavior`, and per step measure TPS, MSPT (avg, p95, max), slow ticks, heap and chunks and profile who uses the tick. Java and Bedrock bots are split across runners; the report shows each runner's share and tick time. Returns the steps and an HTML report; bots are removed at the end unless `keep`. From CI: `npx craftwire load-test --ramp 10,50 --max-mspt 40`.
+
+### dupe_hunt
+
+On your own test server: a bot opens the menu under test (`open {command}` or `{block}`; none = its own inventory) and tries click sequences that have duplicated or lost items before: shift_spam, number_keys, offhand_swap, double_collect, drag_split, click_then_close, close_race, drop_from_menu, middle_clone, outside_drop, right_split, swap_into_menu, spam_with_pause (`sequences` to pick, `rounds` each). Before and after each try it counts its whole inventory, the cursor, the dropped items within `dropRadius` and, with `countMenu` (for chests and other real containers, not plugin GUIs whose items are only displays), the menu. Returns the tries whose items changed: `gained` (a possible dupe) and `lost` (a loss bug), with the errors the clicks met. Give the bot items first; what it gains stays in its inventory.
+
+### locale_tour
+
+Find what a plugin left untranslated: for the `base` locale (en_us) and each of `locales`, a bot joins with that client locale, opens each of `targets` (`{name, command}` or `{name, block}`) and reads the menu title, item names and lore, the chat replies and (`hud`) titles, action bar, boss bars and sidebar. Per locale it lists `untranslated` (text identical to the base locale's at the same place), `rawKeys` (texts that look like message keys, unparsed tags or unfilled placeholders) and `notSeen` (places the base showed that this locale did not).
+
+## Proxy
+
+### proxy
+
+A Velocity proxy with the craftwire-velocity plugin; listed while one is connected. info: version, port, online mode, the try order and servers. servers: each backend pinged (online, latency, players, version, motd; `ping:false` skips the ping). players {server?}: who is on which server. send {player, server}: move a player (status and the backend's reason when it refused). kick {player, reason?}. command {command}: a proxy command (velocity, server, send, glist or a proxy plugin's) as a console with every permission, with its output. Cross-server bot tests: spawn java bots with the proxy's address, move them with `bot_action command "server games"` or proxy send, and wait with wait_for server_switch.
 
 ## Debugging
 
@@ -214,6 +256,10 @@ Time every call of specific methods on a server or client for durationMs, withou
 - `minMs`: Only report calls at least this slow (counts still include every call).
 - `stackDepth`: Frames per slow call (default 8).
 - `limit`: Slowest calls to return (default 50).
+
+### profile_diff
+
+Compare two profile results (before and after a change): MSPT and busy time, and the owners and hot methods whose share changed most.
 
 ### client_eval
 
