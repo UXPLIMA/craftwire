@@ -26,6 +26,7 @@ public final class Snappy {
                     int n = tag >>> 2;
                     if (n >= MAX_LITERAL) {
                         int bytes = n - 59;
+                        check(p + bytes <= in.length);
                         n = 0;
                         for (int i = 0; i < bytes; i++) n |= (in[p++] & 0xff) << (8 * i);
                     }
@@ -37,17 +38,20 @@ public final class Snappy {
                 }
                 case 1 -> {
                     int n = ((tag >>> 2) & 7) + 4;
+                    check(p < in.length);
                     int offset = ((tag & 0xe0) << 3) | (in[p++] & 0xff);
                     o = copy(out, o, offset, n);
                 }
                 case 2 -> {
                     int n = (tag >>> 2) + 1;
+                    check(p + 2 <= in.length);
                     int offset = (in[p] & 0xff) | (in[p + 1] & 0xff) << 8;
                     p += 2;
                     o = copy(out, o, offset, n);
                 }
                 default -> {
                     int n = (tag >>> 2) + 1;
+                    check(p + 4 <= in.length);
                     int offset = (in[p] & 0xff) | (in[p + 1] & 0xff) << 8 | (in[p + 2] & 0xff) << 16 | (in[p + 3] & 0xff) << 24;
                     p += 4;
                     o = copy(out, o, offset, n);
