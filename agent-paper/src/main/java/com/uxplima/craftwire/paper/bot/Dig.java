@@ -1,6 +1,7 @@
 package com.uxplima.craftwire.paper.bot;
 
 import com.google.gson.JsonObject;
+import com.uxplima.craftwire.bot.move.Steering;
 import com.uxplima.craftwire.core.AgentError;
 import com.uxplima.craftwire.paper.compat.ServerCompat;
 import java.util.Locale;
@@ -59,17 +60,18 @@ final class Dig {
         }
         if (!p.isWithinBlockInteractionRange(pos, 1.0)) {
             double d = p.getEyePosition().distanceTo(Vec3.atCenterOf(pos));
-            throw new AgentError("OUT_OF_REACH", String.format(Locale.ROOT, "The block is %.1f blocks away; reach is %.1f", d, p.blockInteractionRange()),
+            throw new AgentError("OUT_OF_REACH",
+                    String.format(Locale.ROOT, "The block is %.1f blocks away; reach is %.1f", d, p.blockInteractionRange()),
                     "move_to next to the block first.");
         }
         Vec3 eye = p.getEyePosition();
         Vec3 c = Vec3.atCenterOf(pos);
         Direction hitFace = face != null ? face : Direction.getApproximateNearest(eye.x - c.x, eye.y - c.y, eye.z - c.z);
-        BotActions.face(p, Steering.yaw(c.x - eye.x, c.z - eye.z), Steering.pitch(c.x - eye.x, c.y - eye.y, c.z - eye.z));
+        b.look(Steering.yaw(c.x - eye.x, c.z - eye.z), Steering.pitch(c.x - eye.x, c.y - eye.y, c.z - eye.z));
         Watch watch = new Watch(b.uuid(), pos);
         Bukkit.getPluginManager().registerEvents(watch, plugin);
         Dig dig = new Dig(pos, hitFace, System.currentTimeMillis() + timeoutMs, BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString(), watch);
-        b.listener().handlePlayerAction(new ServerboundPlayerActionPacket(ServerboundPlayerActionPacket.Action.START_DESTROY_BLOCK, pos, hitFace, b.nextSequence()));
+        action(b, ServerboundPlayerActionPacket.Action.START_DESTROY_BLOCK, pos, hitFace);
         ServerCompat.get().swingAfterInteraction(b.listener(), InteractionHand.MAIN_HAND);
         return dig;
     }
@@ -81,7 +83,7 @@ final class Dig {
         if (!BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString().equals(block)) return "broken";
         if (watch.cancelled != null) return "cancelled";
         if (now >= deadline) {
-            b.listener().handlePlayerAction(new ServerboundPlayerActionPacket(ServerboundPlayerActionPacket.Action.ABORT_DESTROY_BLOCK, pos, face, b.nextSequence()));
+            action(b, ServerboundPlayerActionPacket.Action.ABORT_DESTROY_BLOCK, pos, face);
             return "timeout";
         }
         if (afterStop >= 0) return ++afterStop > SETTLE_TICKS ? "refused" : null;
@@ -91,10 +93,14 @@ final class Dig {
         progress += perTick;
         ServerCompat.get().swingAfterInteraction(b.listener(), InteractionHand.MAIN_HAND);
         if (progress >= 1f) {
-            b.listener().handlePlayerAction(new ServerboundPlayerActionPacket(ServerboundPlayerActionPacket.Action.STOP_DESTROY_BLOCK, pos, face, b.nextSequence()));
+            action(b, ServerboundPlayerActionPacket.Action.STOP_DESTROY_BLOCK, pos, face);
             afterStop = 0;
         }
         return null;
+    }
+
+    private static void action(Bot b, ServerboundPlayerActionPacket.Action a, BlockPos pos, Direction face) {
+        b.listener().handlePlayerAction(new ServerboundPlayerActionPacket(a, pos, face, b.nextSequence()));
     }
 
     void finish(String reason) {

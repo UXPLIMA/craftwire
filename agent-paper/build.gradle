@@ -14,6 +14,7 @@ def compatProjects = rootProject.mcVersions.collect { ":paper-compat-${rootProje
 def itProps = rootProject.mcProps(project.findProperty('mc') ?: rootProject.baseMc)
 
 evaluationDependsOn(':agent-core')
+evaluationDependsOn(':bot-core')
 evaluationDependsOn(':build-core')
 evaluationDependsOn(':agent-script')
 evaluationDependsOn(':craftwire-api')
@@ -37,6 +38,7 @@ dependencies {
     // GraalJS comes from Paper's library loader at runtime (plugin.yml `libraries`), never from this jar.
     compileOnly "org.graalvm.polyglot:polyglot:${graal_version}"
     implementation project(':agent-core')
+    implementation project(':bot-core')
     implementation project(':agent-script')
     implementation project(':build-core')
 
@@ -56,8 +58,10 @@ dependencies {
 
 jar {
     // agent-core is bundled as plain classes; Gson and log4j are provided by Paper.
-    dependsOn ':agent-core:classes', ':agent-script:classes', ':craftwire-api:classes', ':build-core:classes', ':build-core:processResources'
+    dependsOn ':agent-core:classes', ':bot-core:classes', ':agent-script:classes', ':craftwire-api:classes', ':build-core:classes', ':build-core:processResources'
     from project(':agent-core').sourceSets.main.output
+    // The bot model shared with the bot runner: click vocabulary, pathfinder, behaviors.
+    from project(':bot-core').sourceSets.main.output
     // Building without Minecraft: shapes, frames, projects (build and build_manage).
     from project(':build-core').sourceSets.main.output
     // The GraalJS session for server_eval (GraalJS itself comes from Paper's library loader).

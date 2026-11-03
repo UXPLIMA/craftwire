@@ -38,8 +38,8 @@ public sealed interface ScreenAction {
     /** Effect ids such as minecraft:speed; `secondary` may be null. */
     record Beacon(String primary, String secondary) implements ScreenAction {}
 
-    /** `displayId` from the recipe book the server sent, or `result` (an item id) to look one up. */
-    record Recipe(Integer displayId, String result, boolean all) implements ScreenAction {}
+    /** `displayId` from the recipe book the server sent, or `recipeKey` (a recipe id such as minecraft:oak_planks). */
+    record Recipe(Integer displayId, String recipeKey, boolean all) implements ScreenAction {}
 
     record Creative(int slot, String item, int count) implements ScreenAction {}
 
@@ -61,8 +61,7 @@ public sealed interface ScreenAction {
             case "trade_select" -> new Trade(Params.clampedInt(p, "index", 0, 0, 255));
             case "menu_button" -> new Button(Params.clampedInt(p, "id", 0, 0, 255));
             case "beacon" -> new Beacon(Params.string(p, "primary"), Params.optString(p, "secondary").orElse(null));
-            case "recipe_place" -> new Recipe(Params.optInt(p, "recipe").orElse(null), Params.optString(p, "result").orElse(null),
-                    Params.bool(p, "all", false));
+            case "recipe_place" -> recipe(p);
             case "creative_set" -> new Creative(Params.integer(p, "slot"), Params.string(p, "item"), Params.clampedInt(p, "count", 1, 1, 99));
             case "dialog_answer" -> dialog(p);
             case "chat_click" -> chatClick(p);
@@ -90,6 +89,13 @@ public sealed interface ScreenAction {
         int slot = Params.optInt(p, "slot").orElse(-1);
         if (slot != -1 && slot != 40 && (slot < 0 || slot > 8)) throw BotErrors.invalid("slot is a hotbar slot 0-8, or 40 for the off hand");
         return new Book(slot, List.copyOf(pages), title);
+    }
+
+    private static Recipe recipe(JsonObject p) {
+        Integer display = Params.optInt(p, "recipe").orElse(null);
+        String key = Params.optString(p, "id").orElse(null);
+        if (display == null && key == null) throw BotErrors.invalid("recipe_place needs `id` (a recipe id) or `recipe` (a display id)");
+        return new Recipe(display, key, Params.bool(p, "all", false));
     }
 
     private static Dialog dialog(JsonObject p) {

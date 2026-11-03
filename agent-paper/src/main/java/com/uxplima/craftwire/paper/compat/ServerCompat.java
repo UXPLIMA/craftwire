@@ -6,6 +6,9 @@ import java.io.InputStream;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.game.ClientboundOpenSignEditorPacket;
 import net.minecraft.network.protocol.game.ClientboundPlayerChatPacket;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
@@ -26,6 +29,26 @@ public interface ServerCompat {
 
     /** The text a client would show for a player chat message. */
     String chatText(ClientboundPlayerChatPacket packet);
+
+    /** The component a client would show for a player chat message: the unsigned (decorated) one, else the plain body. */
+    Component chatComponent(ClientboundPlayerChatPacket packet);
+
+    /** A sign the server opened the editor for, and which side. */
+    record SignTarget(BlockPos pos, boolean front) {}
+
+    SignTarget signEditor(ClientboundOpenSignEditorPacket packet);
+
+    /** Sends the sign editor's text the way the client does when the editor closes (SignChangeEvent fires). */
+    void signUpdate(ServerGamePacketListenerImpl listener, BlockPos pos, boolean front, List<String> lines);
+
+    /** Swings the arm on its own, as a client does for a left click on nothing (an AFK check sees it). */
+    void swing(ServerGamePacketListenerImpl listener, InteractionHand hand);
+
+    /**
+     * Sets the latency the server reports for the player (tab list, Player#getPing). The server only measures it
+     * from keep-alives, which a bot without a client never answers.
+     */
+    void setLatency(ServerGamePacketListenerImpl listener, int ms);
 
     static ServerCompat get() {
         return Holder.INSTANCE;

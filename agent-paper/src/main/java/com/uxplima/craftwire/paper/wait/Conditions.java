@@ -4,12 +4,12 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
+import com.uxplima.craftwire.bot.inbox.Message;
 import com.uxplima.craftwire.core.AgentError;
 import com.uxplima.craftwire.paper.Args;
 import com.uxplima.craftwire.paper.CraftwirePlugin;
 import com.uxplima.craftwire.paper.Sync;
 import com.uxplima.craftwire.paper.bot.Bot;
-import com.uxplima.craftwire.paper.bot.BotInbox;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -120,8 +120,8 @@ final class Conditions {
 
     private static Check inbox(Bot bot, Pattern pattern, long startedAt) {
         {
-            List<BotInbox.Message> got = bot.inbox().since(startedAt, 100);
-            for (BotInbox.Message m : got) {
+            List<Message> got = bot.inbox().since(startedAt, 100);
+            for (Message m : got) {
                 if (pattern.matcher(m.text()).find()) return new Check(true, message(m));
             }
             return new Check(false, got.isEmpty() ? JsonNull.INSTANCE : message(got.getLast()));
@@ -136,7 +136,7 @@ final class Conditions {
         return sync.entity(pl, () -> check.apply(pl)).exceptionally(t -> offline);
     }
 
-    private static JsonObject message(BotInbox.Message m) {
+    private static JsonObject message(Message m) {
         JsonObject o = new JsonObject();
         o.addProperty("kind", m.kind());
         o.addProperty("text", m.text());

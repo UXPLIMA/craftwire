@@ -39,7 +39,11 @@ public record GuiView(boolean open, String title, String type, int containerId, 
     public JsonObject json() {
         JsonObject o = new JsonObject();
         o.addProperty("open", open);
-        if (!present()) return o;
+        if (!present()) {
+            // A sign editor or a dialog can be open without any menu.
+            if (screen != null) o.add("screen", screen);
+            return o;
+        }
         if (!open) o.addProperty("inventory", true);
         o.addProperty("title", title);
         o.addProperty("type", type);

@@ -1,5 +1,7 @@
 package com.uxplima.craftwire.paper.bot.path;
 
+import com.uxplima.craftwire.bot.path.BlockView;
+import com.uxplima.craftwire.bot.path.Cell;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;

@@ -2,186 +2,112 @@ package com.uxplima.craftwire.paper.bot;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import com.uxplima.craftwire.core.AgentError;
-import com.uxplima.craftwire.paper.Args;
-import com.uxplima.craftwire.paper.Sync;
-import com.uxplima.craftwire.paper.compat.ServerCompat;
-import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
-import java.util.Comparator;
-import java.util.Locale;
-import java.util.UUID;
+import com.uxplima.craftwire.bot.gui.Click;
+import com.uxplima.craftwire.bot.gui.ClickPlan;
+import com.uxplima.craftwire.bot.gui.GuiStep;
+import com.uxplima.craftwire.bot.gui.GuiView;
+import com.uxplima.craftwire.bot.gui.ItemMoves;
+import com.uxplima.craftwire.bot.gui.RawClick;
+import com.uxplima.craftwire.bot.json.Params;
+import com.uxplima.craftwire.bot.model.BotErrors;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.network.HashedStack;
-import net.minecraft.network.protocol.game.ServerboundAttackPacket;
-import net.minecraft.network.protocol.game.ServerboundContainerClickPacket;
-import net.minecraft.network.protocol.game.ServerboundContainerClosePacket;
-import net.minecraft.network.protocol.game.ServerboundInteractPacket;
-import net.minecraft.network.protocol.game.ServerboundUseItemOnPacket;
-import net.minecraft.network.protocol.game.ServerboundUseItemPacket;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.world.inventory.ContainerInput;
-import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.Vec3;
+import java.util.function.Function;
 
-/** GUI, use and attack verbs, sent through the server's own packet handlers so plugins see real-client events. */
+/**
+ * Menu verbs: gui_read, gui_click with the full click vocabulary, gui_close and the helpers move_item, transfer and
+ * equip. Clicks go through the server's container click handler, so InventoryClickEvent and InventoryDragEvent
+ * fire as for a real client; results include the menu as it is after a short settle.
+ */
 final class BotGuiActions {
     private BotGuiActions() {}
 
-    static CompletableFuture<JsonElement> run(String action, JsonObject p, BotManager bots, Sync sync, String name) {
+    static CompletableFuture<JsonElement> run(String action, JsonObject p, BotManager bots, String name) {
+        boolean inventory = Params.bool(p, "inventory", false);
         return switch (action) {
-            case "gui_read" -> bots.on(name, b -> (JsonElement) BotJson.gui(b, Args.bool(p, "inventory", false)));
+            case "gui_read" -> bots.on(name, b -> (JsonElement) BotJson.gui(b, inventory).json());
             case "gui_click" -> {
-                long settleMs = Math.clamp(Args.optLong(p, "settleMs").orElse(150L), 0L, 5000L);
-                String click = Args.optString(p, "click").orElse("left");
-                boolean inventory = Args.bool(p, "inventory", false);
-                yield bots.on(name, b -> click(b, Args.integer(p, "slot"), click, inventory))
-                        .thenCompose(v -> CompletableFuture.supplyAsync(() -> v, CompletableFuture.delayedExecutor(settleMs, TimeUnit.MILLISECONDS)))
-                        .thenCompose(v -> bots.on(name, b -> {
-                            JsonObject r = new JsonObject();
-                            r.addProperty("clicked", v);
-                            r.add("gui", BotJson.gui(b, inventory));
-                            return (JsonElement) r;
-                        }));
+                Click c = Click.parse(p);
+                yield settled(p, bots, name, inventory, b -> {
+                    GuiView v = view(b, inventory);
+                    c.check(v.slotCount());
+                    for (RawClick raw : ClickPlan.of(c)) b.click(raw);
+                    JsonObject r = new JsonObject();
+                    r.addProperty("clicked", c.type().id());
+                    if (c.slot() >= 0) r.addProperty("slot", c.slot());
+                    return r;
+                });
             }
-            case "gui_close" -> bots.on(name, b -> close(b));
-            case "use" -> bots.on(name, b -> use(settled(b), p));
-            case "attack" -> bots.on(name, b -> attack(settled(b), p));
-            default -> CompletableFuture.failedFuture(Args.invalid("Unknown bot action: " + action));
+            case "move_item" -> settled(p, bots, name, inventory, b -> steps(b, ItemMoves.moveItem(view(b, inventory),
+                    Params.integer(p, "from"), Params.integer(p, "to"), Params.optInt(p, "count").orElse(null))));
+            case "transfer" -> settled(p, bots, name, false, b -> {
+                String from = Params.optString(p, "from").orElse("container");
+                if (!from.equals("container") && !from.equals("inventory")) throw BotErrors.invalid("from must be container or inventory");
+                requireMenu(b);
+                return steps(b, ItemMoves.transfer(BotJson.gui(b, false), from.equals("container"),
+                        Params.optString(p, "item").orElse(null), Params.optInt(p, "count").orElse(null)));
+            });
+            case "equip" -> settled(p, bots, name, true, b -> steps(b, ItemMoves.equip(BotJson.gui(b, true),
+                    b.bukkit().getInventory().getHeldItemSlot(), Params.optInt(p, "slot").orElse(null),
+                    Params.optString(p, "item").orElse(null), Params.optString(p, "to").orElse("hand"))));
+            case "gui_close" -> bots.on(name, BotGuiActions::close);
+            default -> CompletableFuture.failedFuture(BotErrors.invalid("Unknown bot action: " + action));
         };
     }
 
-    /** A /tp in the same tick as the action would otherwise make the server ignore it. */
-    private static Bot settled(Bot b) {
-        b.settle();
-        return b;
+    /** Runs the work, waits `settleMs` (default 150) for plugins to react, then adds the menu as it is now. */
+    private static CompletableFuture<JsonElement> settled(JsonObject p, BotManager bots, String name, boolean inventory,
+            Function<Bot, JsonObject> work) {
+        long settleMs = Params.clampedLong(p, "settleMs", 150L, 0L, 5000L);
+        return bots.on(name, work)
+                .thenCompose(v -> CompletableFuture.supplyAsync(() -> v, CompletableFuture.delayedExecutor(settleMs, TimeUnit.MILLISECONDS)))
+                .thenCompose(v -> bots.on(name, b -> {
+                    v.add("gui", BotJson.gui(b, inventory).json());
+                    return (JsonElement) v;
+                }));
     }
 
-    private static int click(Bot b, int slot, String click, boolean inventory) {
-        if (!click.equals("left") && !click.equals("right") && !click.equals("shift")) throw Args.invalid("click must be left, right or shift");
-        // With no menu open, containerMenu is the bot's own inventory (container 0), as with E on a client.
+    /** The menu a click addresses: the open menu, or with `inventory` the bot's own inventory (container 0). */
+    private static GuiView view(Bot b, boolean inventory) {
         if (!inventory) requireMenu(b);
-        AbstractContainerMenu menu = b.player().containerMenu;
-        if (slot < 0 || slot >= menu.slots.size()) {
-            throw new AgentError("SLOT_OUT_OF_RANGE", "Slot " + slot + " is outside 0.." + (menu.slots.size() - 1),
-                    "Use a slot number from gui_read.");
-        }
-        ContainerInput input = click.equals("shift") ? ContainerInput.QUICK_MOVE : ContainerInput.PICKUP;
-        byte button = (byte) (click.equals("right") ? 1 : 0);
-        // Empty predicted-change map: the server applies the click and resyncs the (absent) client afterwards.
-        b.listener().handleContainerClick(new ServerboundContainerClickPacket(menu.containerId, menu.getStateId(), (short) slot, button, input,
-                new Int2ObjectOpenHashMap<>(), HashedStack.EMPTY));
-        return slot;
+        return BotJson.gui(b, true);
     }
 
+    private static JsonObject steps(Bot b, List<GuiStep> steps) {
+        for (GuiStep s : steps) {
+            switch (s) {
+                case GuiStep.ClickStep c -> b.click(c.click());
+                case GuiStep.HotbarStep h -> BotInventoryActions.selectHotbar(b, h.slot());
+            }
+        }
+        JsonObject r = new JsonObject();
+        r.addProperty("clicks", steps.size());
+        return r;
+    }
+
+    /** Closes whatever is open: a dialog (running its cancel action, as Escape does), a sign editor, a book or a menu. */
     private static JsonElement close(Bot b) {
+        BotScreens screens = b.link().screens;
+        JsonObject r = new JsonObject();
+        if (screens.dialog() != null) {
+            BotScreenActions.cancelDialog(b);
+            r.addProperty("closed", "dialog");
+            return r;
+        }
+        if (screens.sign() != null || screens.book()) {
+            r.addProperty("closed", screens.sign() != null ? "sign" : "book");
+            screens.sign(null);
+            screens.book(false);
+            return r;
+        }
         requireMenu(b);
-        b.listener().handleContainerClose(new ServerboundContainerClosePacket(b.player().containerMenu.containerId));
-        JsonObject r = new JsonObject();
-        r.addProperty("closed", true);
+        b.closeScreen();
+        r.addProperty("closed", "menu");
         return r;
     }
 
-    private static void requireMenu(Bot b) {
-        if (!BotJson.menuOpen(b.bukkit().getOpenInventory())) {
-            throw new AgentError("NO_SCREEN_OPEN", b.name() + " has no menu open",
-                    "Open one first, e.g. bot_action {action:'command'} with the plugin's menu command, or pass inventory:true for the bot's own inventory.");
-        }
-    }
-
-    private static JsonElement use(Bot b, JsonObject p) {
-        ServerPlayer sp = b.player();
-        InteractionHand hand = Args.optString(p, "hand").orElse("main").equals("off") ? InteractionHand.OFF_HAND : InteractionHand.MAIN_HAND;
-        JsonObject r = new JsonObject();
-        if (p.has("block")) {
-            JsonObject at = Args.object(p, "block");
-            BlockPos pos = new BlockPos(Args.integer(at, "x"), Args.integer(at, "y"), Args.integer(at, "z"));
-            Direction face = Direction.byName(Args.optString(p, "face").orElse("up").toLowerCase(Locale.ROOT));
-            if (face == null) throw Args.invalid("face must be up, down, north, south, east or west");
-            Vec3 hit = Vec3.atCenterOf(pos).add(face.getStepX() * 0.5, face.getStepY() * 0.5, face.getStepZ() * 0.5);
-            reach(sp, hit, sp.blockInteractionRange());
-            lookAt(sp, hit);
-            b.listener().handleUseItemOn(new ServerboundUseItemOnPacket(hand, new BlockHitResult(hit, face, pos, false), b.nextSequence()));
-            r.addProperty("used", "block");
-        } else if (p.has("entity")) {
-            Entity target = entity(sp, Args.string(p, "entity"));
-            Vec3 center = target.position().add(0, target.getBbHeight() / 2, 0);
-            reach(sp, center, sp.entityInteractionRange());
-            lookAt(sp, center);
-            b.listener().handleInteract(new ServerboundInteractPacket(target.getId(), hand, new Vec3(0, target.getBbHeight() / 2, 0), false));
-            r.addProperty("used", "entity");
-        } else {
-            b.listener().handleUseItem(new ServerboundUseItemPacket(hand, b.nextSequence(), sp.getYRot(), sp.getXRot()));
-            r.addProperty("used", "air");
-        }
-        ServerCompat.get().swingAfterInteraction(b.listener(), hand);
-        return r;
-    }
-
-    private static JsonElement attack(Bot b, JsonObject p) {
-        ServerPlayer sp = b.player();
-        Entity target;
-        if (p.has("entity")) {
-            target = entity(sp, Args.string(p, "entity"));
-        } else {
-            String type = Args.string(p, "type").toLowerCase(Locale.ROOT);
-            String id = type.contains(":") ? type : "minecraft:" + type;
-            double range = sp.entityInteractionRange();
-            target = sp.level().getEntities(sp, sp.getBoundingBox().inflate(range),
-                            e -> EntityType.getKey(e.getType()).toString().equals(id))
-                    .stream().min(Comparator.comparingDouble(sp::distanceToSqr))
-                    .orElseThrow(() -> new AgentError("ENTITY_NOT_FOUND", "No " + id + " within reach of " + b.name(),
-                            "move_to the target first, or pass entity (a UUID from world_query entities)."));
-        }
-        Vec3 center = target.position().add(0, target.getBbHeight() / 2, 0);
-        reach(sp, center, sp.entityInteractionRange());
-        lookAt(sp, center);
-        double before = target instanceof LivingEntity l ? l.getHealth() : 0;
-        b.listener().handleAttack(new ServerboundAttackPacket(target.getId()));
-        ServerCompat.get().swingAfterInteraction(b.listener(), InteractionHand.MAIN_HAND);
-        JsonObject t = new JsonObject();
-        t.addProperty("uuid", target.getUUID().toString());
-        t.addProperty("type", EntityType.getKey(target.getType()).toString());
-        JsonObject r = new JsonObject();
-        r.add("target", t);
-        if (target instanceof LivingEntity l) {
-            r.addProperty("healthBefore", before);
-            r.addProperty("healthAfter", l.getHealth());
-        }
-        return r;
-    }
-
-    private static Entity entity(ServerPlayer sp, String uuid) {
-        Entity e;
-        try {
-            e = sp.level().getEntity(UUID.fromString(uuid));
-        } catch (IllegalArgumentException bad) {
-            throw Args.invalid("entity must be a UUID");
-        }
-        if (e == null) {
-            throw new AgentError("ENTITY_NOT_FOUND", "No entity " + uuid + " in " + sp.level().dimension().identifier(),
-                    "Use world_query {action:'entities'} for UUIDs.");
-        }
-        return e;
-    }
-
-    private static void reach(ServerPlayer sp, Vec3 point, double range) {
-        double d = sp.getEyePosition().distanceTo(point);
-        if (d > range + 0.5) {
-            throw new AgentError("OUT_OF_REACH", String.format(Locale.ROOT, "Target is %.1f blocks away; reach is %.1f", d, range),
-                    "move_to closer first.");
-        }
-    }
-
-    private static void lookAt(ServerPlayer sp, Vec3 point) {
-        Vec3 eye = sp.getEyePosition();
-        BotActions.face(sp, Steering.yaw(point.x - eye.x, point.z - eye.z), Steering.pitch(point.x - eye.x, point.y - eye.y, point.z - eye.z));
+    static void requireMenu(Bot b) {
+        if (!BotJson.menuOpen(b.bukkit().getOpenInventory())) throw BotErrors.noScreen(b.name());
     }
 }
