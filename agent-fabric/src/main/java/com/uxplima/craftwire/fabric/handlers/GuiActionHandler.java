@@ -3,11 +3,13 @@ package com.uxplima.craftwire.fabric.handlers;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.mojang.blaze3d.platform.Window;
+import com.uxplima.craftwire.bot.gui.ScreenAction;
 import com.uxplima.craftwire.core.AgentError;
 import com.uxplima.craftwire.fabric.ClientScheduler;
 import com.uxplima.craftwire.fabric.Params;
 import com.uxplima.craftwire.fabric.compat.ClientCompat;
-import com.uxplima.craftwire.fabric.mixin.AbstractContainerScreenAccessor;
+import com.uxplima.craftwire.fabric.gui.ClientScreenActions;
+import com.uxplima.craftwire.fabric.gui.SlotActions;
 import com.uxplima.craftwire.fabric.mixin.MouseHandlerAccessor;
 import java.util.ArrayList;
 import java.util.List;
@@ -17,31 +19,38 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.input.MouseButtonInfo;
-import net.minecraft.world.inventory.ContainerInput;
-import net.minecraft.world.inventory.Slot;
 
+/**
+ * gui_action: widgets, typing, the slot click vocabulary, the helpers (move_item, transfer, equip) and the special
+ * screens of bot-core's ScreenAction. Every answer is the screen as it is two ticks after the action. Render thread.
+ */
 public final class GuiActionHandler {
-    // Container-click buttons are protocol values (left 0, right 1), not mouse button codes, on every version.
-    private static final int CONTAINER_LEFT = 0;
-    private static final int CONTAINER_RIGHT = 1;
-
     private GuiActionHandler() {}
 
     public static CompletableFuture<JsonElement> act(JsonObject p, ClientScheduler s) {
-        return s.call(() -> {
-                    perform(p);
-                    return Boolean.TRUE;
-                })
-                .thenCompose(v -> s.delay(2))
-                .thenCompose(v -> s.call(() -> (JsonElement) GuiReadHandler.read()));
+        String action = Params.optString(p, "action").orElseThrow(() -> Params.invalid("action is required"));
+        CompletableFuture<JsonObject> done;
+        if (ScreenAction.handles(action)) {
+            done = s.call(() -> ClientScreenActions.run(ScreenAction.parse(action, p)));
+        } else if (SlotActions.HELPERS.contains(action)) {
+            done = SlotActions.helper(action, p, s);
+        } else {
+            done = s.call(() -> {
+                perform(action, p);
+                return null;
+            });
+        }
+        return done.thenCompose(r -> s.delay(2).thenApply(v -> r)).thenCompose(r -> s.call(() -> {
+            JsonObject o = GuiReadHandler.read();
+            if (r != null) o.add("result", r);
+            return (JsonElement) o;
+        }));
     }
 
-    private static void perform(JsonObject p) {
-        String action = Params.optString(p, "action").orElseThrow(() -> Params.invalid("action is required"));
+    private static void perform(String action, JsonObject p) {
         Minecraft mc = Minecraft.getInstance();
         Screen screen = mc.gui.screen();
         if (screen == null) {
@@ -52,43 +61,11 @@ public final class GuiActionHandler {
             case "close" -> screen.onClose();
             case "click_widget" -> clickWidget(mc, screen, findWidget(screen, p));
             case "type" -> type(mc, screen, p);
-            case "hover", "click", "right_click", "shift_click", "drag" -> slotAction(mc, screen, action, p);
-            default -> throw Params.invalid("unknown action: " + action);
-        }
-    }
-
-    private static void slotAction(Minecraft mc, Screen screen, String action, JsonObject p) {
-        if (!(screen instanceof AbstractContainerScreen<?> acs)) {
-            throw new AgentError("NOT_A_CONTAINER", "The open screen (" + screen.getClass().getSimpleName() + ") has no item slots.",
-                    "Use click_widget for buttons; gui_read lists widgets.");
-        }
-        AbstractContainerScreenAccessor acc = (AbstractContainerScreenAccessor) acs;
-        List<Slot> slots = acs.getMenu().slots;
-        int id = slotId(slots, p, "slot");
-        Slot slot = slots.get(id);
-        moveMouseTo(mc, acc.craftwire$getLeftPos() + slot.x + 8, acc.craftwire$getTopPos() + slot.y + 8);
-        switch (action) {
-            case "click" -> acc.craftwire$slotClicked(slot, id, CONTAINER_LEFT, ContainerInput.PICKUP);
-            case "right_click" -> acc.craftwire$slotClicked(slot, id, CONTAINER_RIGHT, ContainerInput.PICKUP);
-            case "shift_click" -> acc.craftwire$slotClicked(slot, id, CONTAINER_LEFT, ContainerInput.QUICK_MOVE);
-            case "drag" -> {
-                int toId = slotId(slots, p, "toSlot");
-                Slot to = slots.get(toId);
-                acc.craftwire$slotClicked(slot, id, CONTAINER_LEFT, ContainerInput.PICKUP);
-                acc.craftwire$slotClicked(to, toId, CONTAINER_LEFT, ContainerInput.PICKUP);
-                moveMouseTo(mc, acc.craftwire$getLeftPos() + to.x + 8, acc.craftwire$getTopPos() + to.y + 8);
+            default -> {
+                if (!SlotActions.CLICKS.contains(action)) throw Params.invalid("unknown action: " + action);
+                SlotActions.click(screen, action, p);
             }
-            default -> { /* hover: moving the mouse is the whole action */ }
         }
-    }
-
-    private static int slotId(List<Slot> slots, JsonObject p, String key) {
-        int id = Params.optInt(p, key).orElseThrow(() -> Params.invalid(key + " is required for this action"));
-        if (id < 0 || id >= slots.size()) {
-            throw new AgentError("SLOT_OUT_OF_RANGE", "Slot " + id + " does not exist; this screen has " + slots.size() + " slots.",
-                    "Call gui_read again: the screen may have changed since you last read it.");
-        }
-        return id;
     }
 
     private static List<AbstractWidget> widgets(Screen screen) {

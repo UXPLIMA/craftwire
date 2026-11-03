@@ -44,6 +44,9 @@ dependencies {
 
     implementation project(':agent-core')
     include project(':agent-core')
+    // The click vocabulary, GUI helpers and screen actions shared with every bot kind; mc-shared's ChatClicks uses it too.
+    implementation project(':bot-core')
+    include project(':bot-core')
     // Build states (mc-shared BuildStates) implement build-core's palette; singleplayer building uses it (M11).
     implementation project(':build-core')
     include project(':build-core')

@@ -4,6 +4,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
 import com.uxplima.craftwire.fabric.ItemJson;
+import com.uxplima.craftwire.fabric.gui.ClientMenus;
 import com.uxplima.craftwire.fabric.mixin.AbstractContainerScreenAccessor;
 import java.util.List;
 import net.minecraft.client.Minecraft;
@@ -16,6 +17,7 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 
+/** gui_read: the open screen, its slots and cursor item, special-screen state and widgets. Render thread. */
 public final class GuiReadHandler {
     private GuiReadHandler() {}
 
@@ -40,6 +42,9 @@ public final class GuiReadHandler {
                 arr.add(item);
             }
             o.add("slots", arr);
+            ItemStack carried = acs.getMenu().getCarried();
+            o.add("carried", carried.isEmpty() ? JsonNull.INSTANCE : ItemJson.of(carried, true));
+            o.addProperty("menuType", ClientMenus.menuType(acs.getMenu()));
             Slot hovered = ((AbstractContainerScreenAccessor) acs).craftwire$getHoveredSlot();
             if (hovered == null) {
                 o.add("hovered", JsonNull.INSTANCE);
@@ -50,6 +55,9 @@ public final class GuiReadHandler {
                 o.add("hovered", h);
             }
         }
+
+        JsonObject screen = ClientMenus.screenInfo(s);
+        if (screen != null) o.add("screen", screen);
 
         JsonArray widgets = new JsonArray();
         int index = 0;

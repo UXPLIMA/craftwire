@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import type { LaunchSession, ResourcePackPolicy } from "./client-types.js";
 import type { FabricProfile } from "./fabric.js";
 import { argumentList, type Os, type VersionJson } from "./mojang.js";
 
@@ -23,6 +24,11 @@ export interface LaunchInput {
   height: number;
   hidden: boolean;
   launcherVersion: string;
+  /** Lite headless mode: the agent skips frames nobody needs; a smaller heap suits it. */
+  lite?: boolean;
+  resourcePacks?: ResourcePackPolicy;
+  /** A Microsoft account's session; without one the client plays offline under `username`. */
+  session?: LaunchSession;
 }
 
 /** The UUID a server gives an offline-mode player: v3 of "OfflinePlayer:<name>", undashed as launchers pass it. */
@@ -36,15 +42,16 @@ export function offlineUuid(name: string): string {
 /** The java command line for a Fabric client: Mojang's argument templates with Fabric's profile on top. */
 export function buildLaunch(i: LaunchInput): { command: string; args: string[] } {
   const values: Record<string, string> = {
-    auth_player_name: i.username,
+    auth_player_name: i.session?.name ?? i.username,
     version_name: i.version.id,
     game_directory: i.gameDir,
     assets_root: i.assetsDir,
     assets_index_name: i.version.assetIndex.id,
-    auth_uuid: offlineUuid(i.username),
-    auth_access_token: "0",
+    auth_uuid: i.session?.uuid ?? offlineUuid(i.username),
+    auth_access_token: i.session?.accessToken ?? "0",
     clientid: "",
-    auth_xuid: "",
+    auth_xuid: i.session?.xuid ?? "",
+    user_type: i.session !== undefined ? "msa" : "",
     version_type: i.version.type,
     natives_directory: i.nativesDir,
     launcher_name: "craftwire",
@@ -62,7 +69,9 @@ export function buildLaunch(i: LaunchInput): { command: string; args: string[] }
     ...argumentList(i.version.arguments.jvm, i.os, {}).map(fill),
     ...(i.fabric.arguments.jvm ?? []),
     ...(i.logConfig && i.version.logging?.client ? [i.version.logging.client.argument.replace("${path}", i.logConfig)] : []),
-    "-Xmx2G",
+    // Lite: a small heap for a client that draws no frames; Serial GC runs no GC threads of its own beside the game.
+    ...(i.lite ? ["-Xmx768M", "-XX:+UseSerialGC", "-Dcraftwire.lite=true"] : ["-Xmx2G"]),
+    ...(i.resourcePacks !== undefined && i.resourcePacks !== "prompt" ? [`-Dcraftwire.resourcePacks=${i.resourcePacks}`] : []),
     // Windows JVMs write a pipe in the ANSI code page; the hub decodes UTF-8.
     "-Dstdout.encoding=UTF-8", "-Dstderr.encoding=UTF-8",
     // Hidden: Fabric must not open its error window (nobody can close it); the game exits and the crash is reported.

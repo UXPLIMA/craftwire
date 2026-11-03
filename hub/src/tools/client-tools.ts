@@ -3,7 +3,14 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { CraftwireError } from "../errors.js";
+import { actionShape, CLICKS } from "./bots/schemas.js";
 import { defineTool, forward, ok, targetArgs, type ToolContext } from "./registry.js";
+
+const GUI_ACTIONS = [
+  "hover", "click", "right_click", "shift_click", "drag", "move_item", "transfer", "equip", "click_widget", "type", "close",
+  "anvil_rename", "sign_edit", "book_edit", "trade_select", "menu_button", "beacon", "recipe_place", "creative_set", "dialog_answer",
+  "chat_click",
+] as const;
 
 const vec3 = { x: z.number(), y: z.number(), z: z.number() };
 
@@ -56,14 +63,39 @@ export function registerClientTools(server: McpServer, ctx: ToolContext): void {
     { ...targetArgs }, fwd("gui.read"));
 
   defineTool(server, ctx, "gui_action",
-    "Act on the open screen: hover/click/right_click/shift_click {slot}, drag {slot,toSlot}, click_widget {widget}, type {text}, close. Returns the new gui_read.",
+    "Act on the open screen. Slots: click {slot, click: left|right|shift|number(key)|offhand|drop|drop_stack|middle|double|drag(slots,"
+      + "button)|outside}, hover, drag {slot,toSlot}; helpers move_item {from,to,count}, transfer {from:container|inventory,item,count}, "
+      + "equip {slot|item,to}; widgets: click_widget {widget}, type {text}, close; screens: anvil_rename, sign_edit, book_edit, "
+      + "trade_select, menu_button, beacon, recipe_place, creative_set, dialog_answer, chat_click (as bot_action). Returns the new gui_read.",
     {
       ...targetArgs,
-      action: z.enum(["hover", "click", "right_click", "shift_click", "drag", "click_widget", "type", "close"]),
+      action: z.enum(GUI_ACTIONS),
       slot: z.number().int().min(0).optional(),
       toSlot: z.number().int().min(0).optional(),
+      click: z.enum(CLICKS).optional(),
+      key: z.number().int().min(1).max(9).optional(),
+      button: z.union([z.string(), z.number().int()]).optional(),
+      slots: z.array(z.number().int().min(0)).max(64).optional(),
+      from: actionShape.from,
+      to: actionShape.to,
+      count: actionShape.count,
+      item: actionShape.item,
       widget: z.string().optional(),
       text: z.string().max(256).optional(),
+      lines: actionShape.lines,
+      side: actionShape.side,
+      pages: actionShape.pages,
+      title: actionShape.title,
+      index: actionShape.index,
+      id: actionShape.id,
+      primary: actionShape.primary,
+      secondary: actionShape.secondary,
+      recipe: actionShape.recipe,
+      all: actionShape.all,
+      inputs: actionShape.inputs,
+      message: actionShape.message,
+      match: actionShape.match,
+      part: actionShape.part,
     }, fwd("gui.action"));
 
   defineTool(server, ctx, "input",

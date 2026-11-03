@@ -1,100 +1,28 @@
 import { type ChildProcess, spawn } from "node:child_process";
-import { existsSync, readdirSync, rmSync, statSync } from "node:fs";
-import { join, relative, resolve, sep } from "node:path";
+import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { setTimeout as sleep } from "node:timers/promises";
-import type { AgentServer, InstanceInfo } from "../agents.js";
+import type { InstanceInfo } from "../agents.js";
+import { Accounts } from "../auth/accounts.js";
 import { CraftwireError } from "../errors.js";
 import { serverAddress } from "../dev/launch.js";
 import { samePath } from "../dev/paths.js";
 import { killTree } from "../dev/server-manager.js";
 import { RingBuffer } from "../ringbuffer.js";
+import { newestCrashReport, removeSave } from "./client-files.js";
+import type {
+  ClientManagerOptions, ClientStartOptions, ClientState, ClientStatus, LaunchSession, PrepareClient, WorldCreate,
+} from "./client-types.js";
+import { type DisconnectScreen, joinFailure } from "./join-failure.js";
+import { ModProfiles } from "./mod-profiles.js";
 import { type McVersion, NEWEST_VERSION, SUPPORTED_VERSIONS, supportedVersion } from "./pins.js";
 import { pingServer } from "./server-ping.js";
 
-export type ClientState = "downloading" | "starting" | "running" | "stopping" | "stopped" | "crashed";
-
-/** How a new singleplayer world is made (the agent does it like the Create World screen). */
-export interface WorldCreate {
-  type?: "normal" | "flat" | "void";
-  seed?: string;
-  gameMode?: "survival" | "creative" | "adventure" | "spectator";
-  difficulty?: "peaceful" | "easy" | "normal" | "hard";
-  cheats?: boolean;
-  /** Delete a save with this name first, for a fresh world on every run. */
-  replace?: boolean;
-}
-
-export interface ClientStartOptions {
-  /** host:port; default: the single server running under server_process. */
-  server?: string;
-  /** A singleplayer world to open (or create) instead of joining a server. */
-  world?: { name: string; create?: WorldCreate };
-  /** Minecraft version; default: the one the server reports, else the newest supported. */
-  version?: McVersion;
-  username?: string;
-  mods?: string[];
-  visible?: boolean;
-  windowSize?: { width: number; height: number };
-  java?: string;
-  sounds?: boolean;
-  timeoutMs?: number;
-}
-
-export interface PrepareInput {
-  root: string;
-  version: McVersion;
-  username: string;
-  server?: string;
-  mods: string[];
-  visible: boolean;
-  width: number;
-  height: number;
-  java?: string;
-  sounds: boolean;
-  onProgress: (done: number, total: number) => void;
-}
-
-/** Downloads what is missing and returns the command to start; the real one is launcher.ts's prepareClient. */
-export type PrepareClient = (p: PrepareInput) => Promise<{ command: string; args: string[]; gameDir: string; downloadedBytes: number }>;
-
-export interface ClientStatus {
-  username: string;
-  state: ClientState;
-  version?: McVersion;
-  instance?: string | null;
-  server?: string;
-  world?: string;
-  pid?: number;
-  gameDir?: string;
-  progress?: { done: number; total: number };
-  downloadedBytes?: number;
-  startedAt?: number;
-  readyMs?: number;
-  exitCode?: number | null;
-  logTail: string[];
-}
-
-/** The part of ServerManager this needs: which managed servers run. */
-export interface ServerLister {
-  status(): { servers: { serverDir: string; state: string }[] };
-}
-
-export interface ClientManagerOptions {
-  agents: AgentServer;
-  /** CRAFTWIRE_HOME for the client, so its agent finds this hub. */
-  home: string;
-  /** Cache and instances (default `<home>/client`). */
-  root?: string;
-  servers: ServerLister;
-  prepare: PrepareClient;
-  /** How long stop waits for the game to quit before killing it (default 10 s). */
-  stopTimeoutMs?: number;
-  quitTimeoutMs?: number;
-  readyPollMs?: number;
-  /** Asks a server for its version (Server List Ping); injectable for tests. */
-  ping?: (host: string, port: number) => Promise<{ name: string; protocol: number } | undefined>;
-}
+export type {
+  ClientManagerOptions, ClientStartOptions, ClientState, ClientStatus, PrepareClient, PrepareInput, ResourcePackPolicy, ServerLister,
+  WorldCreate,
+} from "./client-types.js";
+export { joinFailure } from "./join-failure.js";
 
 interface Managed {
   username: string;
@@ -113,43 +41,31 @@ interface Managed {
   startedAt: number;
   readyMs?: number;
   exitCode?: number | null;
+  lite?: boolean;
+  account?: string;
 }
 
 const USERNAME = /^[A-Za-z0-9_]{3,16}$/;
 /** A save folder name: no path separators or dots-only names, so it always stays inside saves/. */
 const WORLD_NAME = /^(?!\.+$)[A-Za-z0-9 _.-]{1,64}$/;
 
-interface DisconnectScreen {
-  type?: string;
-  title?: string;
-  widgets?: { kind?: string; text?: string }[];
-}
-
-/** The server's reason from a disconnect screen (title plus message lines, without buttons) and how to fix it. */
-export function joinFailure(screen: DisconnectScreen, username: string): { reason: string; hint: string } {
-  const lines = (screen.widgets ?? [])
-    .filter((w) => w.text && /Text|String/.test(w.kind ?? ""))
-    .map((w) => w.text!)
-    .filter((t) => t !== screen.title);
-  const reason = [screen.title ?? screen.type, ...lines].filter(Boolean).join(": ");
-  if (/whitelist/i.test(reason)) {
-    return { reason, hint: `Ask the user to allow the player on this dev server: server_command "whitelist add ${username}", or white-list=false in server.properties (servers since 26.3 whitelist by default).` };
-  }
-  if (/banned/i.test(reason)) return { reason, hint: `The player is banned on this server: server_command "pardon ${username}" if the user agrees.` };
-  if (/outdated|incompatible|version/i.test(reason)) return { reason, hint: "The server runs another Minecraft version: pass version, or let client_process detect it." };
-  return { reason, hint: "Check that the server runs, the address is right and online-mode=false." };
-}
 const LIVE: readonly ClientState[] = ["downloading", "starting", "running", "stopping"];
 const isLive = (m: Managed | undefined): m is Managed => m !== undefined && LIVE.includes(m.state);
 const KEEP_STOPPED = 10;
+/** Hidden clients at once: each is a full game process, and the design aims at 2-4 on one machine. */
+export const MAX_CLIENTS = 4;
 
 /** Runs headless Minecraft clients for the hub and maps each one to its agent by game directory. */
 export class ClientManager {
   private readonly clients = new Map<string, Managed>();
   private readonly root: string;
+  readonly accounts: Accounts;
+  readonly modProfiles: ModProfiles;
 
   constructor(private readonly opts: ClientManagerOptions) {
     this.root = opts.root ?? join(opts.home, "client");
+    this.accounts = opts.accounts ?? new Accounts(opts.home);
+    this.modProfiles = opts.modProfiles ?? new ModProfiles(this.root);
     opts.agents.on("connected", (i: InstanceInfo) => {
       if (i.kind !== "client" || i.gameDir === undefined) return;
       for (const m of this.clients.values()) {
@@ -164,31 +80,27 @@ export class ClientManager {
   }
 
   async start(o: ClientStartOptions): Promise<ClientStatus> {
-    const username = o.username ?? "Craftwire";
-    if (!USERNAME.test(username)) throw new CraftwireError("INVALID_PARAMS", `"${username}" is not a valid player name`, "Use 3-16 letters, digits or _.");
-    if (isLive(this.clients.get(username))) {
-      throw new CraftwireError("ALREADY_RUNNING", `A client named ${username} is already running`, "Use it, stop it first, or pass another username.");
-    }
-    if (o.world !== undefined) {
-      if (o.server !== undefined) throw new CraftwireError("INVALID_PARAMS", "Pass either server or world, not both", "world opens a singleplayer world; server joins a server.");
-      if (!WORLD_NAME.test(o.world.name)) {
-        throw new CraftwireError("INVALID_PARAMS", `"${o.world.name}" is not a usable world name`, "Use 1-64 letters, digits, spaces, '.', '-' and '_'.");
-      }
-    }
-    const server = o.world !== undefined ? undefined : o.server ?? this.defaultServer();
+    const session = o.account !== undefined ? await this.accounts.session(o.account) : undefined;
+    const username = this.checkStart(o, session);
+    const server = o.world !== undefined ? undefined : o.server ?? this.defaultServer(session !== undefined);
     const version = o.version ?? await this.serverVersion(server);
     const m: Managed = { username, version, state: "downloading", log: new RingBuffer(2000), startedAt: Date.now(), agent: null };
     if (server !== undefined) m.server = server;
     if (o.world !== undefined) m.world = o.world;
+    if (o.lite) m.lite = true;
+    if (session !== undefined) m.account = session.name;
     this.clients.set(username, m);
     this.pruneStopped();
 
     let prepared: Awaited<ReturnType<PrepareClient>>;
     try {
+      const profileMods = o.modProfile !== undefined ? await this.modProfiles.resolve(o.modProfile, version) : [];
       prepared = await this.opts.prepare({
-        root: this.root, version, username, mods: o.mods ?? [], visible: o.visible ?? false,
-        width: o.windowSize?.width ?? 1280, height: o.windowSize?.height ?? 720, sounds: o.sounds ?? false,
+        root: this.root, version, username, mods: [...(o.mods ?? []), ...profileMods], visible: (o.visible ?? false) && !o.lite,
+        width: o.windowSize?.width ?? 1280, height: o.windowSize?.height ?? 720, sounds: (o.sounds ?? false) && !o.lite,
+        lite: o.lite ?? false, resourcePacks: o.resourcePacks ?? "prompt",
         ...(server !== undefined ? { server } : {}), ...(o.java !== undefined ? { java: o.java } : {}),
+        ...(session !== undefined ? { session: launchSession(session) } : {}),
         onProgress: (done, total) => { m.progress = { done, total }; },
       });
     } catch (e) {
@@ -234,10 +146,47 @@ export class ClientManager {
     return this.snapshot(m, 10);
   }
 
+  /** Checks a start request before anything is downloaded; returns the player name the client plays as. */
+  private checkStart(o: ClientStartOptions, session: LaunchSession | undefined): string {
+    if (session !== undefined && o.username !== undefined && o.username !== session.name) {
+      throw new CraftwireError("INVALID_PARAMS", `The account plays as ${session.name}, not ${o.username}`,
+        "Leave out username when passing account.");
+    }
+    if (o.lite && o.visible) throw new CraftwireError("INVALID_PARAMS", "A lite client is always hidden", "Leave out visible, or lite.");
+    const username = session?.name ?? o.username ?? "Craftwire";
+    if (!USERNAME.test(username)) throw new CraftwireError("INVALID_PARAMS", `"${username}" is not a valid player name`,
+      "Use 3-16 letters, digits or _.");
+    if (isLive(this.clients.get(username))) {
+      throw new CraftwireError("ALREADY_RUNNING", `A client named ${username} is already running`,
+        "Use it, stop it first, or pass another username.");
+    }
+    const live = [...this.clients.values()].filter(isLive);
+    if (live.length >= MAX_CLIENTS) {
+      throw new CraftwireError("TOO_MANY_CLIENTS", `${live.length} clients are running (at most ${MAX_CLIENTS})`,
+        `Stop one first: ${live.map((c) => c.username).join(", ")}. For many players use bot_spawn instead.`);
+    }
+    if (o.world !== undefined) {
+      if (o.server !== undefined) throw new CraftwireError("INVALID_PARAMS", "Pass either server or world, not both",
+        "world opens a singleplayer world; server joins a server.");
+      if (!WORLD_NAME.test(o.world.name)) {
+        throw new CraftwireError("INVALID_PARAMS", `"${o.world.name}" is not a usable world name`,
+          "Use 1-64 letters, digits, spaces, '.', '-' and '_'.");
+      }
+    }
+    return username;
+  }
+
   private markRunning(m: Managed): void {
     if (m.state !== "starting") return;
     m.state = "running";
     m.readyMs = Date.now() - m.startedAt;
+  }
+
+  /** Stops every live client; what each one did. */
+  async stopAll(): Promise<{ stopped: { username: string; forced: boolean }[] }> {
+    const live = [...this.clients.values()].filter(isLive);
+    const forced = await Promise.all(live.map((m) => this.doStop(m).catch(() => true)));
+    return { stopped: live.map((m, i) => ({ username: m.username, forced: forced[i]! })) };
   }
 
   async stop(username?: string): Promise<{ username: string; stopped: true; forced: boolean; exitCode: number | null }> {
@@ -264,18 +213,21 @@ export class ClientManager {
   /** The supported version matching what `server` reports; the newest when there is no server or it does not answer. */
   private async serverVersion(server: string | undefined): Promise<McVersion> {
     if (server === undefined) return NEWEST_VERSION;
-    const [host, port] = server.includes(":") ? [server.slice(0, server.lastIndexOf(":")), Number(server.slice(server.lastIndexOf(":") + 1))] : [server, 25565];
+    const colon = server.lastIndexOf(":");
+    const [host, port] = colon >= 0 ? [server.slice(0, colon), Number(server.slice(colon + 1))] : [server, 25565];
     const reported = await (this.opts.ping ?? pingServer)(host, port);
     if (reported === undefined) return NEWEST_VERSION;
     const v = supportedVersion(reported.name);
     if (v === undefined) {
-      throw new CraftwireError("VERSION_UNSUPPORTED", `${server} runs ${reported.name}; client_process runs Minecraft ${SUPPORTED_VERSIONS.join(", ")}`,
+      throw new CraftwireError("VERSION_UNSUPPORTED",
+        `${server} runs ${reported.name}; client_process runs Minecraft ${SUPPORTED_VERSIONS.join(", ")}`,
         "Use a server on one of those versions, or start the client without a server.");
     }
     return v;
   }
 
-  private defaultServer(): string | undefined {
+  /** The one running dev server; with no signed-in account it must be offline-mode. */
+  private defaultServer(online: boolean): string | undefined {
     const running = this.opts.servers.status().servers.filter((s) => s.state === "running");
     if (running.length === 0) return undefined;
     if (running.length > 1) {
@@ -283,9 +235,9 @@ export class ClientManager {
         `Pass server as host:port. Running: ${running.map((s) => s.serverDir).join(", ")}.`);
     }
     const a = serverAddress(running[0]!.serverDir);
-    if (a.onlineMode) {
+    if (a.onlineMode && !online) {
       throw new CraftwireError("ONLINE_MODE_SERVER", `The server in ${running[0]!.serverDir} runs online-mode=true`,
-        "client_process clients play offline. Ask the user to set online-mode=false in server.properties of this dev server and restart it.");
+        "Sign in (client_process {action:'sign_in'}) and pass account, or ask the user to set online-mode=false on this dev server.");
     }
     return `${a.host}:${a.port}`;
   }
@@ -293,13 +245,15 @@ export class ClientManager {
   private resolve(username?: string): Managed {
     if (username !== undefined) {
       const m = this.clients.get(username);
-      if (!isLive(m)) throw new CraftwireError("CLIENT_NOT_RUNNING", `No client named ${username} is running`, "client_process {action:'status'} lists them.");
+      if (!isLive(m)) throw new CraftwireError("CLIENT_NOT_RUNNING", `No client named ${username} is running`,
+        "client_process {action:'status'} lists them.");
       return m;
     }
     const live = [...this.clients.values()].filter(isLive);
     if (live.length === 1) return live[0]!;
     if (live.length === 0) throw new CraftwireError("CLIENT_NOT_RUNNING", "No client is running", "Start one with client_process {action:'start'}.");
-    throw new CraftwireError("INVALID_PARAMS", `${live.length} clients are running`, `Pass username: one of ${live.map((m) => m.username).join(", ")}.`);
+    throw new CraftwireError("INVALID_PARAMS", `${live.length} clients are running`,
+      `Pass username: one of ${live.map((m) => m.username).join(", ")}.`);
   }
 
   private spawn(m: Managed, command: string, args: string[]): void {
@@ -415,22 +369,13 @@ export class ClientManager {
     s.startedAt = m.startedAt;
     if (m.readyMs !== undefined) s.readyMs = m.readyMs;
     if (m.exitCode !== undefined) s.exitCode = m.exitCode;
+    if (m.lite) s.lite = true;
+    if (m.account !== undefined) s.account = m.account;
     return s;
   }
 }
 
-function newestCrashReport(gameDir: string, since: number): string | undefined {
-  const dir = join(gameDir, "crash-reports");
-  if (!existsSync(dir)) return undefined;
-  const files = readdirSync(dir).map((f) => join(dir, f)).filter((f) => statSync(f).mtimeMs >= since - 1000);
-  return files.sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)[0];
-}
-
-/** Deletes saves/<name> of a client's game directory, refusing anything that would resolve outside saves/. */
-function removeSave(gameDir: string, name: string): void {
-  const saves = resolve(gameDir, "saves");
-  const target = resolve(saves, name);
-  const rel = relative(saves, target);
-  if (rel === "" || rel.startsWith("..") || rel.includes(sep)) throw new CraftwireError("INVALID_PARAMS", `"${name}" is not a save folder name`);
-  rmSync(target, { recursive: true, force: true });
+/** Only what the launch arguments carry; the session's expiry stays with Accounts. */
+function launchSession(s: LaunchSession): LaunchSession {
+  return { name: s.name, uuid: s.uuid, accessToken: s.accessToken, ...(s.xuid !== undefined ? { xuid: s.xuid } : {}) };
 }

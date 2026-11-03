@@ -4,7 +4,7 @@ import { delimiter, join, posix, win32 } from "node:path";
 import { CraftwireError } from "../errors.js";
 import { probeJavaMajor } from "../dev/launch.js";
 import { HUB_VERSION } from "../version.js";
-import type { PrepareInput } from "./client-manager.js";
+import type { PrepareInput } from "./client-types.js";
 import { fetchAll, type FetchOptions, type FileSpec } from "./download.js";
 import { fabricApiFile, fabricLibraryFiles, fetchFabricProfile, mergeLibraries } from "./fabric.js";
 import { checkMods, prepareInstance } from "./instance.js";
@@ -89,6 +89,7 @@ export async function prepareClient(p: PrepareInput, o: FetchOptions = {}): Prom
     gameDir, assetsDir: dirs.assets, nativesDir: dirs.natives, libraryDir: dirs.libraries,
     username: p.username, ...(p.server !== undefined ? { server: p.server } : {}),
     width: p.width, height: p.height, hidden: !p.visible, launcherVersion: HUB_VERSION,
+    lite: p.lite, resourcePacks: p.resourcePacks, ...(p.session !== undefined ? { session: p.session } : {}),
   });
   return { ...withDisplay(cmd), gameDir, downloadedBytes };
 }

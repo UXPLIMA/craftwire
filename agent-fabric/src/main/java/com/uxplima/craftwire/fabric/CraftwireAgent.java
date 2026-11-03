@@ -11,6 +11,8 @@ import com.uxplima.craftwire.core.LogCapture;
 import com.uxplima.craftwire.core.OperationCache;
 import com.uxplima.craftwire.core.profile.ProfileTools;
 import com.uxplima.craftwire.fabric.handlers.Handlers;
+import com.uxplima.craftwire.fabric.lite.LiteMode;
+import com.uxplima.craftwire.fabric.resourcepack.ClientPacks;
 import com.uxplima.craftwire.fabric.script.ClientEval;
 import com.uxplima.craftwire.fabric.video.Recorder;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
@@ -82,6 +84,9 @@ public final class CraftwireAgent {
         });
         ChatBridge.register(this);
         Indicator.register(this);
+        LiteMode.install(() -> captureInProgress || Recorder.INSTANCE.isActive());
+        ClientLifecycleEvents.CLIENT_STARTED.register(LiteMode::applyOptions);
+        ClientPacks.install(d -> emit("resource_pack", d));
         // A recording running when the game closes is finished into a playable file first.
         ClientLifecycleEvents.CLIENT_STOPPING.register(mc -> Recorder.INSTANCE.shutdown());
 
