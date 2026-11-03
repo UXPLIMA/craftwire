@@ -8,6 +8,7 @@ import com.uxplima.craftwire.botrunner.bot.JoinSpec;
 import com.uxplima.craftwire.botrunner.bot.RunnerBot;
 import com.uxplima.craftwire.botrunner.javabot.JavaContext;
 import com.uxplima.craftwire.botrunner.javabot.session.JavaSession;
+import com.uxplima.craftwire.botrunner.net.NetSim;
 import com.uxplima.craftwire.core.AgentError;
 import java.net.ConnectException;
 import java.net.UnknownHostException;
@@ -38,8 +39,9 @@ final class JavaJoin {
         JavaSession.Identity id = identity(spec);
         JavaBot bot = new JavaBot(ctx, spec, id.uuid());
         ClientInformation info = information(spec.settings(), spec.profile());
+        NetSim netsim = NetSim.from(spec.raw()).orElse(null);
         JavaSession.open(ctx.group(), spec.host(), spec.port(), ctx.protocol(), id, info, spec.settings().brand(), bot,
-                () -> bot.creative, ctx.blocking()).whenComplete((s, err) -> {
+                () -> bot.creative, ctx.blocking(), netsim).whenComplete((s, err) -> {
                     if (err == null) {
                         bot.session(s);
                         return;

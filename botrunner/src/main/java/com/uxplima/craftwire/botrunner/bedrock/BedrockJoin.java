@@ -10,6 +10,7 @@ import com.uxplima.craftwire.bot.json.Params;
 import com.uxplima.craftwire.bot.model.Profile;
 import com.uxplima.craftwire.botrunner.bot.JoinSpec;
 import com.uxplima.craftwire.botrunner.bot.RunnerBot;
+import com.uxplima.craftwire.botrunner.net.NetSim;
 import com.uxplima.craftwire.core.AgentError;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -37,7 +38,8 @@ final class BedrockJoin {
         UUID uuid = UUID.nameUUIDFromBytes(("BedrockBot:" + spec.name()).getBytes(StandardCharsets.UTF_8));
         BedrockBot bot = new BedrockBot(ctx, spec, uuid, view(spec));
         CompletableFuture.supplyAsync(() -> login(spec, bot.key(), view(spec)), ctx.blocking())
-                .thenCompose(req -> BedrockSession.connect(ctx.group(), new InetSocketAddress(spec.host(), spec.port()), bot, req, bot.key()))
+                .thenCompose(req -> BedrockSession.connect(ctx.group(), new InetSocketAddress(spec.host(), spec.port()), bot, req, bot.key(),
+                        NetSim.from(spec.raw()).orElse(null)))
                 .whenComplete((s, err) -> {
                     if (err == null) {
                         bot.session(s);

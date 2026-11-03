@@ -5,10 +5,13 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInitializer;
 import io.netty.channel.EventLoop;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.SimpleChannelInboundHandler;
+import io.netty.channel.socket.DatagramChannel;
 import io.netty.channel.socket.DatagramPacket;
 import io.netty.channel.socket.nio.NioDatagramChannel;
 import java.net.InetSocketAddress;
@@ -55,9 +58,16 @@ public final class RakClient {
         this.listener = listener;
     }
 
-    public static CompletableFuture<RakClient> connect(EventLoopGroup group, InetSocketAddress server, Listener listener) {
+    /** `shaper`, when not null, goes first in the pipeline and sees every raw datagram (a simulated bad network). */
+    public static CompletableFuture<RakClient> connect(EventLoopGroup group, InetSocketAddress server, Listener listener, ChannelHandler shaper) {
         RakClient c = new RakClient(server, listener);
-        ChannelFuture cf = new Bootstrap().group(group).channel(NioDatagramChannel.class).handler(c.new Inbound()).connect(server);
+        ChannelFuture cf = new Bootstrap().group(group).channel(NioDatagramChannel.class).handler(new ChannelInitializer<DatagramChannel>() {
+            @Override
+            protected void initChannel(DatagramChannel ch) {
+                if (shaper != null) ch.pipeline().addLast("netsim", shaper);
+                ch.pipeline().addLast("raknet", c.new Inbound());
+            }
+        }).connect(server);
         cf.addListener(f -> {
             if (!f.isSuccess()) {
                 c.connected.completeExceptionally(f.cause());

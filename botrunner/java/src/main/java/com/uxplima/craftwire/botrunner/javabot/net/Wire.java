@@ -1,5 +1,6 @@
 package com.uxplima.craftwire.botrunner.javabot.net;
 
+import com.uxplima.craftwire.botrunner.net.NetSim;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
@@ -51,8 +52,9 @@ public final class Wire {
         this.codec = codec;
     }
 
+    /** `netsim`, when not null, delays the raw bytes first in the pipeline (a simulated bad network). */
     public static CompletableFuture<Wire> connect(EventLoopGroup group, String host, int port, ProtocolInfo<?> in, ProtocolInfo<?> out,
-            Listener listener) {
+            Listener listener, NetSim netsim) {
         PacketCodec codec = new PacketCodec(in, out);
         CompletableFuture<Wire> result = new CompletableFuture<>();
         Wire[] self = new Wire[1];
@@ -62,6 +64,7 @@ public final class Wire {
                 .handler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     protected void initChannel(SocketChannel ch) {
+                        if (netsim != null) ch.pipeline().addLast("netsim", new NetDelay(netsim));
                         ch.pipeline()
                                 .addLast("timeout", new ReadTimeoutHandler(TIMEOUT_S))
                                 .addLast("splitter", new Varint21FrameDecoder(null))

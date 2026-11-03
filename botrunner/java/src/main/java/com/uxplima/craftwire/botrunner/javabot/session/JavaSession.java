@@ -1,6 +1,7 @@
 package com.uxplima.craftwire.botrunner.javabot.session;
 
 import com.uxplima.craftwire.botrunner.javabot.net.Wire;
+import com.uxplima.craftwire.botrunner.net.NetSim;
 import io.netty.channel.EventLoopGroup;
 import java.security.PublicKey;
 import java.util.List;
@@ -94,11 +95,12 @@ public final class JavaSession implements Wire.Listener {
     /**
      * Connects and starts the login; the bot is told `playing` once the play phase begins. `creative` answers the
      * play protocol's question whether the player has infinite materials (it changes how creative slots encode).
+     * `netsim` (or null) simulates a bad network below everything else.
      */
     public static CompletableFuture<JavaSession> open(EventLoopGroup group, String host, int port, int protocol, Identity identity,
-            ClientInformation information, String brand, Sink sink, BooleanSupplier creative, Executor blocking) {
+            ClientInformation information, String brand, Sink sink, BooleanSupplier creative, Executor blocking, NetSim netsim) {
         JavaSession s = new JavaSession(identity, information, brand, sink, creative, blocking);
-        return Wire.connect(group, host, port, LoginProtocols.CLIENTBOUND, HandshakeProtocols.SERVERBOUND, s).thenApply(w -> {
+        return Wire.connect(group, host, port, LoginProtocols.CLIENTBOUND, HandshakeProtocols.SERVERBOUND, s, netsim).thenApply(w -> {
             s.wire = w;
             w.loop().execute(() -> {
                 w.send(new ClientIntentionPacket(protocol, host, port, ClientIntent.LOGIN));

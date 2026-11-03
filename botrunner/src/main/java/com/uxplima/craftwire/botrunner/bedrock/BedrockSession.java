@@ -10,6 +10,8 @@ import com.uxplima.craftwire.bedrock.packet.LoginPackets;
 import com.uxplima.craftwire.bedrock.packet.PacketDecoder;
 import com.uxplima.craftwire.bedrock.packet.UiPackets;
 import com.uxplima.craftwire.bedrock.raknet.RakClient;
+import com.uxplima.craftwire.botrunner.net.NetSim;
+import com.uxplima.craftwire.botrunner.net.NetSimHandler;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.EventLoopGroup;
 import java.net.InetSocketAddress;
@@ -52,9 +54,10 @@ final class BedrockSession implements RakClient.Listener {
     }
 
     /** Connects and starts the login; completes once RakNet is up (the game login then runs on its own). */
-    static CompletableFuture<BedrockSession> connect(EventLoopGroup group, InetSocketAddress server, Sink sink, byte[] loginRequest, KeyPair key) {
+    static CompletableFuture<BedrockSession> connect(EventLoopGroup group, InetSocketAddress server, Sink sink, byte[] loginRequest, KeyPair key,
+            NetSim netsim) {
         BedrockSession s = new BedrockSession(sink, loginRequest, key);
-        return RakClient.connect(group, server, s).thenApply(r -> {
+        return RakClient.connect(group, server, s, netsim == null ? null : new NetSimHandler(netsim)).thenApply(r -> {
             s.rak = r;
             s.send(List.of(LoginOut.requestNetworkSettings()));
             return s;
