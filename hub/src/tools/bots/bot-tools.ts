@@ -7,6 +7,7 @@ import { defineTool, ok, targetArgs, type ToolContext } from "../registry.js";
 import { type BotKind, directoryFor, expandNames } from "./directory.js";
 import { registerDupeTools } from "./dupe-hunt.js";
 import { registerLoadTools } from "./load-test.js";
+import { registerLocaleTools } from "./locale-tour.js";
 import { merge } from "./merge.js";
 import { agentForBot, broadcast, requireAgents } from "./route.js";
 import { registerRunnerTools } from "./runner-tools.js";
@@ -114,6 +115,7 @@ export function registerBotTools(server: McpServer, ctx: ToolContext): void {
   registerFormTool(server, ctx);
   registerLoadTools(server, ctx);
   registerDupeTools(server, ctx);
+  registerLocaleTools(server, ctx);
   registerRunnerTools(server, ctx);
 }
 
