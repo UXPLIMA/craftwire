@@ -39,6 +39,12 @@ final class BedrockSession implements RakClient.Listener {
     }
 
     private static final Logger LOG = LogManager.getLogger("craftwire-botrunner");
+    /**
+     * Geyser with validate-bedrock-login (its default) refuses a login without an Xbox signature, and closes the
+     * session so fast that its Disconnect packet is often lost: measured 4 out of 6 times against Geyser 2.12.1.
+     */
+    static final String SILENT_AFTER_LOGIN = "the server went silent right after the login without saying why; Geyser does this when it "
+            + "only lets Xbox-signed players in (validate-bedrock-login)";
 
     private final BatchCodec codec = new BatchCodec();
     private final Sink sink;
@@ -46,6 +52,8 @@ final class BedrockSession implements RakClient.Listener {
     private final KeyPair key;
     private final Set<Integer> badPackets = new HashSet<>();
     private volatile RakClient rak;
+    private boolean loginSent;
+    private boolean heardAfterLogin;
 
     private BedrockSession(Sink sink, byte[] loginRequest, KeyPair key) {
         this.sink = sink;
@@ -96,6 +104,7 @@ final class BedrockSession implements RakClient.Listener {
 
     @Override
     public void batch(ByteBuf batch) {
+        if (loginSent) heardAfterLogin = true;
         List<ByteBuf> packets;
         try {
             packets = codec.decode(batch);
@@ -123,6 +132,7 @@ final class BedrockSession implements RakClient.Listener {
             case LoginPackets.NetworkSettings s -> {
                 codec.compression(BatchCodec.Compression.of(s.algorithm()), s.threshold());
                 send(List.of(LoginOut.login(loginRequest)));
+                loginSent = true;
                 return true;
             }
             case LoginPackets.ServerHandshake h -> {
@@ -154,6 +164,6 @@ final class BedrockSession implements RakClient.Listener {
 
     @Override
     public void closed(String reason) {
-        sink.closed(reason);
+        sink.closed(loginSent && !heardAfterLogin && RakClient.TIMED_OUT.equals(reason) ? SILENT_AFTER_LOGIN : reason);
     }
 }

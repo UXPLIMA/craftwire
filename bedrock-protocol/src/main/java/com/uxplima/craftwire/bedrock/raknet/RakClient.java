@@ -34,6 +34,9 @@ public final class RakClient {
         void closed(String reason);
     }
 
+    /** The {@link Listener#closed} reason when nothing came from the server for the idle timeout. */
+    public static final String TIMED_OUT = "the server stopped answering (timed out)";
+
     private static final long TICK_MS = 50;
     private static final long REQUEST_EVERY_MS = 500;
     private static final long IDLE_TIMEOUT_MS = 15_000;
@@ -162,7 +165,7 @@ public final class RakClient {
         ticks++;
         long wall = System.currentTimeMillis();
         if (wall - lastHeard > IDLE_TIMEOUT_MS) {
-            shut("the server stopped answering (timed out)", false);
+            shut(TIMED_OUT, false);
             return;
         }
         if (reliability == null) {

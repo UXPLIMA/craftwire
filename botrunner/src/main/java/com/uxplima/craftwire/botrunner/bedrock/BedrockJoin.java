@@ -81,13 +81,15 @@ final class BedrockJoin {
 
     /** Why a bot left before it was in the world, as an agent error. */
     static AgentError failure(String reason) {
+        // Before the kick check: Geyser's "sign in to Xbox" kick is translated (it says "Xbox" in every language).
+        if (reason.contains("Xbox") || reason.contains("not authenticated")) {
+            String why = reason.startsWith("kicked: ") ? "The server wants Xbox sign-in: " + reason.substring(8) : reason;
+            return new AgentError("ONLINE_MODE", why, "client_process {action:'sign_in'} adds a Microsoft account; spawn with account:<name>. "
+                    + "On a Geyser server you run, validate-bedrock-login: false lets offline bots in.");
+        }
         if (reason.startsWith("kicked: ")) {
             return new AgentError("JOIN_KICKED", "The server refused the bot: " + reason.substring(8),
                     "Check whitelist, bans, the server's version (Bedrock " + PacketIds.GAME_VERSION + ") and anti-bot plugins.");
-        }
-        if (reason.contains("Xbox") || reason.contains("not authenticated")) {
-            return new AgentError("ONLINE_MODE", reason,
-                    "The server wants Xbox sign-in: client_process {action:'sign_in'} adds an account; spawn with account:<name>.");
         }
         return new AgentError("JOIN_FAILED", "The bot could not join: " + reason, "Check the address and that the Bedrock server is up.");
     }
