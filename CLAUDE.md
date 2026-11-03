@@ -33,6 +33,7 @@ Feature-first packages, never layer-first (`bot/gui`, `bot/path`, not `services/
 | `bot-core/` | Bot model shared by every bot kind: actions, GUI click vocabulary, behaviors, pathfinder, world view interfaces |
 | `agent-paper/` | Paper/Folia plugin; the in-server (plugin) bot lives in `paper/bot` on top of `bot-core` |
 | `agent-fabric/` | Fabric client mod |
+| `agent-velocity/` | Velocity proxy plugin: proxy commands, servers, players and switches for the hub |
 | `botrunner/` | Standalone process for external bots: `java/` (vanilla-codec Java bots), `bedrock/` (Bedrock bots), shared world cache |
 | `bedrock-protocol/` | Our own Bedrock protocol: `raknet/`, `crypto/`, `auth/`, `codec/`, `packet/` |
 | `build-core/`, `agent-script/`, `mc-shared/`, `craftwire-api/` | Build engine, script sandbox, shared vanilla data, public extension API |
@@ -84,7 +85,7 @@ Package names: `com.uxplima.craftwire.<module>.<feature>`.
 
 - Conventional Commits: `type(scope): subject`, lowercase, imperative or descriptive, no trailing period.
 - Types: `feat`, `fix`, `perf`, `refactor`, `docs`, `test`, `build`, `release`.
-- Scopes: `hub`, `paper`, `fabric`, `core`, `bot-core`, `botrunner`, `bedrock`, `panel`, `docker`, `build-core`,
+- Scopes: `hub`, `paper`, `fabric`, `velocity`, `core`, `bot-core`, `botrunner`, `bedrock`, `panel`, `docker`, `build-core`,
   `protocol`, `mc` (or none for cross-cutting changes).
 - Body wrapped at about 100 columns, explains why and what changed for the user; one logical change per commit.
 - Work happens on `next`; commit when a module or a coherent feature is complete. Never push or open PRs unless asked.

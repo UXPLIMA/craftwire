@@ -12,7 +12,9 @@ const LOG_LINES = 200;
 const CHAT_LINES = 100;
 /** A subscribed resource is announced at most this often (a busy log would flood the client otherwise). */
 const NOTIFY_EVERY_MS = 1000;
-export const DOC_TOPICS = ["tools", "building", "scenarios", "extensions", "http", "video", "gui-capture", "folia"] as const;
+export const DOC_TOPICS = [
+  "tools", "building", "scenarios", "extensions", "http", "video", "gui-capture", "folia", "bots", "velocity", "docker", "ci",
+] as const;
 
 /** docs/ next to the hub in a repo checkout, or in the npm package. */
 function docsDir(): string | undefined {
@@ -108,7 +110,7 @@ export function registerResources(server: McpServer, ctx: ToolContext): void {
       resources: DOC_TOPICS.map((t) => ({ uri: `craftwire://docs/${t}`, name: `Craftwire docs: ${t}`, mimeType: "text/markdown" })),
     }),
     complete: { topic: (v) => DOC_TOPICS.filter((t) => t.startsWith(v)) },
-  }), { title: "Craftwire docs", description: "scenarios (the scenario file format), extensions (adding tools from a plugin or mod), http (craftwire serve), video (record: presets, camera moves, sound), folia (what changes on Folia, finding thread violations).", mimeType: "text/markdown" },
+  }), { title: "Craftwire docs", description: "scenarios (the scenario file format), extensions (adding tools from a plugin or mod), http (craftwire serve, tokens, panel), video (record: presets, camera moves, sound), folia (what changes on Folia, finding thread violations), bots (kinds, runners, accounts), velocity (proxies), docker, ci.", mimeType: "text/markdown" },
   async (uri, vars) => {
     const topic = String(vars.topic);
     const dir = docsDir();

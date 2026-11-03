@@ -1,6 +1,6 @@
 ---
 name: craftwire
-description: Use when driving Minecraft or a Paper server through the craftwire MCP tools (screenshot, record, camera, gui_*, input, chat, server_command, server_eval, world_query, world_edit, logs, exceptions, events, wait_for, server_process, plugin_deploy, client_process, bot_spawn, bot_action, profile, trace, client_eval) — covers the reliable order of calls, menus, server scripting, safe world edits and recovering from errors.
+description: Use when driving Minecraft or a Paper server through the craftwire MCP tools (screenshot, record, camera, gui_*, input, chat, server_command, server_eval, world_query, world_edit, logs, exceptions, events, wait_for, server_process, plugin_deploy, client_process, bot_spawn, bot_action, bot_behavior, load_test, dupe_hunt, locale_tour, proxy, scenario_record, profile, trace, client_eval) — covers the reliable order of calls, menus, server scripting, safe world edits and recovering from errors.
 ---
 
 # Driving Minecraft with Craftwire
@@ -55,18 +55,26 @@ If `gui_action` returns `SLOT_OUT_OF_RANGE` or `NO_SCREEN_OPEN`, the screen chan
 ## Player commands through `chat`
 - `chat {action:"command"}` strips one leading `/`, so WorldEdit commands keep their double slash: send `//pos1`.
 
-## Bots (server-side fake players)
+## Bots
 - `bot_spawn {count}` (or `names`), then drive with `bot_action`. Bots are real players to plugins: permissions, join/quit, chat and click events all fire.
+- Kinds: `plugin` (default, inside the Paper server), `java` and `bedrock` (protocol clients from a bot runner; need `address`, join any server or proxy). No runner yet: `botrunner_process {action:"start"}`. Online-mode servers: `client_process {action:"sign_in"}` once, then `account`.
+- Many bots: `count` up to 1000, `group`, then `bots:"Load*"` or `group` in `bot_action` / `bot_behavior` instead of `bot`. `load_test {ramp:[10,50,100]}` for a measured ramp.
 - Menus: `bot_action {action:"command", command:"shop"}` → `gui_read` → `gui_click {slot}`; the click result already includes the menu after the plugin reacted. Read replies with `messages`.
 - `move_to {x,y,z}` finds a path (around walls, up steps, down drops up to `maxFall`, through doors, up ladders, through water; never into lava or fire) within 256 blocks in loaded chunks. `reason: no_path` comes with `closest`; `partial:true` walks there. `path:false` walks straight.
 - `break_block {block}` digs like a survival player and returns `cancelledBy` when a plugin refused; `jump`, `sneak {on}`, `sprint {on}`, `drop {all}`, `swap_hands` fire the matching player events.
 - Bots skip the whitelist and bans, and leave no player files behind. They are not op: give permissions with the server's permission plugin, or `minecraft:op` if the test needs it.
+- Every click: `gui_click {slot, click: left|right|shift|number (key)|offhand|drop|drop_stack|middle|double|drag (slots)|outside}`; special screens have their own actions (anvil_rename, sign_edit, trade_select, dialog_answer, …); Bedrock forms: `bot_form`.
+- `dupe_hunt {bot, open:{command}}` tries dupe click sequences and reports item gains/losses; `locale_tour {locales, targets}` lists untranslated texts. Both on the user's own test server.
 - Always `bot_remove {all:true}` when done.
 
 ## Lag and slow code
 - `profile {durationMs}` while the slow thing happens (start the bots or the command first): `owners` says which plugin or mod uses the tick or frame, `entryPoints` which listener (and event) or task, `hotMethods` where, `ticks` the mspt.
 - `trace {method:"com.example.Shop::buy"}` then gives exact call counts, average and worst times, the slowest calls' stacks and the callers. Make the method run while tracing.
 - `client_eval {code}` runs JavaScript on a client (`mc`, `player`, `level`, `screen()`, `Java.type`) for mod and client state no other tool shows. The first call downloads GraalJS (a minute).
+
+## Proxies and recorded sessions
+- A Velocity proxy with the Craftwire plugin adds `proxy` (info, servers, players, send, kick, command). Cross-server: java bots join the proxy's address, `command "server games"`, then `wait_for {condition:"server_switch", pattern}`.
+- `scenario_record` turns this session's calls into a scenario (failed and read-only calls left out); add `expect` checks, save it under `tests/`.
 
 ## Resources and prompts
 `craftwire://instances/<name>/log`, `craftwire://exceptions`, `craftwire://docs/scenarios` and the rest are readable as MCP resources; the prompts `test_plugin`, `debug_lag`, `write_scenario` and `setup` start those workflows.

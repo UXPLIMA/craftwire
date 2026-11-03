@@ -84,7 +84,7 @@ record {action:"start", layer:"gui+tooltip", savePath:"videos/kit.mov", duration
 
 ### Bots that plugins treat as players
 
-`bot_spawn` puts fake players on the Paper server. They join with a join event and a tab-list entry. `bot_action` makes them chat, run commands (and returns what the server answered), walk, look, use items, attack, break blocks, sneak, sprint, jump, drop items, open and click plugin menus, and read their own HUD (scoreboard sidebar, tab list, boss bars, titles). `move_to` finds a path: around walls, up steps, down drops, through doors and gates, up ladders and through water, never into lava or fire. Plugins see the same events a real client would cause, so you can test a shop, a minigame or a permission check without a second account.
+`bot_spawn` puts bots on a server. `plugin` bots are fake players inside your Paper server (thousands of them, cheap); `java` and `bedrock` bots are real protocol clients from a bot runner that join any server by address: Spigot, Fabric, Velocity and BungeeCord proxies, Bedrock Dedicated Server, Geyser, other versions, with an offline name or your own signed-in account, and a simulated bad network if you want one. They join with a join event and a tab-list entry. `bot_action` makes them chat, run commands (and returns what the server answered), walk, look, use items, attack, break blocks, sneak, sprint, jump, drop items, open and click plugin menus, and read their own HUD (scoreboard sidebar, tab list, boss bars, titles). `move_to` finds a path: around walls, up steps, down drops, through doors and gates, up ladders and through water, never into lava or fire. Bots click every kind of menu the way a player can (shift, number keys, off hand, drag, double click, drop, outside) and use the special screens: anvils, signs, books, villager trades, beacons, enchanting tables, recipe book, server dialogs and Bedrock forms. Plugins see the same events a real client would cause, so you can test a shop, a minigame or a permission check without a second account. `bot_behavior` keeps many bots busy on their own (wander, follow, patrol, chat, menu clicks, or a script), and `load_test` ramps them up in steps and profiles each step. See [docs/bots.md](docs/bots.md).
 
 On [Folia](docs/folia.md) the bots tick on their own region threads. Put them in far-apart regions and `exceptions` names the line of your plugin that touched a block or entity from the wrong thread, and the scheduler to use instead.
 
@@ -120,7 +120,7 @@ On [Folia](docs/folia.md) the bots tick on their own region threads. Put them in
 
 ### Test your plugin with scenarios
 
-A scenario is a plugin test written as JSON: bots run commands and click menus, and checks wait for the message, the block, the item or the event that should follow. When a check fails you get the expected and actual values plus what the bots saw, which events fired and which exceptions were logged at that moment. Run them from the AI with `scenario_run`, or in CI with `npx craftwire test --server <dir> --junit report.xml`. See [docs/scenarios.md](docs/scenarios.md).
+A scenario is a plugin test written as JSON: bots run commands and click menus, and checks wait for the message, the block, the item or the event that should follow. When a check fails you get the expected and actual values plus what the bots saw, which events fired and which exceptions were logged at that moment. Run them from the AI with `scenario_run`, or in CI with `npx craftwire test --server <dir> --junit report.xml`. Did a flow by hand (or let the AI do it)? `scenario_record` turns that session into a scenario. In GitHub Actions, `uses: uxplima/craftwire@v1` runs your scenarios and a short load test against a real Paper server in Docker and comments the results on the pull request. See [docs/scenarios.md](docs/scenarios.md), [docs/ci.md](docs/ci.md) and [docs/docker.md](docs/docker.md).
 
 ```json
 { "name": "shop sells a diamond", "bots": ["Buyer"],
@@ -130,6 +130,12 @@ A scenario is a plugin test written as JSON: bots run commands and click menus, 
     { "expect_message": { "bot": "Buyer", "matches": "you bought a diamond" } },
     { "expect_no_exceptions": {} } ] }
 ```
+
+### Hunt dupes and untranslated texts
+
+`dupe_hunt` has a bot try the click sequences that duplicate or lose items in GUI plugins (spam with no delay, clicks racing a close, number-key and off-hand swaps out of a menu, drags, double clicks, creative middle clicks) and counts the items before and after each one. `locale_tour` opens your menus and commands with a bot per locale and lists every text that stayed in the base language, and every message key or placeholder that was never filled in.
+
+> *"Run dupe_hunt on /auction with a bot holding 32 diamonds, then check the menus in tr_tr and de_de for untranslated text."*
 
 ### Give the AI your plugin's own tools
 
@@ -225,7 +231,11 @@ Then ask your AI: *"take a screenshot of what I'm looking at"* or *"what's the T
 
 ### One hub for several AI clients, or another machine
 
-`npx craftwire serve` runs the hub as a server with MCP over HTTP: several AI clients share the same game and server, an AI on another machine can connect (`--allow-remote`, TLS), and `--read-only` gives observers only the tools that change nothing. Every request needs a bearer token. See [docs/http.md](docs/http.md).
+`npx craftwire serve` runs the hub as a server with MCP over HTTP: several AI clients share the same game and server, an AI on another machine can connect (`--allow-remote`, TLS), and `--read-only` gives observers only the tools that change nothing. Every request needs a bearer token; `npx craftwire token add <name> --role dev|bots|read-only` gives each teammate their own, and every call is audited by person. A web panel at `/panel` shows the instances, the bots on a map, logs, a live view of a client and each session's calls step by step. See [docs/http.md](docs/http.md).
+
+### Velocity proxies
+
+The Craftwire Velocity plugin connects a proxy to the hub: the `proxy` tool pings the backend servers, shows who is on which one, moves and kicks players and runs proxy commands, and `wait_for` follows a bot from the lobby to a game server. See [docs/velocity.md](docs/velocity.md).
 
 ## Tools
 
@@ -234,12 +244,13 @@ Then ask your AI: *"take a screenshot of what I'm looking at"* or *"what's the T
 | Hub | `list_instances` · `wait_for` · `get_request_status` · `logs` · `exceptions` |
 | Client | `screenshot` · `record` · `camera` · `gui_read` · `gui_action` · `input` · `chat` · `hud_read` · `player_state` · `client_settings` |
 | Server | `server_command` · `server_eval` · `world_query` · `world_edit` · `world_render` · `server_info` · `plugin_manage` · `events` |
-| Dev loop | `server_process` · `plugin_deploy` · `client_process` · `scenario_run` |
-| Bots | `bot_spawn` · `bot_action` · `bot_remove` |
-| Debugging | `profile` · `trace` · `client_eval` |
-| CLI | `npx craftwire setup` · `npx craftwire doctor` · `npx craftwire test` · `npx craftwire serve` |
+| Dev loop | `server_process` · `plugin_deploy` · `client_process` · `scenario_run` · `scenario_record` |
+| Bots | `bot_spawn` · `bot_action` · `bot_remove` · `bot_list` · `bot_behavior` · `bot_form` · `botrunner_process` · `load_test` · `dupe_hunt` · `locale_tour` |
+| Debugging | `profile` · `trace` · `profile_diff` · `client_eval` |
+| Proxy | `proxy` (while a Velocity proxy is connected) |
+| CLI | `npx craftwire setup` · `npx craftwire doctor` · `npx craftwire test` · `npx craftwire serve` · `npx craftwire token` · `npx craftwire load-test` |
 
-Resources: `craftwire://instances`, `craftwire://exceptions`, each game's log (`craftwire://instances/<name>/log`), a client's chat and a fresh screenshot, and the docs (`craftwire://docs/scenarios`, `extensions`, `http`, `video`). Prompts: `test_plugin`, `debug_lag`, `write_scenario` and `setup`.
+Resources: `craftwire://instances`, `craftwire://exceptions`, each game's log (`craftwire://instances/<name>/log`), a client's chat and a fresh screenshot, and the docs (`craftwire://docs/tools`, `scenarios`, `extensions`, `http`, `video`, `bots`, `velocity`, `docker`, `ci`). Prompts: `test_plugin`, `debug_lag`, `write_scenario` and `setup`.
 
 Skills that teach the agent the workflows ship with the Claude Code plugin, and `setup` installs them for Codex and Gemini CLI:
 - `craftwire`: the tools in general.
@@ -252,6 +263,8 @@ Skills that teach the agent the workflows ship with the Claude Code plugin, and 
 ```
 AI client ──stdio──▶ craftwire hub ◀──WebSocket (127.0.0.1)── Fabric agent mod (your game)
                                     ◀──────────────────────── Paper plugin (your server)
+                                    ◀──────────────────────── Velocity plugin (your proxy)
+                                    ◀──────────────────────── bot runner (java and bedrock bots)
 ```
 
 The hub listens on `127.0.0.1` only. It writes its port and a random token to `~/.craftwire/hub.json`, and the mod and the plugin read that file to connect to it. The game and the server open no ports of their own. Every tool call is logged to `~/.craftwire/logs/`.

@@ -19,7 +19,7 @@ export const SERVE_USAGE = `Usage: craftwire serve [--port 7777] [--host 127.0.0
   --tls-cert <file>     serve HTTPS with this certificate (PEM) …
   --tls-key <file>      … and its private key
   --read-only           offer only tools that change nothing
-  --tools <groups>      offer only these groups: hub, client, server, build, dev, bots, debug, extensions
+  --tools <groups>      offer only these groups: hub, client, server, build, dev, bots, debug, proxy, extensions
   --profile <name>      a preset of groups and tools: build
   --build-dir <dir>     build may read script files from this folder (otherwise build takes only code)
   --allow-host <name>   another Host name this machine is reached by (repeatable)

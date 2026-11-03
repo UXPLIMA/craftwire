@@ -8,7 +8,7 @@ export const TOKEN_USAGE = `Usage: craftwire token <add|list|remove> ...
   list           the teammates with a token, their role and tool groups (never the tokens)
   remove <name>  revoke a teammate's token at once
   Roles: read-only (every tool that changes nothing), bots (hub and bot tools), dev (everything).
-  --tools narrows a role to some groups: hub, client, server, build, dev, bots, debug, extensions.`;
+  --tools narrows a role to some groups: hub, client, server, build, dev, bots, debug, proxy, extensions.`;
 
 export function tokenCommand(args: string[], home: string, out: (s: string) => void): number {
   const tokens = new TeamTokens(home);

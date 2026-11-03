@@ -32,7 +32,13 @@ Once a flow works, keep it as a scenario so it is checked after every change: wr
 - Checks: `expect_message {bot, matches}`, `expect_hud {bot, path, matches}`, `expect_block {x,y,z,is}`, `expect_event {type, player, matches}`, `expect_no_exceptions {}`.
 - `bots: ["Buyer"]` spawns and removes the bots; `cleanup` always runs, so undo world changes there (or `save` a `world_edit` snapshot in setup and restore it).
 - A failure names the step, expected vs actual, and the bots' messages/HUD, events and new exceptions at that moment: read them before changing code. Full format: docs/scenarios.md in the Craftwire repo.
-- CI: `npx craftwire test tests --server <dir> --junit report.xml`.
+- Did the flow by hand first? `scenario_record {file:"tests/<flow>.cwtest.json"}` writes this session's calls as a scenario; add the checks.
+- CI: `npx craftwire test tests --server <dir> --junit report.xml`, or the GitHub Action `uxplima/craftwire@v1` (Docker, PR comment): craftwire://docs/ci.
+
+## Before a release
+- `dupe_hunt {bot, open:{command:"<menu command>"}}` with items in the bot's inventory: any `gained` is a dupe to fix.
+- `locale_tour {locales:["tr_tr","de_de"], targets:[{name, command}]}` lists untranslated menu, chat and HUD texts.
+- `load_test {ramp:[10,50,100], behavior:{type:"wander"}}` and `profile_diff` before/after a performance fix.
 
 ## When it lags
 `profile` during the slow part (bots walking, a minigame running) names the plugin, the listener and its event or the task, and the hot methods; `trace` that method for call counts and times; fix, redeploy, profile again to show the difference.
