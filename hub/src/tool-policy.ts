@@ -5,8 +5,8 @@ export const TOOL_GROUPS: Record<string, readonly string[]> = {
   server: ["server_command", "server_eval", "world_query", "world_edit", "world_render", "server_info", "plugin_manage", "events"],
   build: ["build", "build_manage"],
   dev: ["server_process", "plugin_deploy", "client_process", "scenario_run"],
-  bots: ["bot_spawn", "bot_action", "bot_remove"],
-  debug: ["profile", "trace", "client_eval"],
+  bots: ["bot_spawn", "bot_action", "bot_remove", "bot_list", "bot_behavior", "bot_form", "load_test", "botrunner_process"],
+  debug: ["profile", "trace", "client_eval", "profile_diff"],
   extensions: [],
 };
 
@@ -16,7 +16,7 @@ const BUILT_IN = new Set(Object.values(TOOL_GROUPS).flat());
 const READS = new Set([
   "list_instances", "get_request_status", "wait_for", "logs", "exceptions",
   "screenshot", "gui_read", "hud_read", "player_state",
-  "world_query", "world_render", "server_info", "profile", "trace",
+  "world_query", "world_render", "server_info", "profile", "trace", "bot_list", "profile_diff",
 ]);
 
 /** Tools that read for some actions only: the actions that change nothing. */
@@ -26,7 +26,10 @@ const READING_ACTIONS: Record<string, readonly string[]> = {
   plugin_manage: ["list", "info"],
   chat: ["read"],
   record: ["status"],
-  bot_action: ["messages", "state", "gui_read", "hud_read"],
+  bot_action: ["messages", "state", "gui_read", "hud_read", "resource_packs"],
+  bot_behavior: ["status"],
+  bot_form: ["read"],
+  botrunner_process: ["status"],
   // watch only starts recording more event types.
   events: ["summary", "query", "listeners", "watch"],
 };

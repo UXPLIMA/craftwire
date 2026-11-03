@@ -1,10 +1,12 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import WebSocket from "ws";
-import type { HubStatus } from "./agents.js";
+import type { AgentKind, HubStatus } from "./agents.js";
 import { pluginInfoOfJar, pluginJarsNamed } from "./dev/jar.js";
 import { eulaAccepted, MIN_JAVA, probeJavaMajor, resolveLaunch } from "./dev/launch.js";
 import { HUB_VERSION } from "./version.js";
+
+const AGENT_NAMES: Record<AgentKind, string> = { client: "Agent mod", server: "plugin", botrunner: "bot runner" };
 
 export interface Check {
   status: "ok" | "warn" | "fail";
@@ -87,10 +89,10 @@ function hubChecks(s: HubStatus): Check[] {
     : { status: "warn", label: `hub ${s.hubVersion} is running, this command is ${HUB_VERSION}`, fix: "Restart your AI client so both use the same version." }];
   if (s.instances.length === 0) out.push({ status: "warn", label: "no game or server is connected", fix: "Start Minecraft with the Craftwire Agent mod, or a Paper server with the Craftwire plugin." });
   for (const i of s.instances) {
-    const what = `${i.id} (${i.name}, ${i.kind === "client" ? "mod" : "plugin"} ${i.agentVersion}, Minecraft ${i.mcVersion})`;
+    const what = `${i.id} (${i.name}, ${AGENT_NAMES[i.kind]} ${i.agentVersion}, Minecraft ${i.mcVersion})`;
     out.push(i.agentVersion === s.hubVersion
       ? { status: "ok", label: what }
-      : { status: "warn", label: `${what} differs from hub ${s.hubVersion}`, fix: `Update the Craftwire ${i.kind === "client" ? "Agent mod" : "plugin"} to ${s.hubVersion}.` });
+      : { status: "warn", label: `${what} differs from hub ${s.hubVersion}`, fix: `Update the Craftwire ${AGENT_NAMES[i.kind]} to ${s.hubVersion}.` });
   }
   for (const r of s.rejected) {
     out.push({

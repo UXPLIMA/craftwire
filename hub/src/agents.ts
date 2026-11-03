@@ -7,7 +7,7 @@ import { type AgentEvent, EventNotification, HelloRequest, RpcResponse, StatusRe
 import { RingBuffer } from "./ringbuffer.js";
 import { HUB_VERSION, PROTOCOL_VERSION } from "./version.js";
 
-export type AgentKind = "client" | "server";
+export type AgentKind = "client" | "server" | "botrunner";
 
 export interface InstanceInfo {
   id: string;
@@ -21,6 +21,9 @@ export interface InstanceInfo {
   pid?: number;
   /** Client agents: the game directory, which maps clients started by client_process to their agent (agents >= 0.5.0). */
   gameDir?: string;
+  /** Bot runners: the bot kinds they run and their capacity. */
+  botKinds?: ("java" | "bedrock")[];
+  maxBots?: number;
 }
 
 export interface RejectedAgent {
@@ -62,6 +65,18 @@ export interface AgentServerOptions {
   bufferSize?: number;
 }
 
+const LABELS: Record<AgentKind, string> = {
+  client: "Minecraft client (Craftwire Agent mod)",
+  server: "Paper server (Craftwire plugin)",
+  botrunner: "bot runner (craftwire-botrunner)",
+};
+
+const START_HINTS: Record<AgentKind, string> = {
+  client: "Start Minecraft with the Craftwire Agent mod installed; it connects automatically.",
+  server: "Start the Paper server with the Craftwire plugin installed; it connects automatically.",
+  botrunner: "Start one with botrunner_process {action:'start'}, or run craftwire-botrunner on another machine with the hub token.",
+};
+
 const CLOSE_UNAUTHORIZED = 4001;
 const CLOSE_PROTOCOL = 4002;
 const CLOSE_BAD_HANDSHAKE = 4003;
@@ -69,7 +84,7 @@ const CLOSE_BAD_HANDSHAKE = 4003;
 export class AgentServer extends EventEmitter {
   private wss?: WebSocketServer;
   private readonly live = new Map<string, Instance>();
-  private readonly counters: Record<AgentKind, number> = { client: 0, server: 0 };
+  private readonly counters: Record<AgentKind, number> = { client: 0, server: 0, botrunner: 0 };
   private readonly rejected = new RingBuffer<RejectedAgent>(20);
 
   constructor(private readonly opts: AgentServerOptions) {
@@ -162,6 +177,8 @@ export class AgentServer extends EventEmitter {
         ...(params.serverDir !== undefined ? { serverDir: params.serverDir } : {}),
         ...(params.pid !== undefined ? { pid: params.pid } : {}),
         ...(params.gameDir !== undefined ? { gameDir: params.gameDir } : {}),
+        ...(params.botKinds !== undefined ? { botKinds: params.botKinds } : {}),
+        ...(params.maxBots !== undefined ? { maxBots: params.maxBots } : {}),
       };
       const inst: Instance = { info, socket, pending: new Map(), events: new RingBuffer(this.opts.bufferSize ?? 5000), nextId: 1 };
       this.live.set(info.id, inst);
@@ -232,7 +249,7 @@ export class AgentServer extends EventEmitter {
 
   resolve(kind: AgentKind, selector?: string): InstanceInfo {
     const ofKind = this.instances().filter((i) => i.kind === kind);
-    const label = kind === "client" ? "Minecraft client (Craftwire Agent mod)" : "Paper server (Craftwire plugin)";
+    const label = LABELS[kind];
     if (selector) {
       const s = selector.toLowerCase();
       const hit = ofKind.find((i) => i.id === selector) ?? ofKind.find((i) => i.name.toLowerCase() === s);
@@ -240,9 +257,7 @@ export class AgentServer extends EventEmitter {
       return hit;
     }
     if (ofKind.length === 0) {
-      throw new CraftwireError("NO_INSTANCE", `No ${label} is connected`, kind === "client"
-        ? "Start Minecraft with the Craftwire Agent mod installed; it connects automatically."
-        : "Start the Paper server with the Craftwire plugin installed; it connects automatically.");
+      throw new CraftwireError("NO_INSTANCE", `No ${label} is connected`, START_HINTS[kind]);
     }
     if (ofKind.length > 1) throw new CraftwireError("AMBIGUOUS_INSTANCE", `${ofKind.length} ${kind} instances are connected`, `Pass instance: one of ${ofKind.map((i) => `${i.id} (${i.name})`).join(", ")}.`);
     return ofKind[0]!;

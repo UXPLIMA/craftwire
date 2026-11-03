@@ -4,7 +4,7 @@ const RpcId = z.union([z.number().int(), z.string()]);
 
 export const HelloParams = z.object({
   token: z.string().min(1),
-  agentKind: z.enum(["client", "server"]),
+  agentKind: z.enum(["client", "server", "botrunner"]),
   agentVersion: z.string(),
   protocolVersion: z.number().int(),
   mcVersion: z.string(),
@@ -12,6 +12,9 @@ export const HelloParams = z.object({
   serverDir: z.string().optional(),
   pid: z.number().int().positive().optional(),
   gameDir: z.string().optional(),
+  /** Bot runners: the bot kinds they run (java, bedrock) and how many bots they take at most. */
+  botKinds: z.array(z.enum(["java", "bedrock"])).optional(),
+  maxBots: z.number().int().positive().optional(),
 });
 export type HelloParams = z.infer<typeof HelloParams>;
 
