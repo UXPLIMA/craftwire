@@ -62,8 +62,8 @@ function raw(port: number, method: string, path: string, headers: Record<string,
 
 /** Signs in to the panel like its page does; returns the cookie to send back. */
 async function signIn(port: number, token: string): Promise<string> {
-  const r = await raw(port, "POST", "/panel/login", { origin: `http://127.0.0.1:${port}`, host: `127.0.0.1:${port}`, "content-type": "application/json" },
-    JSON.stringify({ token }));
+  const headers = { origin: `http://127.0.0.1:${port}`, host: `127.0.0.1:${port}`, "content-type": "application/json" };
+  const r = await raw(port, "POST", "/panel/login", headers, JSON.stringify({ token }));
   expect(r.status).toBe(204);
   return String(r.headers["set-cookie"]).split(";")[0]!;
 }

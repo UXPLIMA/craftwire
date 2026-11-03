@@ -151,14 +151,18 @@ class ItemMovesTest {
         assertEquals("SLOT_OUT_OF_RANGE", assertThrows(AgentError.class, () -> ItemMoves.moveItem(c.view(), 0, 63, null)).code());
     }
 
+    private static GuiStep shift(int slot) {
+        return GuiStep.of(new RawClick(slot, 0, ContainerMode.QUICK_MOVE));
+    }
+
     @Test
     void transferShiftClicksMatchingStacksOnTheChosenSideUntilEnough() {
         Chest c = new Chest().put(1, item("diamond", 10, 64)).put(2, item("stone", 64, 64)).put(4, item("diamond", 10, 64))
                 .put(9, item("diamond", 10, 64)).put(40, item("diamond", 5, 64));
         List<GuiStep> steps = ItemMoves.transfer(c.view(), true, "diamond", 15);
-        assertEquals(List.of(GuiStep.of(new RawClick(1, 0, ContainerMode.QUICK_MOVE)), GuiStep.of(new RawClick(4, 0, ContainerMode.QUICK_MOVE))), steps);
+        assertEquals(List.of(shift(1), shift(4)), steps);
         List<GuiStep> back = ItemMoves.transfer(c.view(), false, "diamond", null);
-        assertEquals(List.of(GuiStep.of(new RawClick(40, 0, ContainerMode.QUICK_MOVE))), back);
+        assertEquals(List.of(shift(40)), back);
         assertEquals("ITEM_NOT_FOUND", assertThrows(AgentError.class, () -> ItemMoves.transfer(c.view(), false, "stone", null)).code());
     }
 
@@ -175,7 +179,8 @@ class ItemMovesTest {
         assertEquals(List.of(GuiStep.of(new RawClick(12, 4, ContainerMode.SWAP))), ItemMoves.equip(inv, 4, 12, null, "hand"));
         assertEquals(List.of(GuiStep.of(new RawClick(12, ClickPlan.OFFHAND_BUTTON, ContainerMode.SWAP))),
                 ItemMoves.equip(inv, 0, null, "shield", "offhand"));
-        assertEquals(List.of(GuiStep.left(20), GuiStep.left(PlayerSlots.HEAD), GuiStep.left(20)), ItemMoves.equip(inv, 0, null, "iron_helmet", "head"));
+        assertEquals(List.of(GuiStep.left(20), GuiStep.left(PlayerSlots.HEAD), GuiStep.left(20)),
+                ItemMoves.equip(inv, 0, null, "iron_helmet", "head"));
     }
 
     @Test
