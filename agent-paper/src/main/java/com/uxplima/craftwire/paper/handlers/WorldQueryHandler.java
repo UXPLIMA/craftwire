@@ -25,6 +25,7 @@ import org.bukkit.ChunkSnapshot;
 import org.bukkit.World;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.Item;
 import org.bukkit.entity.Player;
 import org.bukkit.util.BoundingBox;
 
@@ -68,7 +69,9 @@ final class WorldQueryHandler {
         World w = Args.world(p);
         Box box = Box.from(p);
         String encoding = Args.optString(p, "encoding").orElse("runs");
-        if (!encoding.equals("runs") && !encoding.equals("indices") && !encoding.equals("layers")) throw Args.invalid("encoding must be runs, indices or layers");
+        if (!encoding.equals("runs") && !encoding.equals("indices") && !encoding.equals("layers")) {
+            throw Args.invalid("encoding must be runs, indices or layers");
+        }
         long limit = encoding.equals("layers") ? MAX_LAYERS : MAX_REGION;
         if (box.volume() > limit) {
             throw new AgentError("QUERY_TOO_LARGE", "The region covers " + box.volume() + " blocks; the limit is " + limit,
@@ -113,7 +116,8 @@ final class WorldQueryHandler {
         int air = index.getOrDefault("minecraft:air", -3);
         Layers.Encoded e;
         try {
-            e = Layers.encode(box.sizeX(), box.sizeY(), box.sizeZ(), (dx, dy, dz) -> ids[(dy * box.sizeZ() + dz) * box.sizeX() + dx], names::get, air);
+            e = Layers.encode(box.sizeX(), box.sizeY(), box.sizeZ(),
+                    (dx, dy, dz) -> ids[(dy * box.sizeZ() + dz) * box.sizeX() + dx], names::get, air);
         } catch (BuildError err) {
             throw new AgentError(err.code(), err.getMessage(), err.hint());
         }
@@ -242,6 +246,11 @@ final class WorldQueryHandler {
         o.addProperty("z", round(e.getLocation().getZ()));
         o.addProperty("yaw", round(e.getLocation().getYaw()));
         o.addProperty("pitch", round(e.getLocation().getPitch()));
+        // Dropped items carry their stack, so a caller can count items on the ground (dupe_hunt does).
+        if (e instanceof Item item) {
+            o.addProperty("item", item.getItemStack().getType().getKey().toString());
+            o.addProperty("count", item.getItemStack().getAmount());
+        }
         return o;
     }
 

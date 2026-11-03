@@ -5,6 +5,7 @@ import type { InstanceInfo } from "../../agents.js";
 import { CraftwireError } from "../../errors.js";
 import { defineTool, ok, targetArgs, type ToolContext } from "../registry.js";
 import { type BotKind, directoryFor, expandNames } from "./directory.js";
+import { registerDupeTools } from "./dupe-hunt.js";
 import { registerLoadTools } from "./load-test.js";
 import { merge } from "./merge.js";
 import { agentForBot, broadcast, requireAgents } from "./route.js";
@@ -112,6 +113,7 @@ export function registerBotTools(server: McpServer, ctx: ToolContext): void {
 
   registerFormTool(server, ctx);
   registerLoadTools(server, ctx);
+  registerDupeTools(server, ctx);
   registerRunnerTools(server, ctx);
 }
 
