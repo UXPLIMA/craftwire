@@ -26,7 +26,8 @@ describe("Claude Code plugin packaging", () => {
 
   it("skills have name and description front matter", () => {
     for (const skill of ["craftwire", "minecraft-promo-shots", "paper-plugin-dev"]) {
-      const text = readFileSync(join(root, "claude-plugin/skills", skill, "SKILL.md"), "utf8");
+      // The repo stores LF; a Windows checkout with core.autocrlf turns it into CRLF, which is not what users get.
+      const text = readFileSync(join(root, "claude-plugin/skills", skill, "SKILL.md"), "utf8").replace(/\r\n/g, "\n");
       expect(text).toMatch(new RegExp(`^---\\nname: ${skill}\\ndescription: .+\\n---`, "m"));
     }
   });

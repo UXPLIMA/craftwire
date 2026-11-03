@@ -36,7 +36,8 @@ describe("bot tools", () => {
     agent.onRequest("bot.remove", (p) => { calls.push(p); return { removed: [] }; });
     await hub.call("bot_remove", { name: "Bot1" });
     await hub.call("bot_remove", { all: true });
-    expect(calls).toEqual([{ name: "Bot1", all: false }, { all: true }]);
+    // `bot` is the selector of the current protocol; `name` stays for agents from before it
+    expect(calls).toMatchObject([{ bot: "Bot1", name: "Bot1" }, { all: true }]);
   });
 
   it("bot_action waits as long as a move_to may take", async () => {

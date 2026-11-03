@@ -1,11 +1,13 @@
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { loadOrCreateHttpToken } from "../config.js";
 import { runningHub, startHub } from "../hub.js";
 import { createPanel } from "../panel/panel.js";
 import { createCraftwireServer } from "../server.js";
 import { type Person, TeamTokens } from "../team/tokens.js";
 import { parseToolGroups, profile, ToolPolicy } from "../tool-policy.js";
+import type { ToolContext } from "../tools/registry.js";
 import { HUB_VERSION } from "../version.js";
 import { isLoopback, isWildcard } from "./gate.js";
 import { startHttpServer } from "./serve.js";
@@ -29,6 +31,12 @@ export const SERVE_USAGE = `Usage: craftwire serve [--port 7777] [--host 127.0.0
   --rotate-token        make a new token (clients must be set up again)
   --no-panel            do not serve the web panel at /panel
   Teammates get their own tokens and roles with craftwire token add <name>; every call is audited by person.`;
+
+/** One person's MCP session: the hub's own limit (--read-only, --tools) and their role's, with calls audited as them. */
+export function personServer(ctx: ToolContext, hubPolicy: ToolPolicy | undefined, person: Person, session: string): McpServer {
+  const limit = ToolPolicy.both(hubPolicy, person.policy);
+  return createCraftwireServer({ ...ctx, ...(limit ? { policy: limit } : {}), user: person.name, session });
+}
 
 export interface ServeOptions {
   port: number;
@@ -143,10 +151,7 @@ export async function startServe(o: ServeOptions, home: string, log: (msg: strin
   const ctx = { ...hub.ctx, build: { http: true, ...(o.buildDir !== undefined ? { dir: o.buildDir } : {}) } };
   const team = new TeamTokens(home);
   const authenticate = (t: string) => team.identify(t, token);
-  const makeServer = (person: Person, session: string) => {
-    const limit = ToolPolicy.both(policy, person.policy);
-    return createCraftwireServer({ ...ctx, ...(limit ? { policy: limit } : {}), user: person.name, session });
-  };
+  const makeServer = (person: Person, session: string) => personServer(ctx, policy, person, session);
   let http;
   try {
     http = await startHttpServer({

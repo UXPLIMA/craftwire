@@ -30,10 +30,13 @@ afterAll(async () => { await client?.close(); });
 describe("craftwire CLI over stdio", () => {
   it("exposes every built-in tool", async () => {
     const names = (await client.listTools()).tools.map((t) => t.name).sort();
+    // proxy is listed only while a Velocity proxy is connected; bot_form only with a bedrock-capable runner
     expect(names).toEqual([
-      "bot_action", "bot_remove", "bot_spawn", "build", "build_manage", "camera", "chat", "client_eval", "client_process", "client_settings", "events", "exceptions", "get_request_status", "gui_action", "gui_read",
-      "hud_read", "input", "list_instances", "logs", "player_state", "plugin_deploy", "plugin_manage", "profile", "record", "scenario_run", "screenshot",
-      "server_command", "server_eval", "server_info", "server_process", "trace", "wait_for", "world_edit", "world_query", "world_render",
+      "bot_action", "bot_behavior", "bot_list", "bot_remove", "bot_spawn", "botrunner_process", "build", "build_manage", "camera", "chat",
+      "client_eval", "client_process", "client_settings", "dupe_hunt", "events", "exceptions", "get_request_status", "gui_action", "gui_read",
+      "hud_read", "input", "list_instances", "load_test", "locale_tour", "logs", "player_state", "plugin_deploy", "plugin_manage", "profile",
+      "profile_diff", "record", "scenario_record", "scenario_run", "screenshot", "server_command", "server_eval", "server_info", "server_process",
+      "trace", "wait_for", "world_edit", "world_query", "world_render",
     ]);
   });
 
