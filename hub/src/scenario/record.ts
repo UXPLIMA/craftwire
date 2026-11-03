@@ -98,7 +98,7 @@ class SpawnedBots {
       this.groups.set(args.group, args.kind);
       return;
     }
-    for (const n of spawnedNames(result)) this.names.set(n, args.kind);
+    for (const n of spawnedNames(args, result)) this.names.set(n, args.kind);
   }
 
   removed(args: Raw): void {
@@ -125,14 +125,36 @@ class SpawnedBots {
   }
 }
 
-/** The names in a bot_spawn result preview: its text part is the tool's JSON, {spawned, names: "Bot1..Bot50"}. */
-function spawnedNames(result: unknown): string[] {
-  const text = Array.isArray(result) && typeof result[0] === "string" ? result[0] : undefined;
+/**
+ * The bots a bot_spawn made: the names it was given, else those in its result preview, whose text part is the tool's
+ * JSON ({spawned, names: "Bot1..Bot50", bots?}). A spawn of many bots answers with a summary of each, which the audit
+ * log clips ({truncated, preview}); `names` comes first, so it is read from the clipped text.
+ */
+function spawnedNames(args: Raw, result: unknown): string[] {
+  if (Array.isArray(args.names)) return args.names.filter((n): n is string => typeof n === "string");
+  const part: unknown = Array.isArray(result) ? result[0] : undefined;
+  const clipped = (part as { preview?: unknown } | undefined)?.preview;
+  const text = typeof part === "string" ? part : typeof clipped === "string" ? unclip(clipped) : undefined;
   if (text === undefined) return [];
   try {
     const names = (JSON.parse(text) as { names?: unknown }).names;
-    return typeof names === "string" ? expandNames(names) : Array.isArray(names) ? names.filter((n): n is string => typeof n === "string") : [];
+    return typeof names === "string" ? expandNames(names) : [];
   } catch {
-    return [];
+    const m = /"names":("(?:[^"\\]|\\.)*")/.exec(text);
+    return m === null ? [] : expandNames(JSON.parse(m[1]!) as string);
   }
+}
+
+/** A clipped text's start: the audit log keeps the first characters of its JSON form ("{\"spawned\"…), so unquote them. */
+function unclip(preview: string): string {
+  const body = preview.startsWith('"') ? preview.slice(1) : preview;
+  // The cut may fall inside an escape (\" or é): drop up to six characters until the rest parses.
+  for (let cut = body.length; cut >= Math.max(0, body.length - 6); cut--) {
+    try {
+      return JSON.parse(`"${body.slice(0, cut)}"`) as string;
+    } catch {
+      // try a shorter cut
+    }
+  }
+  return "";
 }

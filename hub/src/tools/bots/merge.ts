@@ -32,14 +32,15 @@ export function merge(answers: Answer[], rule: MergeRule): Obj {
     const r = a.result as Obj;
     for (const k of rule.sum ?? []) out[k] = (Number(out[k] ?? 0)) + Number(r[k] ?? 0);
     for (const k of rule.max ?? []) out[k] = Math.max(Number(out[k] ?? 0), Number(r[k] ?? 0));
+    // Joined names before the long lists: a clipped preview of the result (the audit log's) still has them.
+    for (const k of rule.join ?? []) {
+      const s = r[k];
+      if (typeof s === "string" && s.length > 0) out[k] = out[k] === undefined ? s : `${String(out[k])}, ${s}`;
+    }
     for (const k of rule.concat ?? []) {
       const list = (out[k] as unknown[] | undefined) ?? [];
       for (const item of (r[k] as unknown[] | undefined) ?? []) if (list.length < limit) list.push(item);
       if (list.length > 0) out[k] = list;
-    }
-    for (const k of rule.join ?? []) {
-      const s = r[k];
-      if (typeof s === "string" && s.length > 0) out[k] = out[k] === undefined ? s : `${String(out[k])}, ${s}`;
     }
     for (const k of rule.counts ?? []) {
       const into = (out[k] as Record<string, number> | undefined) ?? {};
