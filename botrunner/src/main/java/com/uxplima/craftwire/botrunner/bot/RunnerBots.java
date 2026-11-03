@@ -122,11 +122,17 @@ public final class RunnerBots implements AutoCloseable {
         for (RunnerBot b : registry.all()) tickOne(b, now);
     }
 
-    /** A bot that throws is dropped so it cannot fail every tick; one that left on its own leaves the registry. */
+    /**
+     * A bot that throws is dropped so it cannot fail every tick; one that left on its own leaves the registry, and
+     * the log says why (a kick after the join reaches the agent no other way). Removals are not logged: a load test
+     * removes hundreds at once.
+     */
     private void tickOne(RunnerBot b, long now) {
         try {
             if (b.tick(now) == RunnerBot.Tick.GONE) {
                 registry.remove(b);
+                String why = b.goneReason();
+                if (!why.equals("removed")) LOG.info("Bot {} left: {}", b.name(), why);
                 return;
             }
             b.behavior().tick(b, now);

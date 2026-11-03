@@ -39,5 +39,8 @@ public interface RunnerBot extends BotControl {
     /** Disconnects; the bot is gone after its next tick. */
     void leave(String reason);
 
+    /** Why the bot left (kicked, disconnected, removed), once {@link #tick} has returned GONE. */
+    String goneReason();
+
     boolean connected();
 }

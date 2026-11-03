@@ -148,7 +148,7 @@ public final class JavaBot implements RunnerBot, JavaSession.Sink {
     @Override
     public Tick tick(long now) {
         if (!connected) {
-            cleanup(goneReason == null ? "disconnected" : goneReason);
+            cleanup(goneReason());
             return Tick.GONE;
         }
         if (!life.spawned()) return Tick.ALIVE;
@@ -338,5 +338,10 @@ public final class JavaBot implements RunnerBot, JavaSession.Sink {
     @Override
     public boolean connected() {
         return connected;
+    }
+
+    @Override
+    public String goneReason() {
+        return goneReason == null ? "disconnected" : goneReason;
     }
 }

@@ -171,7 +171,7 @@ final class BedrockBot implements RunnerBot, BedrockSession.Sink {
     @Override
     public Tick tick(long now) {
         if (!connected) {
-            cleanup(goneReason == null ? "disconnected" : goneReason);
+            cleanup(goneReason());
             return Tick.GONE;
         }
         if (!life.spawned()) return Tick.ALIVE;
@@ -352,5 +352,10 @@ final class BedrockBot implements RunnerBot, BedrockSession.Sink {
     @Override
     public boolean connected() {
         return connected;
+    }
+
+    @Override
+    public String goneReason() {
+        return goneReason == null ? "disconnected" : goneReason;
     }
 }
