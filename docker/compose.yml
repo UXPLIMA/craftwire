@@ -1,0 +1,62 @@
+# Craftwire in containers: the hub (MCP over HTTP on 7777, web panel at /panel), a Paper server with the plugin and a
+# bot runner. Paper and the runner share the hub's network namespace, so their agents reach the hub on 127.0.0.1 as
+# on one machine (the agent socket never leaves loopback), and the shared home volume gives them its hub.json.
+#   ./gradlew build && EULA=true docker compose -f docker/compose.yml up --build
+#   (CRAFTWIRE_SOURCE=npm CRAFTWIRE_VERSION=0.11.0 builds from the npm release instead of this checkout)
+# Hidden game clients for screenshots: add -f docker/compose.client.yml. The token: docker compose logs hub.
+name: craftwire
+
+x-source: &source
+  CRAFTWIRE_SOURCE: ${CRAFTWIRE_SOURCE:-repo}
+  CRAFTWIRE_VERSION: ${CRAFTWIRE_VERSION:-latest}
+
+services:
+  hub:
+    build:
+      context: ..
+      dockerfile: docker/hub.Dockerfile
+      target: hub
+      args: *source
+    ports:
+      - "${CRAFTWIRE_HTTP_PORT:-7777}:7777"
+      # Paper's port: Paper runs in the hub's network namespace.
+      - "${MINECRAFT_PORT:-25565}:25565"
+    volumes:
+      - craftwire-home:/craftwire
+    restart: unless-stopped
+
+  paper:
+    build:
+      context: ..
+      dockerfile: docker/paper.Dockerfile
+      args:
+        <<: *source
+        MC_VERSION: ${MC_VERSION:-26.3}
+        PAPER_BUILD: ${PAPER_BUILD:-157}
+        PAPER_SHA256: ${PAPER_SHA256:-77cdcd758777734b0b64db74974f68e56cb08637f3c36b26734842cb8521cc2e}
+    network_mode: "service:hub"
+    depends_on: [hub]
+    environment:
+      # Yours to accept: the server does not start without EULA=true.
+      EULA: ${EULA:-}
+      MEMORY: ${PAPER_MEMORY:-2G}
+      ONLINE_MODE: ${ONLINE_MODE:-false}
+    volumes:
+      - craftwire-home:/craftwire
+      - paper-data:/data
+    restart: unless-stopped
+
+  botrunner:
+    build:
+      context: ..
+      dockerfile: docker/botrunner.Dockerfile
+      args: *source
+    network_mode: "service:hub"
+    depends_on: [hub]
+    volumes:
+      - craftwire-home:/craftwire
+    restart: unless-stopped
+
+volumes:
+  craftwire-home:
+  paper-data:

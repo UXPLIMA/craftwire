@@ -1,0 +1,9 @@
+# Adds hidden game clients to docker/compose.yml: the hub image gains Java, Xvfb and Mesa, so client_process starts
+# clients with software rendering (screenshots, recordings, the panel's live view) inside the hub container.
+#   docker compose -f docker/compose.yml -f docker/compose.client.yml up --build
+services:
+  hub:
+    build:
+      target: client
+    # The game's off-screen buffers live in shared memory.
+    shm_size: 1gb

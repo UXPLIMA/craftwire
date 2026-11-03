@@ -1,0 +1,11 @@
+# The Docker build context is the repository; images copy only hub sources, docs, skills and built agent jars.
+.git
+**/node_modules
+**/.gradle
+**/build/tmp
+**/build/classes
+**/build/run
+hub/dist
+hub/agent
+hub/skills
+hub/docs
