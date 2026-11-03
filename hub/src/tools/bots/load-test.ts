@@ -21,6 +21,8 @@ export interface StepResult {
   heapMb: number;
   chunks: number;
   topOwners: { owner: string; percent: number }[];
+  /** Java and Bedrock bots: how the step's bots were spread over the bot runners, and each runner's tick time. */
+  runners?: { name: string; bots: number; tickMs: number }[];
 }
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -87,13 +89,24 @@ async function run(c: ToolContext, a: RunArgs): Promise<unknown> {
         if (a.behavior !== undefined) await setBehavior(c, a);
       }
       const spawnMs = Date.now() - started;
-      steps.push(await measure(c, server.id, target, spawnMs, a.stepSeconds * 1000));
+      const step = await measure(c, server.id, target, spawnMs, a.stepSeconds * 1000);
+      if (a.kind !== "plugin") step.runners = await runnerShares(c, a.kind);
+      steps.push(step);
     }
   } finally {
     if (!a.keep) await removeGroup(c, a).catch(() => undefined);
   }
   const report = writeLoadReport(c.home, { server: server.name, kind: a.kind, behavior: a.behavior?.type, steps });
   return { server: server.id, kind: a.kind, steps, report };
+}
+
+/** One load test over several runners is one report: each runner's share of the bots and its loop's tick time. */
+async function runnerShares(c: ToolContext, kind: BotKind): Promise<{ name: string; bots: number; tickMs: number }[]> {
+  const answers = await broadcast(c, requireAgents(c, kind), "runner.stats", {}, 10_000);
+  return answers.filter((x) => x.error === undefined).map((x) => {
+    const r = x.result as { bots?: number; tickMs?: number };
+    return { name: x.instance.name, bots: r.bots ?? 0, tickMs: r.tickMs ?? 0 };
+  });
 }
 
 async function setBehavior(c: ToolContext, a: RunArgs): Promise<void> {

@@ -5,7 +5,7 @@ import { CraftwireError } from "../errors.js";
 import { readServeInfo } from "../http/serve-command.js";
 import { runningHub } from "../hub.js";
 import { load, summarize } from "../tools/scenario-tools.js";
-import { formatReport, formatSummary, toJUnit } from "./report.js";
+import { formatReport, formatSummary, toJUnit, toMarkdown } from "./report.js";
 import { runScenario, type ScenarioReport, type ToolCaller } from "./runner.js";
 
 export const TEST_USAGE = `Usage: craftwire test [files or folders…] [--server <dir>] [--junit <file>] [--json] [--wait <seconds>] [--hub <url>]
@@ -14,6 +14,7 @@ export const TEST_USAGE = `Usage: craftwire test [files or folders…] [--server
                    a local craftwire serve is used on its own
   --server <dir>   start this Paper server for the run and stop it afterwards
   --junit <file>   also write JUnit XML (for CI)
+  --summary <file> also write a Markdown summary (for a pull request comment)
   --json           print the full JSON report instead of the summary
   --wait <seconds> how long to wait for a running server to connect (default 60)
 Exit code: 0 all passed, 1 a scenario failed, 2 the run could not start.`;
@@ -23,6 +24,7 @@ export interface TestOptions {
   hub?: string;
   serverDir?: string;
   junit?: string;
+  summary?: string;
   json: boolean;
   waitMs: number;
 }
@@ -39,6 +41,7 @@ export function parseTestArgs(argv: string[]): TestOptions {
     if (a === "--server") o.serverDir = value();
     else if (a === "--hub") o.hub = value();
     else if (a === "--junit") o.junit = value();
+    else if (a === "--summary") o.summary = value();
     else if (a === "--json") o.json = true;
     else if (a === "--wait") {
       const s = Number(value());
@@ -95,6 +98,7 @@ export async function runTests(o: TestOptions, env: { call: ToolCaller; cwd: str
   }
   env.out(o.json ? JSON.stringify(summarize(reports), null, 2) : formatSummary(reports));
   if (o.junit !== undefined) writeFileSync(resolve(env.cwd, o.junit), toJUnit(reports));
+  if (o.summary !== undefined) writeFileSync(resolve(env.cwd, o.summary), toMarkdown(reports));
   return reports.every((r) => r.passed) ? 0 : 1;
 }
 

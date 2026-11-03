@@ -29,6 +29,26 @@ export function formatSummary(reports: ScenarioReport[]): string {
   return `${reports.length} scenario(s): ${reports.length - failed} passed, ${failed} failed`;
 }
 
+/** A Markdown table cell: pipes escaped, line breaks flattened. */
+const cell = (s: string) => s.replace(/\|/g, "\\|").replace(/\r?\n/g, " ");
+
+/** Markdown for a pull request comment: a table of the scenarios, the failing step and why. */
+export function toMarkdown(reports: ScenarioReport[]): string {
+  const failed = reports.filter((r) => !r.passed).length;
+  const lines = [
+    `### Craftwire scenarios: ${reports.length - failed} passed, ${failed} failed`,
+    "",
+    "| scenario | result | time | failing step |",
+    "|---|---|---|---|",
+  ];
+  for (const r of reports) {
+    const f = r.failure;
+    const why = f ? cell(`${f.step}: ${short(f.message, 200)}`) : r.cleanupErrors?.length ? cell(`cleanup: ${r.cleanupErrors[0]}`) : "";
+    lines.push(`| ${cell(r.name)} | ${r.passed ? "passed" : "**failed**"} | ${seconds(r.durationMs)} | ${why} |`);
+  }
+  return `${lines.join("\n")}\n`;
+}
+
 const xml = (s: string) => s.replace(/[<>&"']/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;", "'": "&apos;" })[c]!)
   // XML 1.0 has no escape for most control characters: drop them.
   .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "");

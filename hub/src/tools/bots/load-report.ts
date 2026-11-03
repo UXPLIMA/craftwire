@@ -35,6 +35,7 @@ export function renderLoadReport(r: LoadReport): string {
   const topMspt = Math.max(50, ...r.steps.map((s) => s.msptP95));
   const rows = r.steps.map((s) => `<tr><td>${s.bots}</td><td>${s.tps}</td><td>${s.msptAvg}</td><td>${s.msptP95}</td><td>${s.msptMax}</td>`
     + `<td>${s.slowTicks}</td><td>${s.heapMb}</td><td>${s.chunks}</td><td>${s.spawnMs}</td>`
+    + `<td>${(s.runners ?? []).map((x) => `${esc(x.name)} ${x.bots} (${x.tickMs} ms)`).join("<br>")}</td>`
     + `<td>${s.topOwners.map((o) => `${esc(o.owner)} ${o.percent}%`).join("<br>")}</td></tr>`).join("");
   const limit = H - PAD - ((H - 2 * PAD) * 50) / topMspt;
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -53,7 +54,7 @@ ${line(r.steps, (s) => s.msptAvg, topMspt, "#2b7bd8")}${line(r.steps, (s) => s.m
 <text x="${PAD}" y="${PAD - 10}" fill="currentColor" font-size="11">MSPT avg (blue) and p95 (orange), up to ${topMspt.toFixed(0)} ms</text>
 <text x="${W - PAD}" y="${H - 10}" text-anchor="end" fill="currentColor" font-size="11">bots</text></svg>
 <table><thead><tr><th>bots</th><th>TPS</th><th>MSPT avg</th><th>p95</th><th>max</th><th>&gt;50 ms</th><th>heap MB</th><th>chunks</th>
-<th>spawn ms</th><th>top owners</th></tr></thead><tbody>${rows}</tbody></table></body></html>`;
+<th>spawn ms</th><th>runners (tick)</th><th>top owners</th></tr></thead><tbody>${rows}</tbody></table></body></html>`;
 }
 
 /** Writes the report under <home>/reports and returns its path. */
