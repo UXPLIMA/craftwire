@@ -25,8 +25,13 @@ It connects to the hub like the other agents and reconnects by itself. With seve
 over them by free capacity, and load tests report each runner's share and tick time.
 
 Java bots load the vanilla packet code of the server's version from Mojang's server jar, downloaded once per version
-and checked against its pinned sha1. Bedrock bots speak Craftwire's own Bedrock protocol (see the design doc for the
-pinned Bedrock version).
+and checked against its pinned sha1. Bedrock bots speak Craftwire's own Bedrock protocol, versions 1.26.60 and
+1.26.50: a bot pings the server first and speaks the newest version not above the server's (Geyser takes the newest).
+A bot without an account claims a stable 12-digit XUID from its name, which Floodgate needs and no real player has.
+Menus are titled by their block entity's name, which is how Geyser shows a plugin menu's title.
+
+To see what a Bedrock player sees (the look of a form or a menu), `bedrock_client` drives your own Minecraft for
+Windows from outside: start it with an address, take screenshots, send keys and clicks.
 
 ## Accounts
 

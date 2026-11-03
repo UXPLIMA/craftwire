@@ -6,8 +6,9 @@ list_instances; needed only when several instances match) and `operationId` (an 
 same id returns the first result).
 
 Some tools list only their common fields; the others described here (a sign's `lines`, `rotation` of a schematic, a
-client's `windowSize`, …) are accepted and checked all the same. Six tools are off in a new session to save tokens:
-bot_behavior, load_test, dupe_hunt, locale_tour, scenario_record and profile_diff. `more_tools {enable: [names] | "all"}`
+client's `windowSize`, …) are accepted and checked all the same. Seven tools are off in a new session to save tokens:
+bot_behavior, load_test, dupe_hunt, locale_tour, scenario_record, profile_diff and bedrock_client.
+`more_tools {enable: [names] | "all"}`
 turns them on for the session, and a hub started with `--tools all` (or `--tools ...,extras`) has them on from the
 start. Scenarios and `craftwire load-test` turn on what they use by themselves.
 
@@ -282,6 +283,21 @@ Time every call of specific methods on a server or client for durationMs, withou
 ### profile_diff
 
 Compare two profile results (before and after a change): MSPT and busy time, and the owners and hot methods whose share changed most.
+
+### bedrock_client
+
+Your own Minecraft for Windows (Bedrock), seen and driven from outside the game: the hub opens it with a
+`minecraft://connect` link, takes pictures of its window and sends keys, text and clicks. It reads nothing from inside
+the game, so use it for what a player sees (a menu's look, a form, a HUD); Bedrock bots read menus and forms as data.
+Windows only, one game at a time; the game must be installed and signed in once by hand. Over `craftwire serve` only
+the owner and the dev role have it, since it takes the hub machine's screen, keyboard and mouse.
+
+- `action`: start (open the game; with `address` join host[:port], default port 19132), status (running, focused, the
+  window's area), screenshot (PNG of the window; `maxWidth`, default 1280), key {key, holdMs?} (a letter, a digit,
+  f1-f12, enter, escape, space, tab, backspace, shift, ctrl, alt, arrows, home, end, pageup, pagedown, delete, slash,
+  minus, equals, comma, period), type {text, enter?}, command {command} (T, the text, Enter), click {x, y, button?} and
+  scroll {x, y, amount} (in the last screenshot's pixels), stop (asks the game to close).
+- Input brings the game window to the front first, so do not type in another window meanwhile.
 
 ### client_eval
 

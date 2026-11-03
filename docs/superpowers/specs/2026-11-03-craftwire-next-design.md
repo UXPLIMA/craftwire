@@ -220,22 +220,22 @@ Then: compile everything, fix the build; then tests (approach to be given by the
 
 - Java bots on servers with `enforce-secure-profile`: offline and account bots send unsigned chat; a server that
   requires signed chat may refuse it.
-- Bedrock pin: protocol 2225 / game version 1.26.60 (gophertunnel at 0e179fc). The block state list is dragonfly's
-  `server/world/block_states.nbt` at 51dd9c1d615f17b70bbeef6ab2cbcee0545e66c0 (MIT), downloaded at runtime with
-  a pinned sha256 (`botrunner/src/main/resources/bedrock/bedrock-data.properties`). Both need moving when Bedrock
-  updates.
-- Bedrock Xbox login: the multiplayer OIDC `Token` field of the login envelope is sent empty (the bot only has the
-  XSTS-derived chain). Servers that require the token will refuse Xbox bots; offline-mode servers do not need it.
+- Bedrock versions: 1.26.60 (2225) and 1.26.50 (2193), after gophertunnel at 0e179fc. The block state lists are
+  dragonfly's `server/world/block_states.nbt` (MIT) at the commit that added each version, downloaded at runtime with
+  a pinned sha256 (`botrunner/src/main/resources/bedrock/bedrock-data.properties`). A new Bedrock release adds a
+  `BedrockVersion`, its changed fields and its block list pin (section 18).
+- Bedrock Xbox login: the multiplayer token is requested as the 1.26 client does (section 18); check on a server that
+  requires it (BDS with online mode).
 - Bedrock custom blocks: the order of a custom block's permutations is taken as the cartesian product of its
   properties, first property slowest. Check against a server with custom blocks (Geyser custom blocks, BDS add-ons).
 - Bedrock LevelChunk: on protocol 2225 sub-chunk request mode is signalled by the optional SubChunkLimit field, not by
   the old 0xFFFFFFFF/0xFFFFFFFE counts; the bot requests sub-chunks with base y 0 and absolute y offsets.
 - Bedrock ItemStackRequest ids: the bot numbers its requests negative and odd (-1, -3, ...), like legacy request
   ids; confirm BDS accepts them.
-- Bedrock block hardness is not in the protocol: break times are estimated by block family and the dig waits for the
-  server's block update, re-sending the predicted break once.
-- Bedrock container titles come from the block entity's name (BlockActorData), which the bot does not decode yet;
-  menus are titled after their block.
+- Bedrock block hardness is not in the protocol: break times come from a bundled table (section 18), custom
+  blocks keep the family estimate, and the dig waits for the server's block update.
+- Bedrock container titles come from the block entity's CustomName (section 18); check on BDS, where chests
+  name themselves only when renamed.
 - Velocity: the proxy agent compiles against `velocity-api:3.4.0-SNAPSHOT`; move it to the release current at the
   trials. It ships a hand-written `velocity-plugin.json` (no annotation processor) and loads by its `main` class.
   The command console implements Adventure's deprecated `sendMessage(Identity, Component, MessageType)` as well as
@@ -254,3 +254,37 @@ budget (28,000 in all, 1,800 per tool, 10,500 for `--profile build`) and meet it
 - Unlisted fields: rarely used options of bot_action, gui_action, bot_spawn, client_process, record and world_edit
   are checked by the hub but not listed in the definition; craftwire://docs/tools describes them.
 - The SDK's `execution: {taskSupport: "forbidden"}` is dropped from tools/list, since an absent field means the same.
+
+## 18. Second round (decided 2026-11-03, after the first trials)
+
+The trials against a Geyser and Floodgate network left six items; the user asked for all of them.
+
+- Real Bedrock client (phase two of section 8): the hub drives the user's own licensed Minecraft for Windows. It
+  starts the game with the `minecraft://connect/?serverUrl=<host>&serverPort=<port>` link, finds the game window by
+  its process (`Minecraft.Windows.exe`), captures it (PrintWindow with PW_RENDERFULLCONTENT, falling back to a
+  screen copy of the window when that comes back black) and sends keys, text and clicks with SendInput after
+  bringing the window to the front. A long-lived PowerShell helper with a small C# class (Add-Type, compiled once)
+  does the Win32 calls; the hub talks to it in JSON lines. No mod, no memory reading, no DRM touched: what the agent
+  gets is the picture and input, nothing from inside the game. Windows only. One tool, `bedrock_client`, in the
+  extras group so it costs nothing until turned on.
+- Minecraft 26.4: still blocked. On 2026-11-03 Mojang's manifest lists 26.4-snapshot-7 and Paper has no 26.4
+  build; supporting a moving snapshot would break with every new one. Revisit when 26.4 ships.
+- Bedrock Xbox login token: the bot now fills the login envelope's `Token` with the multiplayer token, as the
+  1.26 client does (gophertunnel 0e179fc, minecraft/service): discovery
+  (`client.discovery.minecraft-services.net/api/v1.0/discovery/MinecraftPE/builds/<version>`, `auth.prod`:
+  `serviceUri`, `playFabTitleId`), PlayFab `Client/LoginWithXbox` with an XSTS token for
+  `http://playfab.xboxlive.com/`, `session/start` with the PlayFab session ticket (an `MCToken` header back), then
+  `multiplayer/session/start` with the bot's public key (base64 PKIX). The hub gets both XSTS tokens; the runner,
+  which holds the key, makes the three calls.
+- Bedrock container titles: block entity names come from BlockActorData (Geyser places a fake chest with the
+  window title as `CustomName` before ContainerOpen) and from the block entities after a sub-chunk's storages.
+  Kept per bot by position (at most 4096), whatever the world mode, since menus matter even without a world.
+- Bedrock break times: from a bundled table generated from PrismarineJS minecraft-data (MIT) at 9b995542,
+  `data/bedrock/1.26.60/blocks.json` (hardness, material, harvest tools) and `1.26.51/materials.json` (tool speed per
+  material), with the vanilla formula: speed / hardness / (can harvest ? 30 : 100) damage per tick. Blocks missing
+  from the table (custom blocks) keep the family estimate.
+- Bedrock versions: the bot speaks protocol 2225 (1.26.60) and 2193 (1.26.50). It reads the server's protocol from
+  the RakNet pong before it connects and codes the packets that changed between them (StartGame, AddActor,
+  AddPlayer, PlayerList, Animate, LevelChunk, the entity and release item transactions) for that protocol. Older
+  protocols are refused with the versions the bot has. 1.26.50 uses dragonfly's block list from before its
+  1.26.60 update, pinned the same way.

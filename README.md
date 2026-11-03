@@ -247,7 +247,7 @@ The Craftwire Velocity plugin connects a proxy to the hub: the `proxy` tool ping
 | Dev loop | `server_process` · `plugin_deploy` · `client_process` · `scenario_run` |
 | Bots | `bot_spawn` · `bot_action` · `bot_remove` · `bot_list` · `bot_form` · `botrunner_process` |
 | Debugging | `profile` · `trace` · `client_eval` |
-| Extras (off until `more_tools` turns them on) | `bot_behavior` · `load_test` · `dupe_hunt` · `locale_tour` · `scenario_record` · `profile_diff` |
+| Extras (off until `more_tools` turns them on) | `bot_behavior` · `load_test` · `dupe_hunt` · `locale_tour` · `scenario_record` · `profile_diff` · `bedrock_client` |
 | Proxy | `proxy` (while a Velocity proxy is connected) |
 | CLI | `npx craftwire setup` · `npx craftwire doctor` · `npx craftwire test` · `npx craftwire serve` · `npx craftwire token` · `npx craftwire load-test` |
 
