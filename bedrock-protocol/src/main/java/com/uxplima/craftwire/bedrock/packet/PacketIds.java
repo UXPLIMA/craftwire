@@ -37,6 +37,7 @@ public final class PacketIds {
     static final int INVENTORY_CONTENT = 49;
     static final int INVENTORY_SLOT = 50;
     static final int CONTAINER_SET_DATA = 51;
+    static final int BLOCK_ACTOR_DATA = 56;
     static final int LEVEL_CHUNK = 58;
     static final int CHANGE_DIMENSION = 61;
     static final int SET_PLAYER_GAME_TYPE = 62;

@@ -4,6 +4,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Decodes the network form of Bedrock sub-chunks (16x16x16 blocks), as LevelChunk and SubChunk carry them. Only the
@@ -12,6 +13,8 @@ import java.util.List;
  * <p>Sub-chunk: version byte (1, 8 or 9), for 8 and 9 a storage count, for 9 also the sub-chunk's y index. Each
  * storage: a header byte (bits per block &lt;&lt; 1 | runtime flag), 4096 indices packed into little-endian uint32
  * words, then the palette of zigzag varint32 network ids (a count first unless bits is 0, which has one entry).
+ * Block entities follow as network NBT compounds: after a SubChunk entry's storages, and in a LevelChunk payload
+ * after its sub-chunks, the biomes (one storage per sub-chunk of the dimension) and the border block list.
  */
 public final class SubChunkDecoder {
     public static final int BLOCKS = 16 * 16 * 16;
@@ -42,6 +45,49 @@ public final class SubChunkDecoder {
     /** One SubChunk entry's payload (null when all air); `fallbackSubY` is used when the version carries no y index. */
     public static Section subChunk(byte[] payload, int fallbackSubY) {
         return read(Unpooled.wrappedBuffer(payload), fallbackSubY);
+    }
+
+    /** A SubChunk entry: its section (null when all air) and the block entities after the storages. */
+    public record Entry(Section section, List<Map<String, Object>> blockEntities) {}
+
+    public static Entry subChunkEntry(byte[] payload, int fallbackSubY) {
+        ByteBuf b = Unpooled.wrappedBuffer(payload);
+        Section s = read(b, fallbackSubY);
+        return new Entry(s, blockEntities(b));
+    }
+
+    /**
+     * The block entities at the end of a LevelChunk payload that holds `count` sub-chunks; `biomeStorages` is the
+     * dimension's sub-chunk count (one biome storage each).
+     */
+    public static List<Map<String, Object>> levelChunkBlockEntities(byte[] payload, int count, int biomeStorages) {
+        ByteBuf b = Unpooled.wrappedBuffer(payload);
+        for (int i = 0; i < count; i++) read(b, 0);
+        for (int i = 0; i < biomeStorages; i++) skipBiomes(b);
+        b.skipBytes(b.readUnsignedByte());
+        return blockEntities(b);
+    }
+
+    private static List<Map<String, Object>> blockEntities(ByteBuf b) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        while (b.isReadable()) out.add(Nbt.readCompound(b, Nbt.Encoding.NETWORK));
+        return out;
+    }
+
+    /** A biome storage: header 0xff repeats the one below; bits 0 has a single entry; else words and a palette. */
+    private static void skipBiomes(ByteBuf b) {
+        int header = b.readUnsignedByte();
+        if (header == 0xff) return;
+        int bits = header >> 1;
+        if (bits == 0) {
+            Bin.readVarInt(b);
+            return;
+        }
+        int perWord = 32 / bits;
+        b.skipBytes((BLOCKS + perWord - 1) / perWord * 4);
+        int size = Bin.readVarInt(b);
+        if (size <= 0 || size > BLOCKS) throw new BedrockCodecException("biome palette size " + size);
+        for (int i = 0; i < size; i++) Bin.readVarInt(b);
     }
 
     /** Section.subY is the absolute sub-chunk y (block y >> 4), as version 9 stores it. */

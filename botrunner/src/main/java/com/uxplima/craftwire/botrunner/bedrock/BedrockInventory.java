@@ -37,6 +37,7 @@ final class BedrockInventory {
     private ItemPackets.ContainerOpen open;
     private BedrockItem[] menu;
     private String menuBlock;
+    private String menuName;
 
     BedrockInventory(BedrockItems items) {
         this.items = items;
@@ -83,8 +84,11 @@ final class BedrockInventory {
         };
     }
 
-    /** ContainerOpen; the slots arrive in InventoryContent for the window. `block` names the block it belongs to, or null. */
-    void opened(ItemPackets.ContainerOpen o, String block) {
+    /**
+     * ContainerOpen; the slots arrive in InventoryContent for the window. `block` is the block it belongs to and
+     * `name` that block entity's CustomName, either null.
+     */
+    void opened(ItemPackets.ContainerOpen o, String block, String name) {
         if (o.type() < 0) {
             open = null;
             return;
@@ -92,12 +96,14 @@ final class BedrockInventory {
         open = o;
         menu = filled(0);
         menuBlock = block;
+        menuName = name;
     }
 
     void closed() {
         open = null;
         menu = null;
         menuBlock = null;
+        menuName = null;
     }
 
     boolean menuOpen() {
@@ -131,9 +137,10 @@ final class BedrockInventory {
         return t < TYPES.length ? TYPES[t] : "CONTAINER_" + t;
     }
 
-    /** The menu's title: Bedrock sends none in ContainerOpen (it is the block entity's name), so the block's name. */
+    /** The menu's title: Bedrock sends none in ContainerOpen; it is the block entity's name, else the block's. */
     String title() {
         if (open == null) return "Inventory";
+        if (menuName != null) return BedrockHud.plain(menuName);
         return menuBlock != null ? BedrockItems.display(menuBlock) : BedrockItems.display(type().toLowerCase(Locale.ROOT));
     }
 

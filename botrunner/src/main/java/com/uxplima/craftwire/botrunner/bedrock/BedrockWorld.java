@@ -35,6 +35,7 @@ final class BedrockWorld {
     private final Object holder;
     private final Consumer<ByteBuf> out;
     private final Set<Long> held = new HashSet<>();
+    private final BedrockNames names = new BedrockNames();
     private BedrockBlocks.Palette palette;
     private SharedWorld world;
     private int dimension;
@@ -50,6 +51,7 @@ final class BedrockWorld {
     /** StartGame or ChangeDimension: the old dimension is let go first. */
     void enter(int dim, BedrockBlocks.Palette p) {
         leave();
+        names.clear();
         dimension = dim >= 0 && dim < DIMENSIONS.length ? dim : 0;
         palette = p;
         if (shared && p != null) world = cache.enter(new WorldKey(server, DIMENSIONS[dimension]), p);
@@ -102,6 +104,11 @@ final class BedrockWorld {
             return;
         }
         hold(c.x(), c.z(), column);
+        try {
+            names.blockEntities(SubChunkDecoder.levelChunkBlockEntities(c.payload(), c.subChunkCount(), SUB_COUNT[dimension]));
+        } catch (BedrockCodecException | IndexOutOfBoundsException e) {
+            // The blocks are in; only the block entities' names are lost, and menus fall back to the block's name.
+        }
     }
 
     private void hold(int cx, int cz, ChunkColumn column) {
@@ -130,8 +137,9 @@ final class BedrockWorld {
                 column.section(index, null);
             } else if (e.result() == WorldPackets.SubChunkEntry.SUCCESS && e.payload().length > 0) {
                 try {
-                    SubChunkDecoder.Section sec = SubChunkDecoder.subChunk(e.payload(), subY);
-                    column.section(index, sec == null ? null : dense(sec));
+                    SubChunkDecoder.Entry entry = SubChunkDecoder.subChunkEntry(e.payload(), subY);
+                    column.section(index, entry.section() == null ? null : dense(entry.section()));
+                    names.blockEntities(entry.blockEntities());
                 } catch (BedrockCodecException | IndexOutOfBoundsException bad) {
                     column.section(index, null);
                 }
@@ -167,6 +175,11 @@ final class BedrockWorld {
             world.unloadChunk(x, z, holder);
             return true;
         });
+    }
+
+    /** Block entity names; kept in every world mode, since menus are titled by them. */
+    BedrockNames names() {
+        return names;
     }
 
     /** The dense state at a block, or -1 when the bot does not have its chunk. */

@@ -53,7 +53,7 @@ final class BedrockSpawn {
     static void containerOpened(BedrockBot b, ItemPackets.ContainerOpen o) {
         int state = b.world.state(o.x(), o.y(), o.z());
         String block = state <= 0 || b.world.palette() == null ? null : b.world.palette().blockId(state);
-        b.inventory.opened(o, block);
+        b.inventory.opened(o, block, b.world.names().at(o.x(), o.y(), o.z()));
     }
 
     /** Respawn state 1: the server placed the bot for its new life; the client answers that it is ready. */

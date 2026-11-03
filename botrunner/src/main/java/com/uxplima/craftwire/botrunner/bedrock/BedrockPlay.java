@@ -34,6 +34,7 @@ final class BedrockPlay {
             case WorldPackets.LevelChunk c -> b.world.chunk(c);
             case WorldPackets.SubChunk s -> b.world.subChunks(s);
             case WorldPackets.UpdateBlock u -> b.world.block(u);
+            case WorldPackets.BlockActorData d -> b.world.names().blockEntity(d.x(), d.y(), d.z(), d.nbt());
             case WorldPackets.ChunkPublisher c -> b.world.publisher(c);
             case PlayerListPacket l -> b.hud.players(l);
             case ItemPackets.InventoryContent c -> b.inventory.content(c);

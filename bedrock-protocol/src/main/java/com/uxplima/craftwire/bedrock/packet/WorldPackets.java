@@ -1,9 +1,11 @@
 package com.uxplima.craftwire.bedrock.packet;
 
 import com.uxplima.craftwire.bedrock.codec.Bin;
+import com.uxplima.craftwire.bedrock.codec.Nbt;
 import io.netty.buffer.ByteBuf;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * The world around the bot: chunk columns (LevelChunk), sub-chunks sent on request (SubChunk), single block changes
@@ -32,6 +34,9 @@ public final class WorldPackets {
     /** UpdateBlock: layer 0 is the block, layer 1 the liquid sharing its cell. */
     public record UpdateBlock(int x, int y, int z, int runtimeId, int layer) implements Clientbound {}
 
+    /** BlockActorData: a block entity's NBT (a chest's CustomName, a sign's text) set or changed at a position. */
+    public record BlockActorData(int x, int y, int z, Map<String, Object> nbt) implements Clientbound {}
+
     /** NetworkChunkPublisherUpdate: the centre and radius of the area the server keeps sending chunks for. */
     public record ChunkPublisher(int x, int y, int z, int radius) implements Clientbound {}
 
@@ -47,6 +52,10 @@ public final class WorldPackets {
                 int runtime = Bin.readVarUInt(b);
                 Bin.readVarUInt(b);
                 yield new UpdateBlock(p[0], p[1], p[2], runtime, Bin.readVarUInt(b));
+            }
+            case PacketIds.BLOCK_ACTOR_DATA -> {
+                int[] p = Bin.readBlockPos(b);
+                yield new BlockActorData(p[0], p[1], p[2], Nbt.readCompound(b, Nbt.Encoding.NETWORK));
             }
             case PacketIds.NETWORK_CHUNK_PUBLISHER_UPDATE -> {
                 int[] p = Bin.readBlockPos(b);
