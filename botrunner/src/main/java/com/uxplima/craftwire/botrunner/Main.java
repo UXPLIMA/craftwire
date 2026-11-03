@@ -49,7 +49,7 @@ public final class Main {
     record Options(String name, Set<BotKind> kinds, int maxBots, Path home) {
         static Options parse(String[] args) {
             String name = "botrunner";
-            Set<BotKind> kinds = EnumSet.of(BotKind.JAVA);
+            Set<BotKind> kinds = EnumSet.of(BotKind.JAVA, BotKind.BEDROCK);
             int maxBots = 1000;
             Path home = HubConfig.defaultHome();
             for (int i = 0; i < args.length; i++) {

@@ -215,3 +215,24 @@ Then: compile everything, fix the build; then tests (approach to be given by the
 - Vanilla `ContainerInput` names on 26.x for SWAP, THROW, CLONE, QUICK_CRAFT, PICKUP_ALL.
 - Vanilla server jar layout for the bot runner: the bundler format (`META-INF/versions`, `META-INF/libraries`) and
   whether 26.x jars ship unobfuscated; if not, load Mojang mappings and remap once per version into a cache.
+
+## 16. Open questions found while writing (check in the trials)
+
+- Java bots on servers with `enforce-secure-profile`: offline and account bots send unsigned chat; a server that
+  requires signed chat may refuse it.
+- Bedrock pin: protocol 2225 / game version 1.26.60 (gophertunnel at 0e179fc). The block state list is dragonfly's
+  `server/world/block_states.nbt` at 51dd9c1d615f17b70bbeef6ab2cbcee0545e66c0 (MIT), downloaded at runtime with
+  a pinned sha256 (`botrunner/src/main/resources/bedrock/bedrock-data.properties`). Both need moving when Bedrock
+  updates.
+- Bedrock Xbox login: the multiplayer OIDC `Token` field of the login envelope is sent empty (the bot only has the
+  XSTS-derived chain). Servers that require the token will refuse Xbox bots; offline-mode servers do not need it.
+- Bedrock custom blocks: the order of a custom block's permutations is taken as the cartesian product of its
+  properties, first property slowest. Check against a server with custom blocks (Geyser custom blocks, BDS add-ons).
+- Bedrock LevelChunk: on protocol 2225 sub-chunk request mode is signalled by the optional SubChunkLimit field, not by
+  the old 0xFFFFFFFF/0xFFFFFFFE counts; the bot requests sub-chunks with base y 0 and absolute y offsets.
+- Bedrock ItemStackRequest ids: the bot numbers its requests negative and odd (-1, -3, ...), like legacy request
+  ids; confirm BDS accepts them.
+- Bedrock block hardness is not in the protocol: break times are estimated by block family and the dig waits for the
+  server's block update, re-sending the predicted break once.
+- Bedrock container titles come from the block entity's name (BlockActorData), which the bot does not decode yet;
+  menus are titled after their block.

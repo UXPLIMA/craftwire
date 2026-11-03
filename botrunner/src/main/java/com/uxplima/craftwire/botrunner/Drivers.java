@@ -1,6 +1,7 @@
 package com.uxplima.craftwire.botrunner;
 
 import com.uxplima.craftwire.bot.model.BotKind;
+import com.uxplima.craftwire.botrunner.bedrock.BedrockDriver;
 import com.uxplima.craftwire.botrunner.bot.BotDriver;
 import com.uxplima.craftwire.botrunner.bot.RunnerServices;
 import com.uxplima.craftwire.botrunner.java.JavaDriver;
@@ -15,6 +16,7 @@ final class Drivers {
     static List<BotDriver> create(Set<BotKind> kinds, RunnerServices services) {
         List<BotDriver> out = new ArrayList<>();
         if (kinds.contains(BotKind.JAVA)) out.add(new JavaDriver(services));
+        if (kinds.contains(BotKind.BEDROCK)) out.add(new BedrockDriver(services));
         return out;
     }
 }

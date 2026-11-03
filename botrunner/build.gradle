@@ -16,6 +16,7 @@ dependencies {
     implementation project(':agent-core')
     implementation project(':bot-core')
     implementation project(':agent-script')
+    implementation project(':bedrock-protocol')
     implementation 'com.google.code.gson:gson:2.13.2'
     implementation "org.apache.logging.log4j:log4j-api:${log4j_version}"
     implementation "org.apache.logging.log4j:log4j-core:${log4j_version}"

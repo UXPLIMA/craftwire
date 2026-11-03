@@ -8,7 +8,7 @@ import { join } from "node:path";
 import { CraftwireError } from "../errors.js";
 import { type DeviceCode, type LiveToken, pollDeviceCode, refreshLive, requestDeviceCode } from "./live.js";
 import { javaSession, type JavaSession } from "./minecraft-java.js";
-import { JAVA_RELYING_PARTY, xboxUserToken, xstsToken } from "./xbox.js";
+import { BEDROCK_RELYING_PARTY, JAVA_RELYING_PARTY, xboxUserToken, xstsToken } from "./xbox.js";
 
 interface Stored {
   uuid: string;
@@ -67,6 +67,20 @@ export class Accounts {
   async session(name: string): Promise<JavaSession> {
     const cached = this.sessions.get(name);
     if (cached && cached.expiresAt - EARLY_MS > this.now()) return cached;
+    const s = await this.javaFrom(await this.refresh(name));
+    this.sessions.set(name, s);
+    return s;
+  }
+
+  /** An XSTS token for Bedrock's multiplayer service; the Bedrock bot requests its login chain with it. */
+  async bedrock(name: string): Promise<{ name: string; userHash: string; xsts: string }> {
+    const user = await xboxUserToken((await this.refresh(name)).accessToken, this.f);
+    const x = await xstsToken(user, BEDROCK_RELYING_PARTY, this.f);
+    return { name, userHash: x.userHash, xsts: x.token };
+  }
+
+  /** A fresh Microsoft token for a saved account; the rotated refresh token is saved. */
+  private async refresh(name: string): Promise<LiveToken> {
     const all = this.read();
     const stored = all[name];
     if (stored === undefined) {
@@ -75,11 +89,9 @@ export class Accounts {
         known.length > 0 ? `Signed in: ${known.join(", ")}.` : "Sign in first: client_process {action:'sign_in'}.");
     }
     const live = await refreshLive(stored.refreshToken, this.f, this.now);
-    const s = await this.javaFrom(live);
     all[name] = { ...stored, refreshToken: live.refreshToken };
     this.write(all);
-    this.sessions.set(name, s);
-    return s;
+    return live;
   }
 
   private async javaFrom(live: LiveToken): Promise<JavaSession> {

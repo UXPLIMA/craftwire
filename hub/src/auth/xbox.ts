@@ -4,6 +4,8 @@ import { CraftwireError } from "../errors.js";
 const USER_AUTH_URL = "https://user.auth.xboxlive.com/user/authenticate";
 const XSTS_URL = "https://xsts.auth.xboxlive.com/xsts/authorize";
 export const JAVA_RELYING_PARTY = "rp://api.minecraftservices.com/";
+/** Bedrock's multiplayer service, which turns this XSTS token into the login chain a Bedrock server checks. */
+export const BEDROCK_RELYING_PARTY = "https://multiplayer.minecraft.net/";
 
 export interface Xsts {
   token: string;

@@ -45,9 +45,9 @@ export async function spawnOn(c: ToolContext, a: SpawnArgs): Promise<unknown> {
   }
   const agents = requireAgents(c, a.kind, runner ?? instance);
   return c.ops.run(operationId, async () => {
-    const session = await accountSession(c, a);
-    if (session !== undefined) rest.session = session;
-    const shares = session !== undefined ? [{ agent: agents[0]!, names: [String(session.name)] }] : split(a, agents, dir);
+    const login = await accountSession(c, a);
+    if (login !== undefined) Object.assign(rest, login.extra);
+    const shares = login !== undefined ? [{ agent: agents[0]!, names: [login.name] }] : split(a, agents, dir);
     const answers: Answer[] = await Promise.all(shares.map(async (s) => {
       try {
         return { instance: s.agent, result: await c.agents.request(s.agent.id, "bot.spawn", { ...rest, names: s.names }, timeout) };
@@ -64,19 +64,24 @@ export async function spawnOn(c: ToolContext, a: SpawnArgs): Promise<unknown> {
 }
 
 /**
- * A signed-in account plays as itself: one bot, named after the account, with the Minecraft session passed to the
- * runner (which joins online-mode servers with it). The token goes to the runner only, never into a result.
+ * A signed-in account plays as itself: one bot, named after the account. Java bots get the Minecraft session; Bedrock
+ * bots get an XSTS token for Bedrock's multiplayer service, from which the runner requests its own login chain. Tokens
+ * go to the runner only, never into a result.
  */
-async function accountSession(c: ToolContext, a: SpawnArgs): Promise<Record<string, unknown> | undefined> {
+async function accountSession(c: ToolContext, a: SpawnArgs): Promise<{ name: string; extra: Record<string, unknown> } | undefined> {
   if (a.account === undefined) return undefined;
-  if (a.kind !== "java") {
-    throw new CraftwireError("INVALID_PARAMS", "account is for Java bots", "Bedrock bots join offline-mode (or Geyser floodgate) servers.");
+  if (a.kind === "plugin") {
+    throw new CraftwireError("INVALID_PARAMS", "account is for Java and Bedrock bots", "Plugin bots are fake players and need no account.");
   }
   if ((a.names?.length ?? a.count) > 1) {
     throw new CraftwireError("INVALID_PARAMS", "An account plays as one player", "Spawn count:1 with account, or leave account out.");
   }
+  if (a.kind === "bedrock") {
+    const b = await c.clients.accounts.bedrock(a.account);
+    return { name: b.name, extra: { xbox: { userHash: b.userHash, xsts: b.xsts } } };
+  }
   const s = await c.clients.accounts.session(a.account);
-  return { name: s.name, uuid: s.uuid, accessToken: s.accessToken };
+  return { name: s.name, extra: { session: { name: s.name, uuid: s.uuid, accessToken: s.accessToken } } };
 }
 
 /**
