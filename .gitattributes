@@ -1,0 +1,5 @@
+# Shell scripts run inside Linux containers: a CRLF checkout on Windows breaks their shebang.
+*.sh text eol=lf
+Dockerfile text eol=lf
+*.Dockerfile text eol=lf
+gradlew text eol=lf

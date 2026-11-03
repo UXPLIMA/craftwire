@@ -19,6 +19,12 @@ import { HUB_VERSION } from "./version.js";
 
 const log = (msg: string) => process.stderr.write(`[craftwire] ${msg}\n`);
 
+/** Prints a command's failure: the message and, for a CraftwireError, its hint. */
+const failWith = (command: string) => (e: unknown) => {
+  const msg = e instanceof CraftwireError ? `${e.message}${e.hint ? `\n${e.hint}` : ""}` : e instanceof Error ? e.message : String(e);
+  process.stderr.write(`craftwire ${command}: ${msg}\n`);
+};
+
 async function main(): Promise<void> {
   let policy;
   try {
@@ -53,10 +59,7 @@ async function test(args: string[]): Promise<void> {
     process.stdout.write(`${TEST_USAGE}\n`);
     return;
   }
-  const fail = (e: unknown) => {
-    const msg = e instanceof CraftwireError ? `${e.message}${e.hint ? `\n${e.hint}` : ""}` : e instanceof Error ? e.message : String(e);
-    process.stderr.write(`craftwire test: ${msg}\n`);
-  };
+  const fail = failWith("test");
   let opts;
   try {
     opts = parseTestArgs(args);
@@ -111,6 +114,7 @@ async function loadTest(args: string[]): Promise<void> {
     return;
   }
   const out = (s: string) => process.stdout.write(`${s}\n`);
+  const fail = failWith("load-test");
   let opts;
   let choice;
   try {
