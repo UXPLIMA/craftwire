@@ -5,9 +5,10 @@ import com.uxplima.craftwire.bot.path.Cell;
 import java.util.Map;
 
 /**
- * How long a Bedrock block takes to break, by the vanilla formula (hardness x 1.5 with the right tool, x 5 without,
- * divided by the tool's speed). The protocol carries no hardness, so it is estimated by block family; the server
- * has the final word, and the dig waits for its block update. Pure functions.
+ * How long a Bedrock block takes to break, by the vanilla formula: each tick deals speed / hardness / 30 when the
+ * tool can harvest the block, / 100 when it cannot, and the block breaks when the damage reaches 1. Hardness,
+ * material and harvest tools come from {@link BedrockHardness}; a block it lacks (a custom block) is estimated by
+ * family. The server has the final word, and the dig waits for its block update. Pure functions.
  */
 final class BedrockDigTime {
     /** Hardness below zero: the block never breaks in survival. */
@@ -16,10 +17,29 @@ final class BedrockDigTime {
     private BedrockDigTime() {}
 
     static int ticks(String block, String tool) {
-        double h = hardness(strip(block));
+        String name = strip(block);
+        // The table gives air -1 (it cannot be mined); digging air has nothing to wait for.
+        if (name.equals("air")) return 0;
+        BedrockHardness.Block known = BedrockHardness.block(name);
+        return known != null ? ticks(known, tool == null ? null : strip(tool)) : estimate(name, tool);
+    }
+
+    /** A block from the table: unbreakable below zero hardness, instant at zero or when one tick's damage is enough. */
+    static int ticks(BedrockHardness.Block b, String tool) {
+        if (b.hardness() < 0) return -1;
+        if (b.hardness() == 0) return 0;
+        boolean harvests = b.tools().isEmpty() || (tool != null && b.tools().contains(tool));
+        // 1 / damage, worked out without the division chain so whole tick counts stay whole (15, not 15.000000000000002).
+        double ticks = b.hardness() * (harvests ? 30 : 100) / BedrockHardness.speed(b.material(), tool);
+        return ticks <= 1 ? 0 : (int) Math.ceil(ticks - 1e-9);
+    }
+
+    /** The family estimate for a block the table lacks. */
+    private static int estimate(String name, String tool) {
+        double h = hardness(name);
         if (h < 0) return -1;
         if (h == 0) return 0;
-        String family = family(strip(block));
+        String family = family(name);
         boolean right = family != null && tool != null && tool.endsWith("_" + family);
         boolean needsTool = family != null && family.equals("pickaxe");
         double speed = right ? speed(tool) : 1;

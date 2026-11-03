@@ -1,0 +1,16 @@
+# Generated table (do not edit by hand): the speed of each tool on each mining material, from PrismarineJS/minecraft-data (MIT licence) at 9b995542ab4a17837dee785439954e43d031b33e,
+# data/bedrock/1.26.51/materials.json (the newest materials file; 1.26.60 points to it).
+# material	tool=speed,...
+default	
+wool	shears=5
+coweb	copper_sword=15,diamond_sword=15,golden_sword=15,iron_sword=15,netherite_sword=15,shears=15,stone_sword=15,wooden_sword=15
+sword_instantly_mines	copper_sword=30,diamond_sword=30,golden_sword=30,iron_sword=30,netherite_sword=30,stone_sword=30,wooden_sword=30
+mineable/axe	copper_axe=5,diamond_axe=8,golden_axe=12,iron_axe=6,netherite_axe=9,stone_axe=4,wooden_axe=2
+mineable/hoe	copper_hoe=5,diamond_hoe=8,golden_hoe=12,iron_hoe=6,netherite_hoe=9,stone_hoe=4,wooden_hoe=2
+mineable/pickaxe	copper_pickaxe=5,diamond_pickaxe=8,golden_pickaxe=12,iron_pickaxe=6,netherite_pickaxe=9,stone_pickaxe=4,wooden_pickaxe=2
+mineable/shovel	copper_shovel=5,diamond_shovel=8,golden_shovel=12,iron_shovel=6,netherite_shovel=9,stone_shovel=4,wooden_shovel=2
+sword_efficient;mineable/hoe	copper_hoe=5,copper_sword=1.5,diamond_hoe=8,diamond_sword=1.5,golden_hoe=12,golden_sword=1.5,iron_hoe=6,iron_sword=1.5,netherite_hoe=9,netherite_sword=1.5,stone_hoe=4,stone_sword=1.5,wooden_hoe=2,wooden_sword=1.5
+leaves;mineable/hoe	copper_hoe=5,copper_sword=1.5,diamond_hoe=8,diamond_sword=1.5,golden_hoe=12,golden_sword=1.5,iron_hoe=6,iron_sword=1.5,netherite_hoe=9,netherite_sword=1.5,shears=15,stone_hoe=4,stone_sword=1.5,wooden_hoe=2,wooden_sword=1.5
+sword_efficient;mineable/axe	copper_axe=5,copper_sword=1.5,diamond_axe=8,diamond_sword=1.5,golden_axe=12,golden_sword=1.5,iron_axe=6,iron_sword=1.5,netherite_axe=9,netherite_sword=1.5,stone_axe=4,stone_sword=1.5,wooden_axe=2,wooden_sword=1.5
+vine_or_glow_lichen;sword_efficient;mineable/axe	copper_axe=5,copper_sword=1.5,diamond_axe=8,diamond_sword=1.5,golden_axe=12,golden_sword=1.5,iron_axe=6,iron_sword=1.5,netherite_axe=9,netherite_sword=1.5,shears=2,stone_axe=4,stone_sword=1.5,wooden_axe=2,wooden_sword=1.5
+sword_instantly_mines;mineable/axe	copper_axe=5,copper_sword=30,diamond_axe=8,diamond_sword=30,golden_axe=12,golden_sword=30,iron_axe=6,iron_sword=30,netherite_axe=9,netherite_sword=30,stone_axe=4,stone_sword=30,wooden_axe=2,wooden_sword=30
