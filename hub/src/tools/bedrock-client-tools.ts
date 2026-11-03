@@ -15,7 +15,8 @@ export function registerBedrockClientTools(server: McpServer, ctx: ToolContext):
     "Your own Minecraft for Windows (Bedrock), seen and driven from outside: start {address?} (opens the game, joins host[:port]), "
       + "status, screenshot {maxWidth?} (the game window), key {key, holdMs?} (a letter, digit, f1-f12, enter, escape, space, arrows...), "
       + "type {text, enter?}, command {command} (chat command), click {x, y, button?} and scroll {x, y, amount} in the last "
-      + "screenshot's pixels, stop. Windows only; reads nothing from inside the game.",
+      + "screenshot's pixels, stop. Screenshots, keys and text work in the background; click and scroll take the real mouse. "
+      + "Windows only; reads nothing from inside the game.",
     {
       action: z.enum(["start", "status", "screenshot", "key", "type", "command", "click", "scroll", "stop"]),
       address: z.string().optional(),

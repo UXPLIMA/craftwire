@@ -297,7 +297,12 @@ the owner and the dev role have it, since it takes the hub machine's screen, key
   f1-f12, enter, escape, space, tab, backspace, shift, ctrl, alt, arrows, home, end, pageup, pagedown, delete, slash,
   minus, equals, comma, period), type {text, enter?}, command {command} (T, the text, Enter), click {x, y, button?} and
   scroll {x, y, amount} (in the last screenshot's pixels), stop (asks the game to close).
-- Input brings the game window to the front first, so do not type in another window meanwhile.
+- Screenshots, keys, text and commands reach the game in the background: the window stays where it is and the
+  user's keyboard and mouse are left alone. Click and scroll need the real mouse, so they bring the game to the front
+  first and fail with BEDROCK_CLIENT_NOT_FOCUSED (sending nothing) when Windows keeps it in the back; menus and
+  dialogs also answer the arrow keys and enter, which work in the background.
+- While the game is playing (no menu open), it reads the mouse even in the background, so the user's mouse turns the
+  character. Leave it on a menu (key escape opens the pause menu) while the user works.
 
 ### client_eval
 

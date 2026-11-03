@@ -1,7 +1,9 @@
 /**
  * The user's own Minecraft for Windows (Bedrock), seen and driven from outside: started with a minecraft://connect
- * link, captured as a picture of its window, and given keys, text and clicks. Nothing is read from inside the game,
- * so the agent learns what the window shows and nothing more. Windows only; one game at a time, as the game itself.
+ * link, captured as a picture of its window, and given keys, text and clicks. Pictures, keys and text work with the
+ * game in the background, so the user can keep working; clicks and scrolls need the real mouse and bring the game to
+ * the front. Nothing is read from inside the game, so the agent learns what the window shows and nothing more.
+ * Windows only; one game at a time, as the game itself.
  */
 import { CraftwireError } from "../errors.js";
 import { virtualKey } from "./keys.js";
@@ -86,7 +88,10 @@ export class BedrockClient {
     await this.type(command.startsWith("/") ? command : `/${command}`, true);
   }
 
-  /** A click at (x, y) in the last screenshot's pixels (window pixels before any screenshot). */
+  /**
+   * A click at (x, y) in the last screenshot's pixels (window pixels before any screenshot). The game ignores posted
+   * mouse messages, so this moves the real cursor after bringing the game to the front.
+   */
   async click(x: number, y: number, button: "left" | "right" | "middle"): Promise<void> {
     const p = await this.screen(x, y);
     await this.call({ op: "click", process: PROCESS, x: p.x, y: p.y, button });
@@ -128,6 +133,10 @@ export class BedrockClient {
     const a = await this.helper.request(req, timeoutMs);
     if (typeof a.error === "string") {
       if (a.error.includes("NOT_RUNNING")) throw notRunning();
+      if (a.error.includes("NOT_FOCUSED")) {
+        throw new CraftwireError("BEDROCK_CLIENT_NOT_FOCUSED", "Windows did not let the game window come to the front, so nothing was sent",
+          "Click the game window once yourself (or close what sits in front of it), then try again.");
+      }
       if (a.error.includes("NO_AREA")) {
         throw new CraftwireError("BEDROCK_CLIENT_HIDDEN", "The game window has no area",
           "It is minimized; bedrock_client {action:'key'} brings it back.");

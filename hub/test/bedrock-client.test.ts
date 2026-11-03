@@ -72,6 +72,12 @@ describe("BedrockClient", () => {
     await expect(new BedrockClient("unused", "win32", helper).screenshot()).rejects.toMatchObject({ code: "BEDROCK_CLIENT_NOT_RUNNING" });
   });
 
+  it("reports a window Windows kept in the back, where no input went", async () => {
+    const { helper } = fakeHelper({ click: { error: "Exception calling \"Focus\": \"NOT_FOCUSED\"" } });
+    const c = new BedrockClient("unused", "win32", helper);
+    await expect(c.click(10, 10, "left")).rejects.toMatchObject({ code: "BEDROCK_CLIENT_NOT_FOCUSED" });
+  });
+
   it("does not start the helper off Windows", async () => {
     const { helper, sent } = fakeHelper();
     await expect(new BedrockClient("unused", "linux", helper).status()).rejects.toMatchObject({ code: "UNSUPPORTED_PLATFORM" });

@@ -36,13 +36,15 @@ public static class CwWin {
     [DllImport("user32.dll")] static extern bool AttachThreadInput(uint a, uint b, bool attach);
     [DllImport("user32.dll")] static extern uint SendInput(uint n, INPUT[] inputs, int size);
     [DllImport("user32.dll")] static extern bool SetCursorPos(int x, int y);
+    [DllImport("user32.dll")] static extern bool PostMessage(IntPtr h, uint msg, IntPtr w, IntPtr l);
     [DllImport("user32.dll")] static extern uint MapVirtualKey(uint code, uint mapType);
     [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();
 
     const uint INPUT_MOUSE = 0, INPUT_KEYBOARD = 1;
-    const uint KEY_EXTENDED = 0x1, KEY_UP = 0x2, KEY_UNICODE = 0x4, KEY_SCANCODE = 0x8;
+    const uint KEY_UP = 0x2;
     const uint PW_CLIENTONLY_FULLCONTENT = 3;
     const ushort VK_MENU = 0x12;
+    const uint WM_KEYDOWN = 0x100, WM_KEYUP = 0x101, WM_CHAR = 0x102;
 
     public static string LastMethod = "";
 
@@ -76,19 +78,32 @@ public static class CwWin {
         return GetForegroundWindow() == Find(process);
     }
 
-    /** Brings the window to the front; Windows lets a process do that after an Alt press and with input attached. */
+    /**
+     * Brings the window to the front, or throws NOT_FOCUSED: input must never land in whatever window is in front
+     * instead. Windows lets a process take the foreground after an Alt press (a virtual-key event, as keybd_event
+     * sends it) with its input attached to the foreground thread; minimizing and restoring is the fallback.
+     */
     public static void Focus(string process) {
         IntPtr h = Need(process);
+        if (GetForegroundWindow() == h) return;
         if (IsIconic(h)) ShowWindow(h, 9);
         uint pid;
         uint fg = GetWindowThreadProcessId(GetForegroundWindow(), out pid);
         uint me = GetCurrentThreadId();
-        Key(VK_MENU, 0, false);
+        SendKey(VK_MENU, 0, 0);
+        SendKey(VK_MENU, 0, KEY_UP);
         AttachThreadInput(me, fg, true);
         BringWindowToTop(h);
         SetForegroundWindow(h);
         AttachThreadInput(me, fg, false);
-        Thread.Sleep(120);
+        Thread.Sleep(150);
+        if (GetForegroundWindow() != h) {
+            ShowWindow(h, 6);
+            ShowWindow(h, 9);
+            SetForegroundWindow(h);
+            Thread.Sleep(400);
+        }
+        if (GetForegroundWindow() != h) throw new InvalidOperationException("NOT_FOCUSED");
     }
 
     /** The client area as a PNG (base64), at most maxWidth wide; PrintWindow first, a screen copy when it is black. */
@@ -144,21 +159,26 @@ public static class CwWin {
         }
     }
 
-    /** A key by virtual-key code, sent as its scan code (games read scan codes); held for holdMs. */
-    public static void Key(ushort vk, int holdMs, bool extended) {
-        ushort scan = (ushort) MapVirtualKey(vk, 0);
-        uint flags = KEY_SCANCODE | (extended ? KEY_EXTENDED : 0);
-        SendKey(0, scan, flags);
+    /**
+     * A key posted to the window as WM_KEYDOWN / WM_KEYUP, held for holdMs: it reaches the game in the background,
+     * without the focus or the user's keyboard (measured on 1.26.60: menus, dialogs and the chat take it). lParam
+     * carries the repeat count 1, the scan code, the extended bit and, on the way up, the previous-state and
+     * transition bits.
+     */
+    public static void PostKey(string process, ushort vk, int holdMs, bool extended) {
+        IntPtr h = Need(process);
+        uint l = 1u | (MapVirtualKey(vk, 0) << 16) | (extended ? 1u << 24 : 0u);
+        PostMessage(h, WM_KEYDOWN, (IntPtr) vk, (IntPtr) (long) l);
         Thread.Sleep(Math.Max(holdMs, 30));
-        SendKey(0, scan, flags | KEY_UP);
+        PostMessage(h, WM_KEYUP, (IntPtr) vk, (IntPtr) (long) (l | 3u << 30));
     }
 
-    /** Text as Unicode key events, which reach text fields whatever the keyboard layout. */
-    public static void Text(string s) {
+    /** Text posted as WM_CHAR, one character at a time, in the background like PostKey. */
+    public static void PostText(string process, string s) {
+        IntPtr h = Need(process);
         foreach (char ch in s) {
-            SendKey(0, ch, KEY_UNICODE);
-            SendKey(0, ch, KEY_UNICODE | KEY_UP);
-            Thread.Sleep(12);
+            PostMessage(h, WM_CHAR, (IntPtr) ch, (IntPtr) 1);
+            Thread.Sleep(15);
         }
     }
 
@@ -231,8 +251,8 @@ while ($true) {
       }
       'capture' { $r.png = [CwWin]::Capture($q.process, [int]$q.maxWidth); $r.method = [CwWin]::LastMethod; $r.client = [CwWin]::Client($q.process) }
       'focus' { [CwWin]::Focus($q.process) }
-      'key' { [CwWin]::Focus($q.process); [CwWin]::Key([uint16]$q.vk, [int]$q.holdMs, [bool]$q.extended) }
-      'text' { [CwWin]::Focus($q.process); [CwWin]::Text([string]$q.text) }
+      'key' { [CwWin]::PostKey($q.process, [uint16]$q.vk, [int]$q.holdMs, [bool]$q.extended) }
+      'text' { [CwWin]::PostText($q.process, [string]$q.text) }
       'click' { [CwWin]::Focus($q.process); [CwWin]::Click([int]$q.x, [int]$q.y, [string]$q.button) }
       'scroll' { [CwWin]::Focus($q.process); [CwWin]::Scroll([int]$q.x, [int]$q.y, [int]$q.clicks) }
       'close' { $r.closed = [CwWin]::Close($q.process) }
