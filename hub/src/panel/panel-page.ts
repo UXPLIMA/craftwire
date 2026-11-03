@@ -127,7 +127,8 @@ async function showLogs() {
     const r = await api("logs?limit=300&instance=" + enc(sel.value));
     out.replaceChildren(...r.lines.map((l) => $("div", { class: l.level === "ERROR" ? "err" : "" }, line(l))));
   };
-  sel.addEventListener("change", () => draw());
+  sel.addEventListener("change", () => { link(); draw(); });
+  link();
   await draw();
   every(3000, draw);
 }
@@ -149,7 +150,9 @@ async function showReplay() {
   const sel = $("select", {}, ...sessions.map((s) => $("option", { value: s.session }, label(s))));
   const steps = $("div", { class: "card" });
   const detail = $("pre");
-  main.append($("div", { class: "row" }, sel), steps, $("div", { class: "card" }, detail));
+  const save = $("a", { class: "act", download: "" }, "save as scenario");
+  const link = () => { save.href = "/panel/api/scenario?id=" + enc(sel.value); };
+  main.append($("div", { class: "row" }, sel, save), steps, $("div", { class: "card" }, detail));
   const step = (c, n) => {
     const row = $("div", { class: "step" }, (n + 1) + ". " + new Date(c.time).toLocaleTimeString() + "  " + c.tool + "  ",
       $("span", { class: c.ok ? "ok" : "err" }, c.ok ? "ok" : "failed"), "  " + c.ms + " ms" + (c.user ? "  " + c.user : ""));
@@ -161,7 +164,8 @@ async function showReplay() {
     return row;
   };
   const draw = async () => { steps.replaceChildren(...(await api("session?id=" + enc(sel.value))).map(step)); };
-  sel.addEventListener("change", () => draw());
+  sel.addEventListener("change", () => { link(); draw(); });
+  link();
   await draw();
 }
 start().catch(() => login());

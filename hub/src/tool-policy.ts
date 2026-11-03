@@ -4,7 +4,7 @@ export const TOOL_GROUPS: Record<string, readonly string[]> = {
   client: ["screenshot", "record", "camera", "gui_read", "gui_action", "input", "chat", "hud_read", "player_state", "client_settings"],
   server: ["server_command", "server_eval", "world_query", "world_edit", "world_render", "server_info", "plugin_manage", "events"],
   build: ["build", "build_manage"],
-  dev: ["server_process", "plugin_deploy", "client_process", "scenario_run"],
+  dev: ["server_process", "plugin_deploy", "client_process", "scenario_run", "scenario_record"],
   bots: ["bot_spawn", "bot_action", "bot_remove", "bot_list", "bot_behavior", "bot_form", "load_test", "botrunner_process"],
   debug: ["profile", "trace", "client_eval", "profile_diff"],
   extensions: [],

@@ -5,6 +5,7 @@
  * shows everyone's arguments).
  */
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { recordScenario } from "../scenario/record.js";
 import type { ToolContext } from "../tools/registry.js";
 import { groupLogs } from "../tools/log-tools.js";
 import { botAgents, broadcast } from "../tools/bots/route.js";
@@ -26,6 +27,7 @@ const ROUTES: Record<string, { tool: string; run: Handler }> = {
   map: { tool: "world_render", run: map },
   sessions: { tool: "replay", run: async (c, _q, res) => sendJson(res, c.audit.sessions()) },
   session: { tool: "replay", run: async (c, q, res) => sendJson(res, c.audit.calls(q.get("id") ?? "local")) },
+  scenario: { tool: "replay", run: scenario },
 };
 
 let liveStreams = 0;
@@ -51,6 +53,18 @@ function allowed(p: Person, tool: string): boolean {
 export function sendJson(res: ServerResponse, body: unknown, status = 200): void {
   res.writeHead(status, { "content-type": "application/json", "cache-control": "no-store" });
   res.end(JSON.stringify(body));
+}
+
+/** A session as a .cwtest.json download: the replay tab's "save as scenario". */
+async function scenario(c: ToolContext, q: URLSearchParams, res: ServerResponse): Promise<void> {
+  const id = q.get("id") ?? "local";
+  const num = (k: string) => (q.get(k) ? Number(q.get(k)) : undefined);
+  const from = num("from");
+  const to = num("to");
+  const r = recordScenario(c.audit.calls(id), { name: `session ${id}`, ...(from ? { from } : {}), ...(to ? { to } : {}) });
+  const file = `session-${id.replace(/[^A-Za-z0-9_-]/g, "").slice(0, 40) || "local"}.cwtest.json`;
+  res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store", "content-disposition": `attachment; filename="${file}"` });
+  res.end(JSON.stringify(r.scenario, null, 2));
 }
 
 function instances(c: ToolContext): unknown {

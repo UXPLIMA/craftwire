@@ -1,8 +1,11 @@
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { CraftwireError } from "../errors.js";
 import { inProcessCaller } from "../scenario/caller.js";
 import { findScenarioFiles, loadScenarioFile } from "../scenario/files.js";
+import { recordScenario } from "../scenario/record.js";
 import { runScenario, type ScenarioReport } from "../scenario/runner.js";
 import { parseScenario, ScenarioError, type Scenario } from "../scenario/scenario.js";
 import { defineTool, ok, type ToolContext } from "./registry.js";
@@ -27,6 +30,55 @@ export function registerScenarioTools(server: McpServer, ctx: ToolContext, makeS
       const scenarios = load(args.scenario, args.files, process.cwd());
       return ok(summarize(await runAll(scenarios, makeServer)));
     });
+
+  defineTool(server, ctx, "scenario_record",
+    "Turn this session's tool calls (or calls from..to, positions as in the web panel) into a scenario that repeats them: "
+      + "bot actions, commands, waits and world changes; failed and read-only calls are left out. file writes a .cwtest.json.",
+    {
+      session: z.string().optional(),
+      name: z.string().min(1).default("recorded"),
+      from: z.number().int().min(1).optional(),
+      to: z.number().int().min(1).optional(),
+      includeReads: z.boolean().default(false),
+      file: z.string().regex(/\.cwtest\.json$/).optional(),
+      overwrite: z.boolean().default(false),
+    },
+    async (args, c) => {
+      const calls = sessionCalls(c, args.session);
+      const r = recordScenario(calls, args);
+      const out: Record<string, unknown> = { steps: (r.scenario.steps as unknown[]).length, skipped: r.skipped };
+      if (args.file !== undefined) out.file = writeScenario(c, args.file, args.overwrite, r.scenario);
+      return ok({ ...out, scenario: r.scenario });
+    });
+}
+
+/** A session's calls, if this person may read them: their own sessions, or any for the owner and the local user. */
+function sessionCalls(c: ToolContext, session: string | undefined) {
+  const id = session ?? c.session ?? "local";
+  const calls = c.audit.calls(id).filter((e) => e.tool !== "scenario_record");
+  if (calls.length === 0) {
+    throw new CraftwireError("SESSION_NOT_FOUND", `No recorded calls for session ${id}`,
+      "The hub keeps the newest 5000 calls since it started; the web panel's replay tab lists the sessions.");
+  }
+  const me = c.user ?? "local";
+  if (me !== "owner" && me !== "local" && calls.some((e) => (e.user ?? "local") !== me)) {
+    throw new CraftwireError("FORBIDDEN", `Session ${id} belongs to someone else`, "Record one of your own sessions, or ask the owner.");
+  }
+  return calls;
+}
+
+function writeScenario(c: ToolContext, file: string, overwrite: boolean, scenario: Record<string, unknown>): string {
+  if (c.build?.http) {
+    throw new CraftwireError("FILE_WRITE_DISABLED", "Over craftwire serve the hub does not write files for callers",
+      "Leave file out and save the returned scenario yourself.");
+  }
+  const path = resolve(process.cwd(), file);
+  if (existsSync(path) && !overwrite) {
+    throw new CraftwireError("FILE_EXISTS", `${path} already exists`, "Pick another name or pass overwrite:true.");
+  }
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, `${JSON.stringify(scenario, null, 2)}\n`);
+  return path;
 }
 
 export function load(inline: Record<string, unknown> | undefined, files: string[] | undefined, cwd: string): Scenario[] {
