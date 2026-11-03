@@ -11,6 +11,7 @@ import { registerClientTools } from "./tools/client-tools.js";
 import { registerDevTools } from "./tools/dev-tools.js";
 import { registerHubTools } from "./tools/hub-tools.js";
 import { registerLogTools } from "./tools/log-tools.js";
+import { registerProxyTools } from "./tools/proxy-tools.js";
 import type { ToolContext } from "./tools/registry.js";
 import { registerServerTools } from "./tools/server-tools.js";
 import { registerScenarioTools } from "./tools/scenario-tools.js";
@@ -40,6 +41,7 @@ export function createCraftwireServer(ctx: ToolContext): McpServer {
   registerDevTools(server, ctx);
   registerBotTools(server, ctx);
   registerDebugTools(server, ctx);
+  registerProxyTools(server, ctx);
   registerScenarioTools(server, ctx, () => createCraftwireServer(ctx));
   // Last, so a plugin's tool can never take a built-in name.
   bindExtensionTools(server, ctx);

@@ -12,6 +12,7 @@ const EVENT_TYPE = {
   log_match: "log",
   player_join: "player",
   resource_pack: "resource_pack",
+  server_switch: "proxy",
 } as const;
 type Condition = keyof typeof EVENT_TYPE;
 
@@ -21,6 +22,7 @@ function matches(condition: Condition, pattern: RegExp | undefined, ev: AgentEve
   if (condition === "screen_open" && d.open !== true) return false;
   if (condition === "screen_closed" && d.open !== false) return false;
   if (condition === "player_join" && d.action !== "join") return false;
+  if (condition === "server_switch" && d.action !== "switch") return false;
   // A pack is done once it loaded or failed; the steps before (accepted, downloaded) do not end the wait.
   if (condition === "resource_pack" && d.final !== true) return false;
   if (!pattern) return true;
@@ -48,11 +50,12 @@ export function registerHubTools(server: McpServer, ctx: ToolContext): void {
 
   defineTool(server, ctx, "wait_for",
     "Wait until something happens (after the call). Events: chat_match, hud_match, screen_open, screen_closed, log_match, player_join "
-      + "{pattern}, resource_pack (a client's server pack loaded or failed; pattern on status). Server, every tick: block, player_near, "
-      + "inventory, event, message, expr {js}. Returns what held and its value. Details: craftwire://docs/tools.",
+      + "{pattern}, resource_pack (a client's server pack loaded or failed; pattern on status), server_switch (proxy; pattern on "
+      + "\"Bob lobby -> games\"). Server, every tick: block, player_near, inventory, event, message, expr {js}. Returns what held and its value. Details: craftwire://docs/tools.",
     {
       condition: z.enum([
-        "chat_match", "hud_match", "screen_open", "screen_closed", "log_match", "player_join", "resource_pack", ...SERVER_CONDITIONS,
+        "chat_match", "hud_match", "screen_open", "screen_closed", "log_match", "player_join", "resource_pack", "server_switch",
+        ...SERVER_CONDITIONS,
       ]),
       pattern: z.string().optional(),
       instance: z.string().optional(),

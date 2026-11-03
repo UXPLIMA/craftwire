@@ -7,6 +7,7 @@ export const TOOL_GROUPS: Record<string, readonly string[]> = {
   dev: ["server_process", "plugin_deploy", "client_process", "scenario_run", "scenario_record"],
   bots: ["bot_spawn", "bot_action", "bot_remove", "bot_list", "bot_behavior", "bot_form", "load_test", "botrunner_process"],
   debug: ["profile", "trace", "client_eval", "profile_diff"],
+  proxy: ["proxy"],
   extensions: [],
 };
 
@@ -30,6 +31,7 @@ const READING_ACTIONS: Record<string, readonly string[]> = {
   bot_behavior: ["status"],
   bot_form: ["read"],
   botrunner_process: ["status"],
+  proxy: ["info", "servers", "players"],
   // watch only starts recording more event types.
   events: ["summary", "query", "listeners", "watch"],
 };

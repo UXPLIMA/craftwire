@@ -6,7 +6,7 @@ import { pluginInfoOfJar, pluginJarsNamed } from "./dev/jar.js";
 import { eulaAccepted, MIN_JAVA, probeJavaMajor, resolveLaunch } from "./dev/launch.js";
 import { HUB_VERSION } from "./version.js";
 
-const AGENT_NAMES: Record<AgentKind, string> = { client: "Agent mod", server: "plugin", botrunner: "bot runner" };
+const AGENT_NAMES: Record<AgentKind, string> = { client: "Agent mod", server: "plugin", botrunner: "bot runner", proxy: "Velocity plugin" };
 
 export interface Check {
   status: "ok" | "warn" | "fail";

@@ -14,7 +14,7 @@ if (providers.gradleProperty('apiOnly').isPresent()) {
     include 'craftwire-api'
     return
 }
-include 'craftwire-api', 'agent-core', 'bot-core', 'build-core', 'agent-script', 'agent-fabric', 'agent-paper', 'botrunner', 'bedrock-protocol', 'test-fixtures'
+include 'craftwire-api', 'agent-core', 'bot-core', 'build-core', 'agent-script', 'agent-fabric', 'agent-paper', 'botrunner', 'bedrock-protocol', 'agent-velocity', 'test-fixtures'
 include 'botrunner-java'
 project(':botrunner-java').projectDir = file('botrunner/java')
 include 'compat-check'

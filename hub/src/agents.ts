@@ -7,7 +7,7 @@ import { type AgentEvent, EventNotification, HelloRequest, RpcResponse, StatusRe
 import { RingBuffer } from "./ringbuffer.js";
 import { HUB_VERSION, PROTOCOL_VERSION } from "./version.js";
 
-export type AgentKind = "client" | "server" | "botrunner";
+export type AgentKind = "client" | "server" | "botrunner" | "proxy";
 
 export interface InstanceInfo {
   id: string;
@@ -69,12 +69,14 @@ const LABELS: Record<AgentKind, string> = {
   client: "Minecraft client (Craftwire Agent mod)",
   server: "Paper server (Craftwire plugin)",
   botrunner: "bot runner (craftwire-botrunner)",
+  proxy: "Velocity proxy (craftwire-velocity plugin)",
 };
 
 const START_HINTS: Record<AgentKind, string> = {
   client: "Start Minecraft with the Craftwire Agent mod installed; it connects automatically.",
   server: "Start the Paper server with the Craftwire plugin installed; it connects automatically.",
   botrunner: "Start one with botrunner_process {action:'start'}, or run craftwire-botrunner on another machine with the hub token.",
+  proxy: "Start the Velocity proxy with the craftwire-velocity plugin installed; it connects automatically.",
 };
 
 const CLOSE_UNAUTHORIZED = 4001;
@@ -84,7 +86,7 @@ const CLOSE_BAD_HANDSHAKE = 4003;
 export class AgentServer extends EventEmitter {
   private wss?: WebSocketServer;
   private readonly live = new Map<string, Instance>();
-  private readonly counters: Record<AgentKind, number> = { client: 0, server: 0, botrunner: 0 };
+  private readonly counters: Record<AgentKind, number> = { client: 0, server: 0, botrunner: 0, proxy: 0 };
   private readonly rejected = new RingBuffer<RejectedAgent>(20);
 
   constructor(private readonly opts: AgentServerOptions) {

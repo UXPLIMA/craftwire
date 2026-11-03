@@ -236,3 +236,8 @@ Then: compile everything, fix the build; then tests (approach to be given by the
   server's block update, re-sending the predicted break once.
 - Bedrock container titles come from the block entity's name (BlockActorData), which the bot does not decode yet;
   menus are titled after their block.
+- Velocity: the proxy agent compiles against `velocity-api:3.4.0-SNAPSHOT`; move it to the release current at the
+  trials. It ships a hand-written `velocity-plugin.json` (no annotation processor) and loads by its `main` class.
+  The command console implements Adventure's deprecated `sendMessage(Identity, Component, MessageType)` as well as
+  `sendMessage(Component)`, so replies are caught whichever entry point a plugin uses; check it on the Adventure
+  version Velocity ships. The agent core targets Java 25, so the proxy has to run on Java 25.

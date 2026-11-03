@@ -1,0 +1,10 @@
+{
+  "id": "craftwire",
+  "name": "Craftwire",
+  "version": "${version}",
+  "description": "Lets AI agents run proxy commands, read the server list and players, and move players between servers.",
+  "url": "https://github.com/uxplima/craftwire",
+  "authors": ["uxplima"],
+  "dependencies": [],
+  "main": "com.uxplima.craftwire.velocity.CraftwireVelocity"
+}

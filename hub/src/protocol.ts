@@ -4,7 +4,7 @@ const RpcId = z.union([z.number().int(), z.string()]);
 
 export const HelloParams = z.object({
   token: z.string().min(1),
-  agentKind: z.enum(["client", "server", "botrunner"]),
+  agentKind: z.enum(["client", "server", "botrunner", "proxy"]),
   agentVersion: z.string(),
   protocolVersion: z.number().int(),
   mcVersion: z.string(),

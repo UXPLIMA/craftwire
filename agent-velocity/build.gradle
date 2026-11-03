@@ -1,0 +1,49 @@
+plugins {
+    id 'java'
+}
+
+base {
+    archivesName = 'craftwire-velocity'
+}
+
+evaluationDependsOn(':agent-core')
+evaluationDependsOn(':craftwire-api')
+
+repositories {
+    maven { name = 'PaperMC'; url = 'https://repo.papermc.io/repository/maven-public/' }
+    mavenCentral()
+}
+
+// The Velocity proxy agent: proxy commands, servers, players and switches for the hub. Velocity ships Gson,
+// Guice, Adventure and log4j-core, so the jar carries only Craftwire's own classes.
+dependencies {
+    compileOnly "com.velocitypowered:velocity-api:${velocity_api_version}"
+    compileOnly "org.apache.logging.log4j:log4j-core:${log4j_version}"
+    implementation project(':agent-core')
+
+    testImplementation "com.velocitypowered:velocity-api:${velocity_api_version}"
+    testImplementation platform('org.junit:junit-bom:5.13.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+jar {
+    dependsOn ':agent-core:classes', ':craftwire-api:classes'
+    from project(':agent-core').sourceSets.main.output
+    from project(':craftwire-api').sourceSets.main.output
+}
+
+processResources {
+    def props = [version: project.version.toString()]
+    inputs.properties props
+    filesMatching(['velocity-plugin.json', 'craftwire-velocity.properties']) { expand props }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 25
+    options.encoding = 'UTF-8'
+}
+
+test {
+    useJUnitPlatform()
+}
