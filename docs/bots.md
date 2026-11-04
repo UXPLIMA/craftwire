@@ -30,8 +30,9 @@ and checked against its pinned sha1. Bedrock bots speak Craftwire's own Bedrock 
 A bot without an account claims a stable 12-digit XUID from its name, which Floodgate needs and no real player has.
 Menus are titled by their block entity's name, which is how Geyser shows a plugin menu's title.
 
-To see what a Bedrock player sees (the look of a form or a menu), `bedrock_client` drives your own Minecraft for
-Windows from outside: start it with an address, take screenshots, send keys and clicks.
+To see what a Bedrock player sees (the look of a form or a menu), `bedrock_client` drives your own Bedrock game from
+outside (Minecraft for Windows, or mcpelauncher on Linux, where it runs on a screen of its own): start it with an
+address, take screenshots, send keys and clicks.
 
 ## Accounts
 

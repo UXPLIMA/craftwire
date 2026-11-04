@@ -286,11 +286,12 @@ Compare two profile results (before and after a change): MSPT and busy time, and
 
 ### bedrock_client
 
-Your own Minecraft for Windows (Bedrock), seen and driven from outside the game: the hub opens it with a
-`minecraft://connect` link, takes pictures of its window and sends keys, text and clicks. It reads nothing from inside
-the game, so use it for what a player sees (a menu's look, a form, a HUD); Bedrock bots read menus and forms as data.
-Windows only, one game at a time; the game must be installed and signed in once by hand. Over `craftwire serve` only
-the owner and the dev role have it, since it takes the hub machine's screen, keyboard and mouse.
+Your own Bedrock game, seen and driven from outside: Minecraft for Windows, or on Linux the Android game run by
+[mcpelauncher](https://minecraft-linux.github.io). The hub opens it with a `minecraft://connect` link, takes pictures of
+its window and sends keys, text and clicks. It reads nothing from inside the game, so use it for what a player sees (a
+menu's look, a form, a HUD); Bedrock bots read menus and forms as data. One game at a time; the game must be installed
+and signed in once by hand. Over `craftwire serve` only the owner and the dev role have it, since it takes the hub
+machine's screen, keyboard and mouse.
 
 - `action`: start (open the game; with `address` join host[:port], default port 19132), status (running, focused, the
   window's area), screenshot (PNG of the window; `maxWidth`, default 1280), key {key, holdMs?} (a letter, a digit,
@@ -303,6 +304,20 @@ the owner and the dev role have it, since it takes the hub machine's screen, key
   dialogs also answer the arrow keys and enter, which work in the background.
 - While the game is playing (no menu open), it reads the mouse even in the background, so the user's mouse turns the
   character. Leave it on a menu (key escape opens the pause menu) while the user works.
+
+On Linux:
+
+- Install mcpelauncher (a package, the Flatpak `io.mrarm.mcpelauncher` or a build), open its launcher once, sign in
+  to Google Play with the account that bought Minecraft and download a version; sign in to Xbox in the game once if
+  the server needs it. Craftwire never downloads the game. The hub then runs `mcpelauncher-client` itself with the
+  newest downloaded version; `CRAFTWIRE_MCPELAUNCHER` names another client program and `CRAFTWIRE_BEDROCK_GAME_DIR`
+  another version folder.
+- The game runs on an Xvfb screen of its own (1280 x 720), so the machine needs no display and every action,
+  clicks and scrolls included, stays off the user's desktop. `CRAFTWIRE_BEDROCK_DISPLAY=:0` puts it on a display
+  you can watch instead; then keys and clicks move that display's focus and pointer.
+- Needs Xvfb, xdotool and ImageMagick (or ffmpeg): `apt install xvfb xdotool imagemagick`. Xvfb renders with Mesa on
+  the CPU, so expect a low frame rate; screenshots do not mind. `npx craftwire doctor` checks all of it.
+- A start that ends with BEDROCK_CLIENT_EXITED carries the game's last log lines in `details`.
 
 ### client_eval
 

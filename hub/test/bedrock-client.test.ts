@@ -78,9 +78,9 @@ describe("BedrockClient", () => {
     await expect(c.click(10, 10, "left")).rejects.toMatchObject({ code: "BEDROCK_CLIENT_NOT_FOCUSED" });
   });
 
-  it("does not start the helper off Windows", async () => {
+  it("does not start a helper off Windows and Linux", async () => {
     const { helper, sent } = fakeHelper();
-    await expect(new BedrockClient("unused", "linux", helper).status()).rejects.toMatchObject({ code: "UNSUPPORTED_PLATFORM" });
+    await expect(new BedrockClient("unused", "darwin", helper).status()).rejects.toMatchObject({ code: "UNSUPPORTED_PLATFORM" });
     expect(sent).toEqual([]);
   });
 });

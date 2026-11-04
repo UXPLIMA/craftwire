@@ -1,12 +1,14 @@
 /**
- * The user's own Minecraft for Windows (Bedrock), seen and driven from outside: started with a minecraft://connect
- * link, captured as a picture of its window, and given keys, text and clicks. Pictures, keys and text work with the
- * game in the background, so the user can keep working; clicks and scrolls need the real mouse and bring the game to
- * the front. Nothing is read from inside the game, so the agent learns what the window shows and nothing more.
- * Windows only; one game at a time, as the game itself.
+ * The user's own Bedrock game, seen and driven from outside: started with a minecraft://connect link, captured as a
+ * picture of its window, and given keys, text and clicks. On Windows it is Minecraft for Windows (win32-helper.ts):
+ * pictures, keys and text work with the game in the background, clicks and scrolls need the real mouse and bring the
+ * game to the front. On Linux it is mcpelauncher's game on its own X screen (linux-helper.ts), where all input stays
+ * off the user's desktop. Nothing is read from inside the game, so the agent learns what the window shows and nothing
+ * more. One game at a time, as the game itself.
  */
 import { CraftwireError } from "../errors.js";
 import { virtualKey } from "./keys.js";
+import { LinuxHelper } from "./linux-helper.js";
 import { type HelperAnswer, type HelperRequest, Win32Helper } from "./win32-helper.js";
 
 const PROCESS = "Minecraft.Windows";
@@ -37,7 +39,7 @@ export class BedrockClient {
   private scale = 1;
 
   constructor(home: string, private readonly platform: NodeJS.Platform = process.platform, helper?: Helper) {
-    this.helper = helper ?? new Win32Helper(home);
+    this.helper = helper ?? (platform === "linux" ? new LinuxHelper() : new Win32Helper(home));
   }
 
   /** Starts the game (or reuses the running one) and, with an address, sends it to that server. */
@@ -47,10 +49,13 @@ export class BedrockClient {
     const end = Date.now() + timeoutMs;
     for (;;) {
       const s = await this.status();
+      if (s.exited !== undefined) throw exitedEarly(s.exited);
       if (s.running === true) return { ...s, ...(address !== undefined ? { connecting: address } : {}) };
       if (Date.now() > end) {
-        throw new CraftwireError("BEDROCK_CLIENT_NOT_FOUND", `Minecraft for Windows did not open a window in ${timeoutMs / 1000} s`,
-          "Install Minecraft from the Microsoft Store or the Xbox app and start it once yourself to sign in.");
+        throw new CraftwireError("BEDROCK_CLIENT_NOT_FOUND", `The game did not open a window in ${timeoutMs / 1000} s`,
+          this.platform === "linux"
+            ? "bedrock_client {action:'status'} shows whether it is still starting; the first start of a version can take minutes."
+            : "Install Minecraft from the Microsoft Store or the Xbox app and start it once yourself to sign in.");
       }
       await new Promise((r) => setTimeout(r, 1000));
     }
@@ -58,7 +63,7 @@ export class BedrockClient {
 
   async status(): Promise<Record<string, unknown>> {
     const a = await this.call({ op: "find", process: PROCESS });
-    if (a.running !== true) return { running: false };
+    if (a.running !== true) return a.exited === undefined ? { running: false } : { running: false, exited: a.exited };
     return { running: true, focused: a.focused === true, window: area(a.client) };
   }
 
@@ -73,7 +78,7 @@ export class BedrockClient {
 
   async key(name: string, holdMs = 50): Promise<void> {
     const k = virtualKey(name);
-    await this.call({ op: "key", process: PROCESS, vk: k.vk, extended: k.extended, holdMs }, holdMs + 10_000);
+    await this.call({ op: "key", process: PROCESS, key: name, vk: k.vk, extended: k.extended, holdMs }, holdMs + 10_000);
   }
 
   async type(text: string, enter: boolean): Promise<void> {
@@ -89,8 +94,8 @@ export class BedrockClient {
   }
 
   /**
-   * A click at (x, y) in the last screenshot's pixels (window pixels before any screenshot). The game ignores posted
-   * mouse messages, so this moves the real cursor after bringing the game to the front.
+   * A click at (x, y) in the last screenshot's pixels (window pixels before any screenshot). On Windows the game
+   * ignores posted mouse messages, so this moves the real cursor after bringing the game to the front.
    */
   async click(x: number, y: number, button: "left" | "right" | "middle"): Promise<void> {
     const p = await this.screen(x, y);
@@ -126,8 +131,8 @@ export class BedrockClient {
   }
 
   private async call(req: HelperRequest, timeoutMs?: number): Promise<HelperAnswer> {
-    if (this.platform !== "win32") {
-      throw new CraftwireError("UNSUPPORTED_PLATFORM", "The Bedrock client runs on Windows only",
+    if (this.platform !== "win32" && this.platform !== "linux") {
+      throw new CraftwireError("UNSUPPORTED_PLATFORM", "The Bedrock client runs on Windows and Linux",
         "Bedrock bots (bot_spawn kind:'bedrock') read menus and forms on any system.");
     }
     const a = await this.helper.request(req, timeoutMs);
@@ -162,7 +167,14 @@ function area(v: unknown): ClientArea {
   return { x: a[0] ?? 0, y: a[1] ?? 0, width: a[2] ?? 0, height: a[3] ?? 0 };
 }
 
+function exitedEarly(v: unknown): CraftwireError {
+  const e = (v ?? {}) as { code?: unknown; log?: unknown };
+  const log = Array.isArray(e.log) ? e.log.map(String) : [];
+  return new CraftwireError("BEDROCK_CLIENT_EXITED", `The game stopped while starting (exit ${String(e.code ?? "unknown")})`,
+    "Its last log lines are in details; start the same version once from the mcpelauncher launcher to see it run.", { log });
+}
+
 function notRunning(): CraftwireError {
-  return new CraftwireError("BEDROCK_CLIENT_NOT_RUNNING", "Minecraft for Windows is not running",
+  return new CraftwireError("BEDROCK_CLIENT_NOT_RUNNING", "The Bedrock game is not running",
     "bedrock_client {action:'start', address} starts it.");
 }

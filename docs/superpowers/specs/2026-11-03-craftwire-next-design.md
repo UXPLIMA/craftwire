@@ -291,3 +291,24 @@ The trials against a Geyser and Floodgate network left six items; the user asked
   AddPlayer, PlayerList, Animate, LevelChunk, the entity and release item transactions) for that protocol. Older
   protocols are refused with the versions the bot has. 1.26.50 uses dragonfly's block list from before its
   1.26.60 update, pinned the same way.
+
+## 19. Bedrock client on Linux (decided 2026-11-04)
+
+The user asked for a Linux machine that opens both a Java and a Bedrock client, takes screenshots and drives them.
+Java already did (client_process under xvfb-run, section 18 and launcher.ts). Bedrock:
+
+- Microsoft has no Linux Bedrock client. The one lawful way is mcpelauncher (minecraft-linux, open source), which
+  runs the Android game; its launcher downloads the APK from Google Play with the user's own account. Craftwire
+  never downloads or ships the game, and touches no DRM: it starts `mcpelauncher-client` and drives its window.
+- Launch, from mcpelauncher-client's main.cpp: `-dg <version folder> -ww <w> -wh <h> --uri <minecraft://connect
+  link>`; a second client given only a link hands it to the running game over its sendfile IPC, which is how a
+  running game is sent to another server. Version folders are the launcher's `<data>/mcpelauncher/versions/<name>`
+  (QStandardPaths GenericDataLocation, or `~/.var/app/io.mrarm.mcpelauncher/data` for the Flatpak); the newest one
+  that has an AndroidManifest.xml is used. The window starts titled "mcpelauncher".
+- The game runs on an Xvfb of its own (`-displayfd`, so Xvfb picks the display number), 1280 x 720, without
+  WAYLAND_DISPLAY. On its own screen the game has the only focus and pointer, so all input, clicks included, works
+  without touching the user's desktop: the headless Bedrock that Windows could not give.
+- The same request shapes as the Windows helper (open, find, capture, key, text, click, scroll, close), answered by
+  linux-helper.ts with xdotool (windowfocus, then XTEST keys, text and pointer) and ImageMagick's `import -window`
+  (ffmpeg's x11grab when import is missing). No long-lived helper process is needed.
+- A game that exits while starting is reported once as BEDROCK_CLIENT_EXITED with its last log lines.

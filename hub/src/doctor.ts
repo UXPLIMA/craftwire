@@ -4,6 +4,7 @@ import WebSocket from "ws";
 import type { AgentKind, HubStatus } from "./agents.js";
 import { pluginInfoOfJar, pluginJarsNamed } from "./dev/jar.js";
 import { eulaAccepted, MIN_JAVA, probeJavaMajor, resolveLaunch } from "./dev/launch.js";
+import { linuxChecks } from "./doctor-linux.js";
 import { HUB_VERSION } from "./version.js";
 
 const AGENT_NAMES: Record<AgentKind, string> = { client: "Agent mod", server: "plugin", botrunner: "bot runner", proxy: "Velocity plugin" };
@@ -40,6 +41,7 @@ export interface DoctorOptions {
   serverDir?: string;
   nodeVersion?: string;
   javaMajor?: (java: string) => Promise<number>;
+  platform?: NodeJS.Platform;
 }
 
 export async function runDoctor(o: DoctorOptions): Promise<Check[]> {
@@ -80,6 +82,7 @@ export async function runDoctor(o: DoctorOptions): Promise<Check[]> {
     checks.push({ status: "warn", label: "java is not on PATH", fix: `Install Java ${MIN_JAVA}+ to run Paper 26.x servers.` });
   }
   if (o.serverDir) checks.push(...serverChecks(o.serverDir));
+  if ((o.platform ?? process.platform) === "linux") checks.push(...linuxChecks());
   return checks;
 }
 
