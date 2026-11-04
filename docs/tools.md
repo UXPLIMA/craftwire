@@ -197,6 +197,10 @@ Drive a bot. chat {text}. command {command, collectMs} sends it like a client (P
 
 Remove a bot (`name`) or every bot (`all:true`). Bots leave like players logging out (quit event, data saved).
 
+### bedrock_bot
+
+A headless Bedrock player that joins through Geyser (needs `bedrock-protocol` in the hub, and `validate-bedrock-login: false` in Geyser's config: the bot logs in offline). It sees what a Bedrock client is sent. Actions: `spawn` {bot, text: "host:port", default 127.0.0.1:19132}; `list`; `remove` (without bot: every one); `state`; `chat` and `command` {text}; `messages` {since}; `titles`; `forms`; `form_answer` {values: `[button index]` for a simple form, `[true|false]` for a modal, the field values for a custom form}, which answers the newest open form; `form_close`; `scoreboard`; `bossbars`; `players`; `packs`; `commands`. Text is as Geyser sent it, Bedrock colour codes included. It cannot render, so what a pack draws is checked on a real client.
+
 ## Debugging
 
 ### profile
