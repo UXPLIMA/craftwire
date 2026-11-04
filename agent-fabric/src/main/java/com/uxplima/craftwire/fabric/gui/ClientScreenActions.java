@@ -4,6 +4,7 @@ import com.google.gson.JsonObject;
 import com.uxplima.craftwire.bot.gui.ScreenAction;
 import com.uxplima.craftwire.bot.model.BotErrors;
 import com.uxplima.craftwire.core.AgentError;
+import com.uxplima.craftwire.fabric.compat.ClientCompat;
 import com.uxplima.craftwire.fabric.mixin.AbstractSignEditScreenAccessor;
 import com.uxplima.craftwire.fabric.mixin.BookEditScreenAccessor;
 import java.util.Optional;
@@ -95,8 +96,9 @@ public final class ClientScreenActions {
                     "Right-click the sign first (input {action:'use'} while looking at it), then sign_edit.");
         }
         AbstractSignEditScreenAccessor acc = (AbstractSignEditScreenAccessor) editor;
-        if (s.front() != acc.craftwire$isFrontText()) {
-            throw new AgentError("WRONG_SIGN_SIDE", "The open editor is for the " + (acc.craftwire$isFrontText() ? "front" : "back") + " side",
+        boolean front = ClientCompat.get().signFront(editor);
+        if (s.front() != front) {
+            throw new AgentError("WRONG_SIGN_SIDE", "The open editor is for the " + (front ? "front" : "back") + " side",
                     "Pass side to match, or right-click the other side of the sign.");
         }
         String[] lines = acc.craftwire$getMessages();

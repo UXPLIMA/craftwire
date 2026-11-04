@@ -6,6 +6,7 @@ import com.uxplima.craftwire.bot.gui.GuiView;
 import com.uxplima.craftwire.bot.gui.SlotItem;
 import com.uxplima.craftwire.bot.model.ItemInfo;
 import com.uxplima.craftwire.fabric.ItemJson;
+import com.uxplima.craftwire.fabric.compat.ClientCompat;
 import com.uxplima.craftwire.fabric.mixin.AbstractSignEditScreenAccessor;
 import com.uxplima.craftwire.mc.MenuInfo;
 import java.util.ArrayList;
@@ -74,7 +75,7 @@ public final class ClientMenus {
         } else if (screen instanceof AbstractSignEditScreen sign) {
             AbstractSignEditScreenAccessor acc = (AbstractSignEditScreenAccessor) sign;
             JsonObject s = new JsonObject();
-            s.addProperty("side", acc.craftwire$isFrontText() ? "front" : "back");
+            s.addProperty("side", ClientCompat.get().signFront(sign) ? "front" : "back");
             JsonArray lines = new JsonArray();
             for (String line : acc.craftwire$getMessages()) lines.add(line);
             s.add("lines", lines);

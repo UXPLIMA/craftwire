@@ -5,6 +5,7 @@ import com.mojang.blaze3d.platform.Window;
 import com.uxplima.craftwire.fabric.capture.GuiLayer;
 import java.nio.ByteBuffer;
 import java.util.function.Consumer;
+import net.minecraft.client.gui.screens.inventory.AbstractSignEditScreen;
 
 /**
  * What differs between the supported Minecraft versions on the client. Each version has its implementation in
@@ -49,6 +50,9 @@ public interface ClientCompat {
      * no menu background or blur. The main render target is not touched. Render thread.
      */
     Drawn drawGui(GuiLayer layer, RenderTarget canvas, int clearArgb);
+
+    /** Whether the open sign editor edits the front text (26.2 keeps a boolean, 26.3 a SignTextSlot). */
+    boolean signFront(AbstractSignEditScreen screen);
 
     static ClientCompat get() {
         return Holder.INSTANCE;

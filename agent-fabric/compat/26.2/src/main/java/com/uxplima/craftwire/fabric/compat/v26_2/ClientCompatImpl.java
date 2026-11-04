@@ -4,8 +4,10 @@ import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.blaze3d.platform.Window;
 import com.uxplima.craftwire.fabric.compat.ClientCompat;
+import com.uxplima.craftwire.fabric.compat.v26_2.mixin.SignSideAccessor;
 import java.nio.ByteBuffer;
 import java.util.function.Consumer;
+import net.minecraft.client.gui.screens.inventory.AbstractSignEditScreen;
 import org.lwjgl.glfw.GLFW;
 
 /** Minecraft 26.2: GLFW window and input. */
@@ -53,5 +55,10 @@ public final class ClientCompatImpl implements ClientCompat {
     @Override
     public Drawn drawGui(com.uxplima.craftwire.fabric.capture.GuiLayer layer, RenderTarget canvas, int clearArgb) {
         return gui.draw(layer, canvas, clearArgb);
+    }
+
+    @Override
+    public boolean signFront(AbstractSignEditScreen screen) {
+        return ((SignSideAccessor) screen).craftwire$isFrontText();
     }
 }

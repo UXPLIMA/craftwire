@@ -13,7 +13,8 @@
     "GuiRenderStateAccessor",
     "DeferredTooltipMixin",
     "ScreenBackgroundMixin",
-    "GuiRendererTargetMixin"
+    "GuiRendererTargetMixin",
+    "SignSideAccessor"
   ],
   "injectors": {
     "defaultRequire": 1
