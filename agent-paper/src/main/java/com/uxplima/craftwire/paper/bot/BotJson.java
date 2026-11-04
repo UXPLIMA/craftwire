@@ -13,6 +13,7 @@ import java.util.Locale;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.item.ItemInstance;
 import org.bukkit.Location;
 import org.bukkit.craftbukkit.inventory.CraftItemStack;
 import org.bukkit.entity.Player;
@@ -28,6 +29,11 @@ public final class BotJson {
         Location l = b.bukkit().getLocation();
         return BotState.summary(b.name(), BotKind.PLUGIN, b.uuid().toString(), b.group(), l.getWorld().getName(),
                 new Position(l.getX(), l.getY(), l.getZ()));
+    }
+
+    /** A server stack, copied through ItemInstance: 26.3 dropped asBukkitCopy(ItemStack) and kept only that overload. */
+    public static ItemInfo item(ItemInstance stack) {
+        return item(CraftItemStack.asBukkitCopy(stack));
     }
 
     public static ItemInfo item(ItemStack s) {
@@ -75,7 +81,7 @@ public final class BotJson {
             if (s == null || s.getType().isAir()) continue;
             slots.add(new SlotItem(raw, raw < topSize, item(s)));
         }
-        ItemInfo carried = menu.getCarried().isEmpty() ? null : item(CraftItemStack.asBukkitCopy(menu.getCarried()));
+        ItemInfo carried = menu.getCarried().isEmpty() ? null : item(menu.getCarried());
         return new GuiView(open, open ? plain(view.title()) : "Inventory", view.getType().name(), menu.containerId, menu.getStateId(),
                 count, topSize, slots, carried, screen);
     }

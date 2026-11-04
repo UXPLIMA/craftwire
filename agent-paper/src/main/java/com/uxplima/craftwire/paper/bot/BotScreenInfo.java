@@ -8,7 +8,6 @@ import net.minecraft.core.Holder;
 import net.minecraft.server.dialog.Dialog;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.AnvilMenu;
-import org.bukkit.craftbukkit.inventory.CraftItemStack;
 
 /**
  * What a special screen shows beyond its slots, for gui_read's `screen`: anvil cost, merchant offers, enchanting
@@ -21,7 +20,7 @@ final class BotScreenInfo {
     static JsonObject of(Bot b) {
         JsonObject o = new JsonObject();
         AbstractContainerMenu menu = b.player().containerMenu;
-        MenuInfo.fill(o, menu, stack -> BotJson.item(CraftItemStack.asBukkitCopy(stack)).json());
+        MenuInfo.fill(o, menu, stack -> BotJson.item(stack).json());
         // Paper widens AnvilMenu.itemName; the client cannot read it, so only the plugin bot reports the typed name.
         if (menu instanceof AnvilMenu a && a.itemName != null) o.addProperty("name", a.itemName);
         ServerCompat.SignTarget sign = b.link().screens.sign();
