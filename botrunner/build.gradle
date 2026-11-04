@@ -23,7 +23,10 @@ dependencies {
     // Script behaviors: the runner runs GraalJS in its own JVM, so it ships the engine instead of downloading it.
     implementation "org.graalvm.polyglot:polyglot:${graal_version}"
     implementation "org.graalvm.js:js-language:${graal_version}"
-    implementation 'io.netty:netty-all:4.2.19.Final'
+    // Only what RakNet uses (buffers, the NIO datagram transport): netty-all would add 33 MB of QUIC natives.
+    // Java bots load the Netty their server jar bundles (VersionLoader), not this one.
+    implementation 'io.netty:netty-buffer:4.2.19.Final'
+    implementation 'io.netty:netty-transport:4.2.19.Final'
 
     testImplementation platform('org.junit:junit-bom:5.13.4')
     testImplementation 'org.junit.jupiter:junit-jupiter'
