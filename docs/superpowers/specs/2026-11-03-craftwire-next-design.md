@@ -262,8 +262,11 @@ The trials against a Geyser and Floodgate network left six items; the user asked
 - Real Bedrock client (phase two of section 8): the hub drives the user's own licensed Minecraft for Windows. It
   starts the game with the `minecraft://connect/?serverUrl=<host>&serverPort=<port>` link, finds the game window by
   its process (`Minecraft.Windows.exe`), captures it (PrintWindow with PW_RENDERFULLCONTENT, falling back to a
-  screen copy of the window when that comes back black) and sends keys, text and clicks with SendInput after
-  bringing the window to the front. A long-lived PowerShell helper with a small C# class (Add-Type, compiled once)
+  screen copy of the window when that comes back black). Keys and text are posted to the game window
+  (WM_KEYDOWN, WM_KEYUP, WM_CHAR), which its menus, dialogs and chat take in the background, so the user can keep
+  working; clicks and scrolls need SendInput with the window in front, since the game ignores posted mouse
+  messages, and are refused (BEDROCK_CLIENT_NOT_FOCUSED) when Windows keeps it in the back. While playing, the game
+  reads the raw mouse even in the background, so it is left on a menu. A long-lived PowerShell helper with a small C# class (Add-Type, compiled once)
   does the Win32 calls; the hub talks to it in JSON lines. No mod, no memory reading, no DRM touched: what the agent
   gets is the picture and input, nothing from inside the game. Windows only. One tool, `bedrock_client`, in the
   extras group so it costs nothing until turned on.
