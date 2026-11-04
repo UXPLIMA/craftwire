@@ -26,6 +26,7 @@ public final class PathSearch {
     private final MoveRules rules;
     private final Pathfinder.Options o;
     private final int gx, gy, gz;
+    private final boolean goalInAir;
     private final Map<Long, Entry> seen = new HashMap<>();
     private final PriorityQueue<Open> open = new PriorityQueue<>((a, b) -> Double.compare(a.f(), b.f()));
     private long closestKey;
@@ -39,6 +40,7 @@ public final class PathSearch {
         this.gx = gx;
         this.gy = gy;
         this.gz = gz;
+        this.goalInAir = rules.nowhereToStand(gx, gy, gz);
         Step start = new Step(sx, sy, sz, rules.standY(sx, sy, sz), Move.START);
         long k = key(sx, sy, sz);
         seen.put(k, new Entry(start, 0, NONE));
@@ -60,9 +62,16 @@ public final class PathSearch {
             Entry e = seen.get(cur.key());
             Step n = e.node();
             if (cur.f() > e.g() + h(n) + 1e-9) continue;   // a stale entry
-            if (n.x() == gx && n.z() == gz && Math.abs(n.y() - gy) <= 1) {
-                result = finish(cur.key(), true);
-                return true;
+            if (n.x() == gx && n.z() == gz) {
+                if (Math.abs(n.y() - gy) <= 1) {
+                    result = finish(cur.key(), true);
+                    return true;
+                }
+                // Under (or over) a goal nobody can stand at: searching on would only use up maxNodes.
+                if (goalInAir) {
+                    result = finish(cur.key(), false);
+                    return true;
+                }
             }
             explored++;
             double hn = h(n);

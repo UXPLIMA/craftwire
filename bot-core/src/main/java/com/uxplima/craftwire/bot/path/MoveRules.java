@@ -60,6 +60,16 @@ final class MoveRules {
         return at(x, y - 1, z).kind() == Kind.SOLID;
     }
 
+    /**
+     * Whether the goal test (feet within one block of y at x, z) can never pass: no cell there can be stood in, judged
+     * on loaded blocks only. An unloaded block there may hide a floor, so that is not judged unreachable.
+     */
+    boolean nowhereToStand(int x, int y, int z) {
+        for (int dy = -2; dy <= 3; dy++) if (view.cell(x, y + dy, z).kind() == Kind.UNKNOWN) return false;
+        for (int dy = -1; dy <= 1; dy++) if (standable(x, y + dy, z)) return false;
+        return true;
+    }
+
     private boolean passable(int x, int y, int z) {
         return body(at(x, y, z)) && body(at(x, y + 1, z));
     }

@@ -172,6 +172,21 @@ class PathfinderTest {
     }
 
     @Test
+    void aTargetInTheAirEndsUnderItWithoutSearchingEverything() {
+        // Nothing to stand on within a block of y=5: no complete path can exist, so the search stops at the column.
+        Pathfinder.Result r = find(new World(), 0, 0, 0, 6, 5, 0);
+        assertFalse(r.complete());
+        assertEquals(6, r.closest().x());
+        assertEquals(0, r.closest().z());
+        assertTrue(r.explored() < 200, "explored " + r.explored());
+        // A platform at the target makes it standable again: the search goes on looking for a way up.
+        World platform = new World().fill(5, 4, -1, 7, 4, 1, Cell.SOLID);
+        Pathfinder.Result up = find(platform, 0, 0, 0, 6, 5, 0);
+        assertFalse(up.complete(), "no stairs lead up there");
+        assertTrue(up.explored() > 200, "explored " + up.explored());
+    }
+
+    @Test
     void theStartMayBeAnywhere() {
         // A bot standing in a slab cell, or mid-air at a ledge, still gets a path.
         List<Pathfinder.Step> steps = find(new World(), 0, 0, 0, 0, 0, 0).steps();
