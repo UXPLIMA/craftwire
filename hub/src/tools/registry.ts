@@ -3,6 +3,7 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import type { AgentKind, AgentServer } from "../agents.js";
 import type { AuditLog } from "../audit.js";
+import type { BedrockBots } from "../bedrock/bedrock-bots.js";
 import type { ClientManager } from "../client/client-manager.js";
 import type { ServerManager } from "../dev/server-manager.js";
 import { CraftwireError, toToolError } from "../errors.js";
@@ -26,6 +27,8 @@ export interface ToolContext {
   /** CRAFTWIRE_HOME, for caches such as the block colour tables; unset in tests that must not download. */
   home?: string;
   log?: (msg: string) => void;
+  /** Headless Bedrock players, made on first use and shared by every session of this hub. */
+  bedrockBots?: BedrockBots;
 }
 
 export const targetArgs = {

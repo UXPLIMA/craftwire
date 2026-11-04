@@ -4,10 +4,24 @@
   "mcpName": "io.github.UXPLIMA/craftwire",
   "description": "MCP hub that lets AI agents see and drive Minecraft (Craftwire by UXPLIMA)",
   "license": "MIT",
-  "repository": { "type": "git", "url": "git+https://github.com/uxplima/craftwire.git", "directory": "hub" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/uxplima/craftwire.git",
+    "directory": "hub"
+  },
   "homepage": "https://github.com/uxplima/craftwire#readme",
-  "bugs": { "url": "https://github.com/uxplima/craftwire/issues" },
-  "keywords": ["minecraft", "mcp", "model-context-protocol", "claude", "fabric", "paper", "ai-agent"],
+  "bugs": {
+    "url": "https://github.com/uxplima/craftwire/issues"
+  },
+  "keywords": [
+    "minecraft",
+    "mcp",
+    "model-context-protocol",
+    "claude",
+    "fabric",
+    "paper",
+    "ai-agent"
+  ],
   "type": "module",
   "bin": {
     "craftwire": "dist/cli.js"
@@ -38,5 +52,8 @@
     "@types/ws": "^8.18.0",
     "typescript": "~5.9.0",
     "vitest": "^5.0.3"
+  },
+  "optionalDependencies": {
+    "bedrock-protocol": "3.61.0"
   }
 }

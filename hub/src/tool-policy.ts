@@ -5,7 +5,7 @@ export const TOOL_GROUPS: Record<string, readonly string[]> = {
   server: ["server_command", "server_eval", "world_query", "world_edit", "world_render", "server_info", "plugin_manage", "events"],
   build: ["build", "build_manage"],
   dev: ["server_process", "plugin_deploy", "client_process", "scenario_run"],
-  bots: ["bot_spawn", "bot_action", "bot_remove"],
+  bots: ["bot_spawn", "bot_action", "bot_remove", "bedrock_bot_spawn", "bedrock_bot_action", "bedrock_bot_remove"],
   debug: ["profile", "trace", "client_eval"],
   extensions: [],
 };
@@ -27,6 +27,7 @@ const READING_ACTIONS: Record<string, readonly string[]> = {
   chat: ["read"],
   record: ["status"],
   bot_action: ["messages", "state", "gui_read", "hud_read"],
+  bedrock_bot_action: ["state", "messages", "titles", "forms", "scoreboard", "bossbars", "players", "packs", "commands"],
   // watch only starts recording more event types.
   events: ["summary", "query", "listeners", "watch"],
 };
