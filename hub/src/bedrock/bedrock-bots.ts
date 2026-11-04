@@ -46,6 +46,20 @@ class BedrockBot {
 }
 
 /** Loads `bedrock-protocol` on first use; it pulls a native RakNet library, so it is an optional dependency. */
+let backend: "raknet-native" | "jsp-raknet" | undefined;
+
+async function raknetBackend(): Promise<"raknet-native" | "jsp-raknet"> {
+  if (backend === undefined) {
+    try {
+      await import("raknet-native");
+      backend = "raknet-native";
+    } catch {
+      backend = "jsp-raknet";
+    }
+  }
+  return backend;
+}
+
 async function protocol(): Promise<{ createClient(options: Record<string, unknown>): BedrockClient }> {
   try {
     const name = "bedrock-protocol";
@@ -78,8 +92,9 @@ export class BedrockBots {
       port: o.port,
       username: o.name,
       offline: true,
-      // The pure JavaScript RakNet: the native one needs an install script the hub does not run.
-      raknetBackend: "jsp-raknet",
+      // The native RakNet when its binary is built: Geyser's RakNet does not finish the handshake with the pure
+      // JavaScript one, which is kept only for an install where the native build did not run.
+      raknetBackend: await raknetBackend(),
       useRaknetWorkers: false,
       ...(o.version ? { version: o.version } : {}),
       ...(o.transport ? { transport: o.transport } : {}),
