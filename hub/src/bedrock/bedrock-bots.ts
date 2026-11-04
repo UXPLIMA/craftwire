@@ -51,7 +51,8 @@ let backend: "raknet-native" | "jsp-raknet" | undefined;
 async function raknetBackend(): Promise<"raknet-native" | "jsp-raknet"> {
   if (backend === undefined) {
     try {
-      await import("raknet-native");
+      const name = "raknet-native";
+      await import(name);
       backend = "raknet-native";
     } catch {
       backend = "jsp-raknet";
