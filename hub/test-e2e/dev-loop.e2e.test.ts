@@ -105,7 +105,7 @@ describe("dev loop against a real Paper server", () => {
 
   it("drives a bot through a plugin menu", async () => {
     const spawned = json(await hub.call("bot_spawn", { names: ["E2eBot"] }));
-    expect(spawned.bots[0].name).toBe("E2eBot");
+    expect(spawned).toMatchObject({ spawned: 1, names: "E2eBot" });
     await hub.call("bot_action", { bot: "E2eBot", action: "command", command: "cwfixture menu", collectMs: 100 });
     const gui = json(await hub.call("bot_action", { bot: "E2eBot", action: "gui_read" }));
     expect(gui.title).toBe("Fixture Menu");
@@ -113,7 +113,7 @@ describe("dev loop against a real Paper server", () => {
     expect(click.gui.open).toBe(false);
     const inbox = json(await hub.call("bot_action", { bot: "E2eBot", action: "messages" }));
     expect(JSON.stringify(inbox)).toContain("fixture: clicked 4");
-    expect(json(await hub.call("bot_remove", { all: true })).removed).toEqual(["E2eBot"]);
+    expect(json(await hub.call("bot_remove", { all: true, names: true }))).toMatchObject({ removed: 1, names: "E2eBot" });
   });
 
   it("runs scenario files: a plugin flow that passes and one that fails with its context", async () => {

@@ -34,13 +34,14 @@ class BotLifecycleIT {
 
     @Test
     void spawnJoinsAsRealPlayersAndRemoveQuits() throws Exception {
-        JsonArray bots = hub.result("bot.spawn", "{\"count\":2,\"namePrefix\":\"It\"}").getAsJsonObject().getAsJsonArray("bots");
-        assertEquals("It1", bots.get(0).getAsJsonObject().get("name").getAsString());
-        assertEquals("It2", bots.get(1).getAsJsonObject().get("name").getAsString());
+        JsonObject spawned = hub.result("bot.spawn", "{\"count\":2,\"namePrefix\":\"It\"}").getAsJsonObject();
+        assertEquals(2, spawned.get("spawned").getAsInt(), spawned.toString());
+        assertEquals("It1..It2", spawned.get("names").getAsString());
         hub.awaitEvent(e -> e.toString().contains("\"action\":\"join\"") && e.toString().contains("It2"), 5000);
         assertTrue(player("It1").get("bot").getAsBoolean());
-        JsonArray removed = hub.result("bot.remove", "{\"all\":true}").getAsJsonObject().getAsJsonArray("removed");
-        assertEquals(2, removed.size());
+        JsonObject removed = hub.result("bot.remove", "{\"all\":true,\"names\":true}").getAsJsonObject();
+        assertEquals(2, removed.get("removed").getAsInt(), removed.toString());
+        assertEquals("It1..It2", removed.get("names").getAsString());
         hub.awaitEvent(e -> e.toString().contains("\"action\":\"quit\"") && e.toString().contains("It1"), 5000);
         assertEquals(0, players().size());
     }
@@ -65,7 +66,7 @@ class BotLifecycleIT {
     void removingABotInTheTickItWasKickedLeavesItOnce() throws Exception {
         hub.result("bot.spawn", "{\"names\":[\"ItRace\"]}");
         hub.result("server.eval", "{\"code\":\"server.dispatchCommand(server.getConsoleSender(), 'minecraft:kick ItRace bye');"
-                + " plugin('Craftwire').bots().remove('ItRace'); 'ok'\",\"reset\":true}");
+                + " plugin('Craftwire').bots().removeAll(false); 'ok'\",\"reset\":true}");
         Thread.sleep(500);
         assertNull(player("ItRace"));
         long quits = hub.events.stream().filter(e -> e.toString().contains("\"action\":\"quit\"") && e.toString().contains("ItRace")).count();
@@ -75,7 +76,7 @@ class BotLifecycleIT {
 
     @Test
     void removedBotsLeaveNoPlayerFilesBehind() throws Exception {
-        String uuid = hub.result("bot.spawn", "{\"names\":[\"ItFiles\"]}").getAsJsonObject().getAsJsonArray("bots")
+        String uuid = hub.result("bot.spawn", "{\"names\":[\"ItFiles\"],\"detail\":true}").getAsJsonObject().getAsJsonArray("bots")
                 .get(0).getAsJsonObject().get("uuid").getAsString();
         hub.result("bot.remove", "{\"name\":\"ItFiles\"}");
         Thread.sleep(1000);   // give any asynchronous save time to land

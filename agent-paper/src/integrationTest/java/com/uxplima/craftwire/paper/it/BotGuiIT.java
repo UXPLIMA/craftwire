@@ -74,7 +74,7 @@ class BotGuiIT {
     void guiCloseAndSlotRange() throws Exception {
         act("{\"bot\":\"Gui\",\"action\":\"command\",\"command\":\"cwfixture menu\",\"collectMs\":100}");
         assertEquals("SLOT_OUT_OF_RANGE", hub.error("bot.action", "{\"bot\":\"Gui\",\"action\":\"gui_click\",\"slot\":999}").get("code").getAsString());
-        assertTrue(act("{\"bot\":\"Gui\",\"action\":\"gui_close\"}").get("closed").getAsBoolean());
+        assertEquals("menu", act("{\"bot\":\"Gui\",\"action\":\"gui_close\"}").get("closed").getAsString());
         assertFalse(act("{\"bot\":\"Gui\",\"action\":\"gui_read\"}").get("open").getAsBoolean());
     }
 
