@@ -18,8 +18,7 @@ export function registerBedrockClientTools(server: McpServer, ctx: ToolContext):
       + "type {text, enter?}, command {command} (chat command), click {x, y, button?} and scroll {x, y, amount} in the last "
       + "screenshot's pixels (Linux only), show (Windows: brings the window back for the user), stop. All of it works with the "
       + "game off the user's screen, without their mouse or focus; on Windows menus take keys: arrows move the selection, "
-      + "enter presses, escape goes back. In a world the game turns its camera with the user's mouse even then, so leave it "
-      + "on the pause menu (key escape) when done. Reads nothing from inside the game.",
+      + "enter presses, escape goes back; walk by holding w/a/s/d (holdMs). Reads nothing from inside the game.",
     {
       action: z.enum(["start", "status", "screenshot", "key", "type", "command", "click", "scroll", "show", "stop"]),
       address: z.string().optional(),

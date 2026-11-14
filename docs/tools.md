@@ -316,8 +316,9 @@ On Windows:
   posted mouse messages nor injected input reach it, even with the game in front (measured on 26.63). click and
   scroll fail with BEDROCK_CLICK_UNSUPPORTED. Every menu, dialog and form takes the keys instead: the arrows move the
   selection (a long list scrolls with it), enter presses the selected button, escape goes back.
-- While the game is playing (no menu open), it reads the mouse from the device even off the screen, so the user's
-  mouse turns the character. Leave it on the pause menu (key escape) while the user works; there it ignores the mouse.
+- Movement keys work the same way: holding w for 2 s walks about 9 blocks. Off the screen the game no longer turns
+  its camera with the user's mouse; on the screen (a game the user had in front, or after `show`) it does whenever
+  the cursor is over its window.
 
 On Linux:
 

@@ -334,8 +334,10 @@ and a Hyper-V machine (fully separate, heavy to set up). Chosen: keep the Window
   (measured with a 50 ms foreground log), while a cold start with the link never took the front. So start with an
   address restarts a running game: close, wait for the process to end plus 3 s (a link sent while it is still
   ending left gamelaunchhelper waiting with no game), then open with the link.
-- In a world the game turns the camera with the user's mouse even off the screen (GameInput reads the device). No
-  outside fix exists; on the pause menu it ignores the mouse, so the tool tells agents to leave it there.
+- On the screen and behind other windows, the game in a world turned its camera with the user's mouse. Off the
+  screen it does not (the user moved the mouse over their own windows with the game playing, and the view stayed;
+  pictures before and after agree), so no pause menu is needed. Posted w/a/s/d move the player in the background:
+  2 s of w walked about 9 blocks, and s, d, a moved it back, right and left.
 - Mouse: the game imports GameInputCreate and reads buttons and the wheel from the device. Measured on 26.63:
   posted WM_MOUSEMOVE/WM_LBUTTONDOWN/WM_MOUSEWHEEL, SendInput clicks with the game in front (with absolute and
   relative moves), and both together leave the main menu and the settings list untouched. So click and scroll are
