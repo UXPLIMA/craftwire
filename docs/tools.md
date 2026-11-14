@@ -290,18 +290,28 @@ Your own Bedrock game, seen and driven from outside: Minecraft for Windows, or o
 [mcpelauncher](https://minecraft-linux.github.io). The hub opens it with a `minecraft://connect` link, takes pictures of
 its window and sends keys, text and clicks. It reads nothing from inside the game, so use it for what a player sees (a
 menu's look, a form, a HUD); Bedrock bots read menus and forms as data. One game at a time; the game must be installed
-and signed in once by hand. Over `craftwire serve` only the owner and the dev role have it, since it takes the hub
-machine's screen, keyboard and mouse.
+and signed in once by hand. Over `craftwire serve` only the owner and the dev role have it, since it drives a game on
+the hub machine.
 
 - `action`: start (open the game; with `address` join host[:port], default port 19132), status (running, focused, the
   window's area), screenshot (PNG of the window; `maxWidth`, default 1280), key {key, holdMs?} (a letter, a digit,
   f1-f12, enter, escape, space, tab, backspace, shift, ctrl, alt, arrows, home, end, pageup, pagedown, delete, slash,
   minus, equals, comma, period), type {text, enter?}, command {command} (T, the text, Enter), click {x, y, button?} and
-  scroll {x, y, amount} (in the last screenshot's pixels), stop (asks the game to close).
-- Screenshots, keys, text and commands reach the game in the background: the window stays where it is and the
-  user's keyboard and mouse are left alone. Click and scroll need the real mouse, so they bring the game to the front
-  first and fail with BEDROCK_CLIENT_NOT_FOCUSED (sending nothing) when Windows keeps it in the back; menus and
-  dialogs also answer the arrow keys and enter, which work in the background.
+  scroll {x, y, amount} (in the last screenshot's pixels; Linux only), stop (asks the game to close).
+
+On Windows:
+
+- The game works behind the user's windows. start opens it with the link, which brings it to the front, then puts it
+  back behind the window the user was in and returns the focus there (a game the user already had in front stays).
+- Screenshots use Windows.Graphics.Capture, as screen recorders do: the picture comes with the window covered and
+  without the focus (`method: "capture"`). Only where that fails (an old Windows 10) do they fall back to
+  PrintWindow, then to a screen copy that brings the game to the front.
+- Keys, text and commands are posted to the window, so they reach the game in the background without the user's
+  keyboard.
+- Clicks and the wheel cannot be sent: the game reads the mouse straight from the device (GameInput), and neither
+  posted mouse messages nor injected input reach it, even with the game in front (measured on 26.63). click and
+  scroll fail with BEDROCK_CLICK_UNSUPPORTED. Every menu, dialog and form takes the keys instead: the arrows move the
+  selection (a long list scrolls with it), enter presses the selected button, escape goes back.
 - While the game is playing (no menu open), it reads the mouse even in the background, so the user's mouse turns the
   character. Leave it on a menu (key escape opens the pause menu) while the user works.
 

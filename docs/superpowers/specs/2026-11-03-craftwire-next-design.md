@@ -312,3 +312,25 @@ Java already did (client_process under xvfb-run, section 18 and launcher.ts). Be
   linux-helper.ts with xdotool (windowfocus, then XTEST keys, text and pointer) and ImageMagick's `import -window`
   (ffmpeg's x11grab when import is missing). No long-lived helper process is needed.
 - A game that exits while starting is reported once as BEDROCK_CLIENT_EXITED with its last log lines.
+
+## 20. Bedrock client on Windows in the background (decided 2026-11-14)
+
+Agents testing Bedrock opened Minecraft for Windows on the user's own desktop: the maximized game took the front,
+screenshots focused it when PrintWindow gave black, and clicks moved the user's mouse. The user asked for a fix. The
+options weighed were this one, mcpelauncher under WSL (section 19; needs the Android game and renders on the CPU)
+and a Hyper-V machine (fully separate, heavy to set up). Chosen: keep the Windows game, out of the user's way.
+
+- Pictures: Windows.Graphics.Capture on the game window (win32-capture.ts), called through vtables from Add-Type's
+  C# 5 (IIDs and slots from the 10.0.26100 SDK headers). It captures the window covered, on a free-threaded frame
+  pool, without the cursor and without the yellow border. Measured on 26.63 at 3840 x 2054: the game keeps
+  rendering behind other windows (loading progress and the menu panorama move between pictures); 170-390 ms a
+  picture. PrintWindow and the screen copy stay as fallbacks.
+- Placement: before opening the link the helper notes the foreground window; 1.5 s and 4 s after the game's window
+  appears it gives that window the front back and puts the game at the bottom of the z-order. A game the user had in
+  front is left alone.
+- Mouse: the game imports GameInputCreate and reads buttons and the wheel from the device. Measured on 26.63:
+  posted WM_MOUSEMOVE/WM_LBUTTONDOWN/WM_MOUSEWHEEL, SendInput clicks with the game in front (with absolute and
+  relative moves), and both together leave the main menu and the settings list untouched. So click and scroll are
+  refused on Windows (BEDROCK_CLICK_UNSUPPORTED) and never touch the user's mouse; posted keys drive every menu
+  (arrows move the selection and scroll lists, enter presses, escape goes back), measured on the main menu, the
+  settings and the Realms page.

@@ -4,6 +4,8 @@
  * JSON request per stdin line with one JSON line on stdout. Kept as a string so the package ships no extra file;
  * the manager writes it to the hub's home before starting it.
  */
+import { CAPTURE_CSHARP } from "./win32-capture.js";
+
 const CSHARP = String.raw`
 using System;
 using System.Diagnostics;
@@ -17,6 +19,7 @@ using System.Threading;
 public static class CwWin {
     [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left, Top, Right, Bottom; }
     [StructLayout(LayoutKind.Sequential)] public struct POINT { public int X, Y; }
+    // MOUSEINPUT is the union's largest member: SendInput refuses an INPUT of any other size.
     [StructLayout(LayoutKind.Sequential)]
     public struct MOUSEINPUT { public int dx, dy; public uint mouseData, dwFlags, time; public IntPtr dwExtraInfo; }
     [StructLayout(LayoutKind.Sequential)] public struct KEYBDINPUT { public ushort wVk, wScan; public uint dwFlags, time; public IntPtr dwExtraInfo; }
@@ -35,18 +38,26 @@ public static class CwWin {
     [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
     [DllImport("user32.dll")] static extern bool AttachThreadInput(uint a, uint b, bool attach);
     [DllImport("user32.dll")] static extern uint SendInput(uint n, INPUT[] inputs, int size);
-    [DllImport("user32.dll")] static extern bool SetCursorPos(int x, int y);
     [DllImport("user32.dll")] static extern bool PostMessage(IntPtr h, uint msg, IntPtr w, IntPtr l);
     [DllImport("user32.dll")] static extern uint MapVirtualKey(uint code, uint mapType);
+    [DllImport("user32.dll")] static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int cx, int cy, uint flags);
+    [DllImport("user32.dll")] static extern bool IsWindow(IntPtr h);
     [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();
 
-    const uint INPUT_MOUSE = 0, INPUT_KEYBOARD = 1;
+    const uint INPUT_KEYBOARD = 1;
     const uint KEY_UP = 0x2;
     const uint PW_CLIENTONLY_FULLCONTENT = 3;
     const ushort VK_MENU = 0x12;
     const uint WM_KEYDOWN = 0x100, WM_KEYUP = 0x101, WM_CHAR = 0x102;
+    const int SW_SHOWNOACTIVATE = 4;
+    const uint SWP_NOSIZE = 0x1, SWP_NOMOVE = 0x2, SWP_NOACTIVATE = 0x10;
+    static readonly IntPtr HWND_BOTTOM = new IntPtr(1);
 
     public static string LastMethod = "";
+    /** Why the last Windows.Graphics.Capture attempt failed, reported with the fallback's picture. */
+    public static string CaptureError = "";
+    /** The window the user was in when the hub opened the game, so the game can go behind it again. */
+    static IntPtr userWindow = IntPtr.Zero;
 
     public static void Init() { SetProcessDPIAware(); }
 
@@ -78,14 +89,41 @@ public static class CwWin {
         return GetForegroundWindow() == Find(process);
     }
 
-    /**
-     * Brings the window to the front, or throws NOT_FOCUSED: input must never land in whatever window is in front
-     * instead. Windows lets a process take the foreground after an Alt press (a virtual-key event, as keybd_event
-     * sends it) with its input attached to the foreground thread; minimizing and restoring is the fallback.
-     */
+    /** Brings the game to the front, or throws NOT_FOCUSED: input must never land in whatever window is in front instead. */
     public static void Focus(string process) {
-        IntPtr h = Need(process);
-        if (GetForegroundWindow() == h) return;
+        if (!Activate(Need(process))) throw new InvalidOperationException("NOT_FOCUSED");
+    }
+
+    /** Called before the hub opens the game: notes the window the user is in, unless that is the game itself. */
+    public static void Remember(string process) {
+        IntPtr fg = GetForegroundWindow();
+        userWindow = fg != IntPtr.Zero && fg != Find(process) ? fg : IntPtr.Zero;
+    }
+
+    /**
+     * Puts the game behind the user's windows and gives the focus back to the window the user was in when the hub
+     * opened the game (a minecraft:// link brings the game to the front). A game the user had in front stays there.
+     */
+    public static bool Park(string process) {
+        IntPtr h = Find(process);
+        IntPtr back = userWindow;
+        if (h == IntPtr.Zero || back == IntPtr.Zero || !IsWindow(back)) return false;
+        if (GetForegroundWindow() == h) Activate(back);
+        ToBack(h);
+        return true;
+    }
+
+    static void ToBack(IntPtr h) {
+        SetWindowPos(h, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE);
+    }
+
+    /**
+     * Makes a window the foreground one. Windows lets a process take the foreground after an Alt press (a virtual-key
+     * event, as keybd_event sends it) with its input attached to the foreground thread; minimizing and restoring is
+     * the fallback.
+     */
+    static bool Activate(IntPtr h) {
+        if (GetForegroundWindow() == h) return true;
         if (IsIconic(h)) ShowWindow(h, 9);
         uint pid;
         uint fg = GetWindowThreadProcessId(GetForegroundWindow(), out pid);
@@ -103,12 +141,30 @@ public static class CwWin {
             SetForegroundWindow(h);
             Thread.Sleep(400);
         }
-        if (GetForegroundWindow() != h) throw new InvalidOperationException("NOT_FOCUSED");
+        return GetForegroundWindow() == h;
     }
 
-    /** The client area as a PNG (base64), at most maxWidth wide; PrintWindow first, a screen copy when it is black. */
+    /**
+     * The client area as a PNG (base64), at most maxWidth wide: Windows.Graphics.Capture (win32-capture.ts) with the
+     * game in the background; where that fails, PrintWindow, and a screen copy with the game in front when that is
+     * black. A minimized game is first restored behind the other windows, as a minimized window has no picture.
+     */
     public static string Capture(string process, int maxWidth) {
         IntPtr h = Need(process);
+        if (IsIconic(h)) {
+            ShowWindow(h, SW_SHOWNOACTIVATE);
+            ToBack(h);
+            Thread.Sleep(300);
+        }
+        try {
+            using (Bitmap shot = CwCapture.Window(h, 2000)) {
+                LastMethod = "capture";
+                return Png(shot, maxWidth);
+            }
+        } catch (Exception e) {
+            if (e.Message == "NO_AREA") throw;
+            CaptureError = e.Message;
+        }
         int[] c = Client(process);
         if (c[2] <= 0 || c[3] <= 0) throw new InvalidOperationException("NO_AREA");
         using (Bitmap bmp = new Bitmap(c[2], c[3], PixelFormat.Format32bppArgb)) {
@@ -191,33 +247,6 @@ public static class CwWin {
         SendInput(1, i, Marshal.SizeOf(typeof(INPUT)));
     }
 
-    /** A click at a screen position: left, right or middle. */
-    public static void Click(int x, int y, string button) {
-        uint down = 0x2, up = 0x4;
-        if (button == "right") { down = 0x8; up = 0x10; }
-        if (button == "middle") { down = 0x20; up = 0x40; }
-        SetCursorPos(x, y);
-        Thread.Sleep(40);
-        SendMouse(down, 0);
-        Thread.Sleep(40);
-        SendMouse(up, 0);
-    }
-
-    /** Wheel clicks at a screen position: positive scrolls up. */
-    public static void Scroll(int x, int y, int clicks) {
-        SetCursorPos(x, y);
-        Thread.Sleep(40);
-        SendMouse(0x800, (uint) (clicks * 120));
-    }
-
-    static void SendMouse(uint flags, uint data) {
-        INPUT[] i = new INPUT[1];
-        i[0].type = INPUT_MOUSE;
-        i[0].u.mi.dwFlags = flags;
-        i[0].u.mi.mouseData = data;
-        SendInput(1, i, Marshal.SizeOf(typeof(INPUT)));
-    }
-
     /** Asks the window to close, as its close button does. */
     public static bool Close(string process) {
         foreach (Process p in Process.GetProcessesByName(process)) {
@@ -244,17 +273,19 @@ while ($true) {
     $q = $line | ConvertFrom-Json
     $r = @{ id = $q.id }
     switch ($q.op) {
-      'open' { Start-Process $q.url }
+      'open' { [CwWin]::Remember($q.process); Start-Process $q.url }
+      'park' { $r.parked = [CwWin]::Park($q.process) }
       'find' {
         $r.running = ([CwWin]::Find($q.process) -ne [IntPtr]::Zero)
         if ($r.running) { $r.client = [CwWin]::Client($q.process); $r.focused = [CwWin]::Focused($q.process) }
       }
-      'capture' { $r.png = [CwWin]::Capture($q.process, [int]$q.maxWidth); $r.method = [CwWin]::LastMethod; $r.client = [CwWin]::Client($q.process) }
+      'capture' {
+        $r.png = [CwWin]::Capture($q.process, [int]$q.maxWidth); $r.method = [CwWin]::LastMethod; $r.client = [CwWin]::Client($q.process)
+        if ($r.method -ne 'capture') { $r.captureError = [CwWin]::CaptureError }
+      }
       'focus' { [CwWin]::Focus($q.process) }
       'key' { [CwWin]::PostKey($q.process, [uint16]$q.vk, [int]$q.holdMs, [bool]$q.extended) }
       'text' { [CwWin]::PostText($q.process, [string]$q.text) }
-      'click' { [CwWin]::Focus($q.process); [CwWin]::Click([int]$q.x, [int]$q.y, [string]$q.button) }
-      'scroll' { [CwWin]::Focus($q.process); [CwWin]::Scroll([int]$q.x, [int]$q.y, [int]$q.clicks) }
       'close' { $r.closed = [CwWin]::Close($q.process) }
       default { throw "unknown op $($q.op)" }
     }
@@ -269,5 +300,5 @@ while ($true) {
 
 /** The helper script: the C# source in a single-quoted here-string (no PowerShell expansion inside), then the loop. */
 export function helperScript(): string {
-  return `$cs = @'\r\n${CSHARP.trim()}\r\n'@\r\n${LOOP.trim()}\r\n`;
+  return `$cs = @'\r\n${CSHARP.trim()}\r\n${CAPTURE_CSHARP.trim()}\r\n'@\r\n${LOOP.trim()}\r\n`;
 }

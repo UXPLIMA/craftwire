@@ -57,6 +57,9 @@ export class LinuxHelper {
         return this.open(String(req.url));
       case "find":
         return this.find();
+      case "park":
+        // The game has a screen of its own; nothing to move out of the user's way.
+        return { parked: false };
       case "capture":
         return this.capture(Number(req.maxWidth));
       case "key": {

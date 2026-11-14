@@ -107,7 +107,8 @@ export class X11Screen {
       };
       const timer = setTimeout(() => {
         x.kill();
-        fail(new CraftwireError("HELPER_FAILED", `Xvfb did not start in ${START_MS / 1000} s`, `Xvfb said: ${said.toArray().join(" | ") || "nothing"}`));
+        fail(new CraftwireError("HELPER_FAILED", `Xvfb did not start in ${START_MS / 1000} s`,
+          `Xvfb said: ${said.toArray().join(" | ") || "nothing"}`));
       }, START_MS);
       if (x.stderr) createInterface({ input: x.stderr, crlfDelay: Infinity }).on("line", (l) => said.push(l));
       if (x.stdout) {

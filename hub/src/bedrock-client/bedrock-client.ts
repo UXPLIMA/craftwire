@@ -1,10 +1,11 @@
 /**
  * The user's own Bedrock game, seen and driven from outside: started with a minecraft://connect link, captured as a
- * picture of its window, and given keys, text and clicks. On Windows it is Minecraft for Windows (win32-helper.ts):
- * pictures, keys and text work with the game in the background, clicks and scrolls need the real mouse and bring the
- * game to the front. On Linux it is mcpelauncher's game on its own X screen (linux-helper.ts), where all input stays
- * off the user's desktop. Nothing is read from inside the game, so the agent learns what the window shows and nothing
- * more. One game at a time, as the game itself.
+ * picture of its window, and given keys, text and clicks. On Windows it is Minecraft for Windows (win32-helper.ts): the
+ * game opens behind the user's windows and pictures, keys and text reach it there, so the user keeps their desktop;
+ * it reads the mouse from the device itself (GameInput), which no program can click for, so its menus are driven with
+ * keys. On Linux it is mcpelauncher's game on its own X screen (linux-helper.ts), where clicks work too and all input
+ * stays off the user's desktop. Nothing is read from inside the game, so the agent learns what the window shows and
+ * nothing more. One game at a time, as the game itself.
  */
 import { CraftwireError } from "../errors.js";
 import { virtualKey } from "./keys.js";
@@ -15,6 +16,8 @@ const PROCESS = "Minecraft.Windows";
 const DEFAULT_PORT = 19132;
 const START_MS = 120_000;
 const DEFAULT_WIDTH = 1280;
+/** How long after its window appears the game is put behind the user's windows: it takes the front while it starts. */
+const PARK_MS = [1500, 4000];
 
 export interface ClientArea {
   x: number;
@@ -50,7 +53,10 @@ export class BedrockClient {
     for (;;) {
       const s = await this.status();
       if (s.exited !== undefined) throw exitedEarly(s.exited);
-      if (s.running === true) return { ...s, ...(address !== undefined ? { connecting: address } : {}) };
+      if (s.running === true) {
+        await this.park();
+        return { ...(await this.status()), ...(address !== undefined ? { connecting: address } : {}) };
+      }
       if (Date.now() > end) {
         throw new CraftwireError("BEDROCK_CLIENT_NOT_FOUND", `The game did not open a window in ${timeoutMs / 1000} s`,
           this.platform === "linux"
@@ -93,16 +99,15 @@ export class BedrockClient {
     await this.type(command.startsWith("/") ? command : `/${command}`, true);
   }
 
-  /**
-   * A click at (x, y) in the last screenshot's pixels (window pixels before any screenshot). On Windows the game
-   * ignores posted mouse messages, so this moves the real cursor after bringing the game to the front.
-   */
+  /** A click at (x, y) in the last screenshot's pixels (window pixels before any screenshot); Linux only. */
   async click(x: number, y: number, button: "left" | "right" | "middle"): Promise<void> {
+    this.needMouse();
     const p = await this.screen(x, y);
     await this.call({ op: "click", process: PROCESS, x: p.x, y: p.y, button });
   }
 
   async scroll(x: number, y: number, clicks: number): Promise<void> {
+    this.needMouse();
     const p = await this.screen(x, y);
     await this.call({ op: "scroll", process: PROCESS, x: p.x, y: p.y, clicks });
   }
@@ -115,6 +120,25 @@ export class BedrockClient {
 
   shutdown(): void {
     this.helper.close();
+  }
+
+  /** Gives the user's window the front back after the game took it; twice, as the game may take it again while loading. */
+  private async park(): Promise<void> {
+    for (const ms of PARK_MS) {
+      await new Promise((r) => setTimeout(r, ms));
+      const a = await this.call({ op: "park", process: PROCESS });
+      if (a.parked === false) return;
+    }
+  }
+
+  /**
+   * Minecraft for Windows reads the mouse from the device through GameInput: posted mouse messages and SendInput
+   * (even with the game in front) leave its buttons and wheel untouched (measured on 26.63), while posted keys work.
+   */
+  private needMouse(): void {
+    if (this.platform !== "win32") return;
+    throw new CraftwireError("BEDROCK_CLICK_UNSUPPORTED", "Minecraft for Windows takes clicks and the wheel only from a real mouse",
+      "Use keys: up/down/left/right move the selection (lists scroll with it), enter presses it, escape goes back.");
   }
 
   private async screen(x: number, y: number): Promise<{ x: number; y: number }> {

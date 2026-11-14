@@ -12,11 +12,13 @@ const NEEDS: Record<string, string[]> = { key: ["key"], type: ["text"], command:
 
 export function registerBedrockClientTools(server: McpServer, ctx: ToolContext): void {
   defineTool(server, ctx, "bedrock_client",
-    "Your own Bedrock game (Minecraft for Windows; on Linux mcpelauncher), seen and driven from outside: start {address?} (opens the game, joins host[:port]), "
-      + "status, screenshot {maxWidth?} (the game window), key {key, holdMs?} (a letter, digit, f1-f12, enter, escape, space, arrows...), "
+    "Your own Bedrock game (Minecraft for Windows; on Linux mcpelauncher), seen and driven from outside: "
+      + "start {address?} (opens the game, joins host[:port]), status, screenshot {maxWidth?} (the game window), "
+      + "key {key, holdMs?} (a letter, digit, f1-f12, enter, escape, space, arrows...), "
       + "type {text, enter?}, command {command} (chat command), click {x, y, button?} and scroll {x, y, amount} in the last "
-      + "screenshot's pixels, stop. Screenshots, keys and text work in the background; on Windows click and scroll take the "
-      + "real mouse, on Linux the game has a screen of its own. Reads nothing from inside the game.",
+      + "screenshot's pixels (Linux only), stop. All of it works with the game in the background, without the user's mouse or "
+      + "focus; on Windows menus take keys: arrows move the selection, enter presses, escape goes back. Reads nothing from "
+      + "inside the game.",
     {
       action: z.enum(["start", "status", "screenshot", "key", "type", "command", "click", "scroll", "stop"]),
       address: z.string().optional(),

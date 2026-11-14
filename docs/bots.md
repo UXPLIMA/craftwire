@@ -32,7 +32,7 @@ Menus are titled by their block entity's name, which is how Geyser shows a plugi
 
 To see what a Bedrock player sees (the look of a form or a menu), `bedrock_client` drives your own Bedrock game from
 outside (Minecraft for Windows, or mcpelauncher on Linux, where it runs on a screen of its own): start it with an
-address, take screenshots, send keys and clicks.
+address, take screenshots, send keys and text (and clicks on Linux); on Windows it stays behind your windows.
 
 ## Accounts
 

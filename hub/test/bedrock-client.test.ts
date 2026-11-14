@@ -2,7 +2,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { BedrockClient, connectUrl, type Helper } from "../src/bedrock-client/bedrock-client.js";
 import { virtualKey } from "../src/bedrock-client/keys.js";
 import type { HelperRequest } from "../src/bedrock-client/win32-helper.js";
@@ -48,7 +48,7 @@ describe("virtualKey", () => {
 describe("BedrockClient", () => {
   it("clicks in the last screenshot's pixels, scaled back to the window on screen", async () => {
     const { helper, sent } = fakeHelper();
-    const c = new BedrockClient("unused", "win32", helper);
+    const c = new BedrockClient("unused", "linux", helper);
     const shot = await c.screenshot(1280);
     expect([shot.width, shot.height]).toEqual([1280, 720]);
     await c.click(640, 360, "left");
@@ -56,7 +56,7 @@ describe("BedrockClient", () => {
   });
 
   it("refuses a click outside the window", async () => {
-    const c = new BedrockClient("unused", "win32", fakeHelper().helper);
+    const c = new BedrockClient("unused", "linux", fakeHelper().helper);
     await c.screenshot(1280);
     await expect(c.click(1280, 10, "left")).rejects.toMatchObject({ code: "INVALID_PARAMS" });
   });
@@ -72,10 +72,44 @@ describe("BedrockClient", () => {
     await expect(new BedrockClient("unused", "win32", helper).screenshot()).rejects.toMatchObject({ code: "BEDROCK_CLIENT_NOT_RUNNING" });
   });
 
-  it("reports a window Windows kept in the back, where no input went", async () => {
-    const { helper } = fakeHelper({ click: { error: "Exception calling \"Focus\": \"NOT_FOCUSED\"" } });
+  it("reports a window Windows kept in the back when the last-resort screen copy needs it in front", async () => {
+    const { helper } = fakeHelper({ capture: { error: "Exception calling \"Capture\": \"NOT_FOCUSED\"" } });
     const c = new BedrockClient("unused", "win32", helper);
-    await expect(c.click(10, 10, "left")).rejects.toMatchObject({ code: "BEDROCK_CLIENT_NOT_FOCUSED" });
+    await expect(c.screenshot()).rejects.toMatchObject({ code: "BEDROCK_CLIENT_NOT_FOCUSED" });
+  });
+
+  it("points Windows clicks and scrolls to keys, without touching the mouse", async () => {
+    const { helper, sent } = fakeHelper();
+    const c = new BedrockClient("unused", "win32", helper);
+    await expect(c.click(10, 10, "left")).rejects.toMatchObject({ code: "BEDROCK_CLICK_UNSUPPORTED" });
+    await expect(c.scroll(10, 10, -3)).rejects.toMatchObject({ code: "BEDROCK_CLICK_UNSUPPORTED" });
+    expect(sent).toEqual([]);
+  });
+
+  it("puts the game it opened behind the user's windows, again once it has loaded", async () => {
+    vi.useFakeTimers();
+    try {
+      const { helper, sent } = fakeHelper({ park: { parked: true } });
+      const started = new BedrockClient("unused", "win32", helper).start("play.example.com");
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(await started).toMatchObject({ running: true, connecting: "play.example.com" });
+      expect(sent.map((r) => r.op)).toEqual(["open", "find", "park", "park", "find"]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("leaves a game the user had in front where it is", async () => {
+    vi.useFakeTimers();
+    try {
+      const { helper, sent } = fakeHelper({ park: { parked: false } });
+      const started = new BedrockClient("unused", "win32", helper).start(undefined);
+      await vi.advanceTimersByTimeAsync(10_000);
+      await started;
+      expect(sent.map((r) => r.op)).toEqual(["open", "find", "park", "find"]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("does not start a helper off Windows and Linux", async () => {
