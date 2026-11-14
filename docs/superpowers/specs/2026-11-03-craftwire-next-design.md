@@ -325,9 +325,17 @@ and a Hyper-V machine (fully separate, heavy to set up). Chosen: keep the Window
   pool, without the cursor and without the yellow border. Measured on 26.63 at 3840 x 2054: the game keeps
   rendering behind other windows (loading progress and the menu panorama move between pictures); 170-390 ms a
   picture. PrintWindow and the screen copy stay as fallbacks.
-- Placement: before opening the link the helper notes the foreground window; 1.5 s and 4 s after the game's window
-  appears it gives that window the front back and puts the game at the bottom of the z-order. A game the user had in
-  front is left alone.
+- Placement: first tried at the bottom of the z-order, which was not enough: the maximized window still lay under
+  every uncovered part of the desktop, and with the cursor there the game hid it (the user felt the mouse stick).
+  So 1.5 s and 4 s after its window appears the game the hub opened is restored from maximized and moved past the
+  right edge of the virtual screen, 1600 x 940, without activation; capture works there and the game keeps
+  rendering. A game the user had in front is left alone; `show` brings it back.
+- A running game given a minecraft://connect link came to the front for about a second and stayed on its menu
+  (measured with a 50 ms foreground log), while a cold start with the link never took the front. So start with an
+  address restarts a running game: close, wait for the process to end plus 3 s (a link sent while it is still
+  ending left gamelaunchhelper waiting with no game), then open with the link.
+- In a world the game turns the camera with the user's mouse even off the screen (GameInput reads the device). No
+  outside fix exists; on the pause menu it ignores the mouse, so the tool tells agents to leave it there.
 - Mouse: the game imports GameInputCreate and reads buttons and the wheel from the device. Measured on 26.63:
   posted WM_MOUSEMOVE/WM_LBUTTONDOWN/WM_MOUSEWHEEL, SendInput clicks with the game in front (with absolute and
   relative moves), and both together leave the main menu and the settings list untouched. So click and scroll are

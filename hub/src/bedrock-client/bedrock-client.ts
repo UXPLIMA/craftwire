@@ -1,7 +1,7 @@
 /**
  * The user's own Bedrock game, seen and driven from outside: started with a minecraft://connect link, captured as a
  * picture of its window, and given keys, text and clicks. On Windows it is Minecraft for Windows (win32-helper.ts): the
- * game opens behind the user's windows and pictures, keys and text reach it there, so the user keeps their desktop;
+ * game the hub opens is moved off the screen and pictures, keys and text reach it there, so the user keeps their desktop;
  * it reads the mouse from the device itself (GameInput), which no program can click for, so its menus are driven with
  * keys. On Linux it is mcpelauncher's game on its own X screen (linux-helper.ts), where clicks work too and all input
  * stays off the user's desktop. Nothing is read from inside the game, so the agent learns what the window shows and
@@ -16,8 +16,10 @@ const PROCESS = "Minecraft.Windows";
 const DEFAULT_PORT = 19132;
 const START_MS = 120_000;
 const DEFAULT_WIDTH = 1280;
-/** How long after its window appears the game is put behind the user's windows: it takes the front while it starts. */
+/** How long after its window appears the game is moved off the screen; again later, as it may resize while loading. */
 const PARK_MS = [1500, 4000];
+const STOP_MS = 30_000;
+const RELAUNCH_MS = 3000;
 
 export interface ClientArea {
   x: number;
@@ -45,9 +47,20 @@ export class BedrockClient {
     this.helper = helper ?? (platform === "linux" ? new LinuxHelper() : new Win32Helper(home));
   }
 
-  /** Starts the game (or reuses the running one) and, with an address, sends it to that server. */
+  /**
+   * Starts the game (or reuses the running one) and, with an address, sends it to that server. A running Minecraft
+   * for Windows given a link comes to the front and stays on its menu (measured on 26.63), so there the game is
+   * closed and started again with the link; a cold start leaves the user's window in front.
+   */
   async start(address: string | undefined, timeoutMs = START_MS): Promise<Record<string, unknown>> {
     const url = address === undefined ? "minecraft://" : connectUrl(address);
+    let restarted = false;
+    if (this.platform === "win32" && (await this.status()).running === true) {
+      if (address === undefined) return this.status();
+      await this.stop();
+      await this.gone(STOP_MS);
+      restarted = true;
+    }
     await this.call({ op: "open", url });
     const end = Date.now() + timeoutMs;
     for (;;) {
@@ -55,7 +68,7 @@ export class BedrockClient {
       if (s.exited !== undefined) throw exitedEarly(s.exited);
       if (s.running === true) {
         await this.park();
-        return { ...(await this.status()), ...(address !== undefined ? { connecting: address } : {}) };
+        return { ...(await this.status()), ...(address !== undefined ? { connecting: address } : {}), ...(restarted ? { restarted } : {}) };
       }
       if (Date.now() > end) {
         throw new CraftwireError("BEDROCK_CLIENT_NOT_FOUND", `The game did not open a window in ${timeoutMs / 1000} s`,
@@ -118,11 +131,38 @@ export class BedrockClient {
     return { closed: a.closed === true };
   }
 
+  /** Windows: brings the game the hub keeps off the screen back onto it and to the front, for the user. */
+  async show(): Promise<void> {
+    if (this.platform !== "win32") {
+      throw new CraftwireError("UNSUPPORTED", "show is for Windows, where the game is kept off the screen",
+        "On Linux set CRAFTWIRE_BEDROCK_DISPLAY to a display you can watch.");
+    }
+    await this.call({ op: "show", process: PROCESS });
+  }
+
   shutdown(): void {
     this.helper.close();
   }
 
-  /** Gives the user's window the front back after the game took it; twice, as the game may take it again while loading. */
+  /**
+   * Waits for the closed game's process to end, then a little more: a link sent while it is still ending leaves the
+   * game's launcher (gamelaunchhelper) waiting and no game starts (measured on 26.63).
+   */
+  private async gone(timeoutMs: number): Promise<void> {
+    const end = Date.now() + timeoutMs;
+    for (;;) {
+      const a = await this.call({ op: "find", process: PROCESS });
+      if (a.running !== true && !(Number(a.processes) > 0)) break;
+      if (Date.now() > end) {
+        throw new CraftwireError("BEDROCK_CLIENT_BUSY", "The running game did not close to switch servers",
+          "It may be asking something on screen: take a screenshot, or close it yourself and start again.");
+      }
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    await new Promise((r) => setTimeout(r, RELAUNCH_MS));
+  }
+
+  /** Moves the game the hub opened off the screen (win32-script.ts, Park); twice, as it may move again while loading. */
   private async park(): Promise<void> {
     for (const ms of PARK_MS) {
       await new Promise((r) => setTimeout(r, ms));

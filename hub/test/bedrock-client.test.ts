@@ -86,30 +86,73 @@ describe("BedrockClient", () => {
     expect(sent).toEqual([]);
   });
 
-  it("puts the game it opened behind the user's windows, again once it has loaded", async () => {
+  /** A Windows game that is running or not: open starts it, close ends it. */
+  function gameHelper(running: boolean, park: Record<string, unknown> = { parked: true }) {
+    const sent: HelperRequest[] = [];
+    let up = running;
+    const helper: Helper = {
+      request: async (req) => {
+        sent.push(req);
+        if (req.op === "open") up = true;
+        if (req.op === "close") up = false;
+        if (req.op === "park") return park;
+        if (req.op === "find") return up ? { running: true, focused: false, client: [5000, 100, 1578, 884] } : { running: false };
+        return {};
+      },
+      close: () => undefined,
+    };
+    return { helper, sent };
+  }
+
+  async function run<T>(p: () => Promise<T>): Promise<T> {
     vi.useFakeTimers();
     try {
-      const { helper, sent } = fakeHelper({ park: { parked: true } });
-      const started = new BedrockClient("unused", "win32", helper).start("play.example.com");
+      const started = p();
       await vi.advanceTimersByTimeAsync(10_000);
-      expect(await started).toMatchObject({ running: true, connecting: "play.example.com" });
-      expect(sent.map((r) => r.op)).toEqual(["open", "find", "park", "park", "find"]);
+      return await started;
     } finally {
       vi.useRealTimers();
     }
+  }
+
+  it("moves the game it opened off the screen, again once it has loaded", async () => {
+    const { helper, sent } = gameHelper(false);
+    const r = await run(() => new BedrockClient("unused", "win32", helper).start("play.example.com"));
+    expect(r).toMatchObject({ running: true, connecting: "play.example.com" });
+    expect(r.restarted).toBeUndefined();
+    expect(sent.map((q) => q.op)).toEqual(["find", "open", "find", "park", "park", "find"]);
   });
 
   it("leaves a game the user had in front where it is", async () => {
-    vi.useFakeTimers();
-    try {
-      const { helper, sent } = fakeHelper({ park: { parked: false } });
-      const started = new BedrockClient("unused", "win32", helper).start(undefined);
-      await vi.advanceTimersByTimeAsync(10_000);
-      await started;
-      expect(sent.map((r) => r.op)).toEqual(["open", "find", "park", "find"]);
-    } finally {
-      vi.useRealTimers();
-    }
+    const { helper, sent } = gameHelper(false, { parked: false });
+    await run(() => new BedrockClient("unused", "win32", helper).start(undefined));
+    expect(sent.map((q) => q.op)).toEqual(["find", "open", "find", "park", "find"]);
+  });
+
+  it("restarts a running Windows game to send it to a server, as a link would only bring it to the front", async () => {
+    const { helper, sent } = gameHelper(true);
+    const r = await run(() => new BedrockClient("unused", "win32", helper).start("play.example.com"));
+    expect(r).toMatchObject({ running: true, restarted: true });
+    expect(sent.map((q) => q.op)).toEqual(["find", "close", "find", "open", "find", "park", "park", "find"]);
+  });
+
+  it("does nothing to a running Windows game started without an address", async () => {
+    const { helper, sent } = gameHelper(true);
+    expect(await run(() => new BedrockClient("unused", "win32", helper).start(undefined))).toMatchObject({ running: true });
+    expect(sent.map((q) => q.op)).toEqual(["find", "find"]);
+  });
+
+  it("sends a running Linux game the link, which its IPC hands over", async () => {
+    const { helper, sent } = fakeHelper();
+    await run(() => new BedrockClient("unused", "linux", helper).start("play.example.com"));
+    expect(sent[0]).toMatchObject({ op: "open", url: "minecraft://connect/?serverUrl=play.example.com&serverPort=19132" });
+  });
+
+  it("brings the game back for the user only on Windows", async () => {
+    const { helper, sent } = fakeHelper();
+    await new BedrockClient("unused", "win32", helper).show();
+    expect(sent.at(-1)).toMatchObject({ op: "show" });
+    await expect(new BedrockClient("unused", "linux", helper).show()).rejects.toMatchObject({ code: "UNSUPPORTED" });
   });
 
   it("does not start a helper off Windows and Linux", async () => {

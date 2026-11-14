@@ -42,6 +42,8 @@ public static class CwWin {
     [DllImport("user32.dll")] static extern uint MapVirtualKey(uint code, uint mapType);
     [DllImport("user32.dll")] static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int cx, int cy, uint flags);
     [DllImport("user32.dll")] static extern bool IsWindow(IntPtr h);
+    [DllImport("user32.dll")] static extern bool IsZoomed(IntPtr h);
+    [DllImport("user32.dll")] static extern int GetSystemMetrics(int index);
     [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();
 
     const uint INPUT_KEYBOARD = 1;
@@ -50,7 +52,9 @@ public static class CwWin {
     const ushort VK_MENU = 0x12;
     const uint WM_KEYDOWN = 0x100, WM_KEYUP = 0x101, WM_CHAR = 0x102;
     const int SW_SHOWNOACTIVATE = 4;
-    const uint SWP_NOSIZE = 0x1, SWP_NOMOVE = 0x2, SWP_NOACTIVATE = 0x10;
+    const uint SWP_NOSIZE = 0x1, SWP_NOMOVE = 0x2, SWP_NOZORDER = 0x4, SWP_NOACTIVATE = 0x10;
+    const int SM_XVIRTUALSCREEN = 76, SM_YVIRTUALSCREEN = 77, SM_CXVIRTUALSCREEN = 78;
+    const int PARK_WIDTH = 1600, PARK_HEIGHT = 940;
     static readonly IntPtr HWND_BOTTOM = new IntPtr(1);
 
     public static string LastMethod = "";
@@ -58,6 +62,8 @@ public static class CwWin {
     public static string CaptureError = "";
     /** The window the user was in when the hub opened the game, so the game can go behind it again. */
     static IntPtr userWindow = IntPtr.Zero;
+    /** Whether the hub started the game (rather than finding the user playing it), so it may move the window. */
+    static bool hubOpened = false;
 
     public static void Init() { SetProcessDPIAware(); }
 
@@ -97,20 +103,34 @@ public static class CwWin {
     /** Called before the hub opens the game: notes the window the user is in, unless that is the game itself. */
     public static void Remember(string process) {
         IntPtr fg = GetForegroundWindow();
-        userWindow = fg != IntPtr.Zero && fg != Find(process) ? fg : IntPtr.Zero;
+        hubOpened = fg != Find(process);
+        userWindow = hubOpened ? fg : IntPtr.Zero;
     }
 
     /**
-     * Puts the game behind the user's windows and gives the focus back to the window the user was in when the hub
-     * opened the game (a minecraft:// link brings the game to the front). A game the user had in front stays there.
+     * Moves the game the hub opened off the screen, past the right edge of the desktop, at about 1600 x 900, and
+     * gives the focus back to the window the user was in if the game took it. Off the screen the user's cursor never
+     * passes over it: the game hides the cursor over its window, and in a world turns the camera with it. Windows
+     * Graphics Capture still gets its picture there and the game keeps rendering (measured on 26.63). A game the user
+     * had in front stays where it is.
      */
     public static bool Park(string process) {
         IntPtr h = Find(process);
-        IntPtr back = userWindow;
-        if (h == IntPtr.Zero || back == IntPtr.Zero || !IsWindow(back)) return false;
-        if (GetForegroundWindow() == h) Activate(back);
-        ToBack(h);
+        if (h == IntPtr.Zero || !hubOpened) return false;
+        if (GetForegroundWindow() == h && userWindow != IntPtr.Zero && IsWindow(userWindow)) Activate(userWindow);
+        if (IsZoomed(h) || IsIconic(h)) ShowWindow(h, SW_SHOWNOACTIVATE);
+        int x = GetSystemMetrics(SM_XVIRTUALSCREEN) + GetSystemMetrics(SM_CXVIRTUALSCREEN) + 200;
+        SetWindowPos(h, HWND_BOTTOM, x, GetSystemMetrics(SM_YVIRTUALSCREEN) + 100, PARK_WIDTH, PARK_HEIGHT, SWP_NOACTIVATE);
         return true;
+    }
+
+    /** Brings the game back onto the primary screen and to the front, for the user to watch or play. */
+    public static void Show(string process) {
+        IntPtr h = Need(process);
+        if (IsIconic(h)) ShowWindow(h, 9);
+        SetWindowPos(h, IntPtr.Zero, 100, 100, PARK_WIDTH, PARK_HEIGHT, SWP_NOZORDER | SWP_NOACTIVATE);
+        hubOpened = false;
+        Activate(h);
     }
 
     static void ToBack(IntPtr h) {
@@ -247,6 +267,11 @@ public static class CwWin {
         SendInput(1, i, Marshal.SizeOf(typeof(INPUT)));
     }
 
+    /** How many processes of that name run, windows or not: a closed game's process outlives its window for seconds. */
+    public static int Count(string process) {
+        return Process.GetProcessesByName(process).Length;
+    }
+
     /** Asks the window to close, as its close button does. */
     public static bool Close(string process) {
         foreach (Process p in Process.GetProcessesByName(process)) {
@@ -275,8 +300,10 @@ while ($true) {
     switch ($q.op) {
       'open' { [CwWin]::Remember($q.process); Start-Process $q.url }
       'park' { $r.parked = [CwWin]::Park($q.process) }
+      'show' { [CwWin]::Show($q.process) }
       'find' {
         $r.running = ([CwWin]::Find($q.process) -ne [IntPtr]::Zero)
+        $r.processes = [CwWin]::Count($q.process)
         if ($r.running) { $r.client = [CwWin]::Client($q.process); $r.focused = [CwWin]::Focused($q.process) }
       }
       'capture' {

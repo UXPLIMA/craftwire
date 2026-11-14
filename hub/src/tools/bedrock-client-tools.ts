@@ -16,11 +16,12 @@ export function registerBedrockClientTools(server: McpServer, ctx: ToolContext):
       + "start {address?} (opens the game, joins host[:port]), status, screenshot {maxWidth?} (the game window), "
       + "key {key, holdMs?} (a letter, digit, f1-f12, enter, escape, space, arrows...), "
       + "type {text, enter?}, command {command} (chat command), click {x, y, button?} and scroll {x, y, amount} in the last "
-      + "screenshot's pixels (Linux only), stop. All of it works with the game in the background, without the user's mouse or "
-      + "focus; on Windows menus take keys: arrows move the selection, enter presses, escape goes back. Reads nothing from "
-      + "inside the game.",
+      + "screenshot's pixels (Linux only), show (Windows: brings the window back for the user), stop. All of it works with the "
+      + "game off the user's screen, without their mouse or focus; on Windows menus take keys: arrows move the selection, "
+      + "enter presses, escape goes back. In a world the game turns its camera with the user's mouse even then, so leave it "
+      + "on the pause menu (key escape) when done. Reads nothing from inside the game.",
     {
-      action: z.enum(["start", "status", "screenshot", "key", "type", "command", "click", "scroll", "stop"]),
+      action: z.enum(["start", "status", "screenshot", "key", "type", "command", "click", "scroll", "show", "stop"]),
       address: z.string().optional(),
       maxWidth: z.number().int().min(256).max(3840).optional(),
       key: z.string().optional(),
@@ -66,6 +67,9 @@ export function registerBedrockClientTools(server: McpServer, ctx: ToolContext):
         case "scroll":
           await client.scroll(args.x!, args.y!, args.amount!);
           return ok({ scrolled: args.amount });
+        case "show":
+          await client.show();
+          return ok({ shown: true });
         case "stop":
           return ok(await client.stop());
       }

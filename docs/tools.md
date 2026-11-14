@@ -297,12 +297,16 @@ the hub machine.
   window's area), screenshot (PNG of the window; `maxWidth`, default 1280), key {key, holdMs?} (a letter, a digit,
   f1-f12, enter, escape, space, tab, backspace, shift, ctrl, alt, arrows, home, end, pageup, pagedown, delete, slash,
   minus, equals, comma, period), type {text, enter?}, command {command} (T, the text, Enter), click {x, y, button?} and
-  scroll {x, y, amount} (in the last screenshot's pixels; Linux only), stop (asks the game to close).
+  scroll {x, y, amount} (in the last screenshot's pixels; Linux only), show (Windows: brings the window back onto the
+  screen and to the front for you), stop (asks the game to close).
 
 On Windows:
 
-- The game works behind the user's windows. start opens it with the link, which brings it to the front, then puts it
-  back behind the window the user was in and returns the focus there (a game the user already had in front stays).
+- The game works off the screen. start opens it with the link and moves its window past the right edge of the
+  desktop (about 1600 x 900), so the user's cursor never passes over it; if it took the focus, the window the user
+  was in gets it back. A game the user started and has in front stays where it is; `show` brings the hub's game back.
+- A running game given a link only comes to the front and stays on its menu, so start with an address closes a
+  running game and starts it again (`restarted: true`); start without one leaves a running game alone.
 - Screenshots use Windows.Graphics.Capture, as screen recorders do: the picture comes with the window covered and
   without the focus (`method: "capture"`). Only where that fails (an old Windows 10) do they fall back to
   PrintWindow, then to a screen copy that brings the game to the front.
@@ -312,8 +316,8 @@ On Windows:
   posted mouse messages nor injected input reach it, even with the game in front (measured on 26.63). click and
   scroll fail with BEDROCK_CLICK_UNSUPPORTED. Every menu, dialog and form takes the keys instead: the arrows move the
   selection (a long list scrolls with it), enter presses the selected button, escape goes back.
-- While the game is playing (no menu open), it reads the mouse even in the background, so the user's mouse turns the
-  character. Leave it on a menu (key escape opens the pause menu) while the user works.
+- While the game is playing (no menu open), it reads the mouse from the device even off the screen, so the user's
+  mouse turns the character. Leave it on the pause menu (key escape) while the user works; there it ignores the mouse.
 
 On Linux:
 
